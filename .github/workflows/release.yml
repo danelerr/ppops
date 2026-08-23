@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.13.0
+          cache: npm
+      - name: Verify release source and generate SBOM
+        run: |
+          npm ci
+          npm run verify
+          npm run --silent sbom > "$RUNNER_TEMP/ppops-sbom.cdx.json"
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Build and publish immutable container
+        env:
+          PPOPS_IMAGE: ghcr.io/${{ github.repository }}
+          PPOPS_VERSION: ${{ github.ref_name }}
+          PPOPS_REVISION: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg "VERSION=$PPOPS_VERSION" \
+            --build-arg "VCS_REF=$PPOPS_REVISION" \
+            --tag "$PPOPS_IMAGE:$PPOPS_VERSION" \
+            --tag "$PPOPS_IMAGE:sha-$PPOPS_REVISION" \
+            .
+          docker push "$PPOPS_IMAGE:$PPOPS_VERSION"
+          docker push "$PPOPS_IMAGE:sha-$PPOPS_REVISION"
+      - name: Publish GitHub release evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PPOPS_VERSION: ${{ github.ref_name }}
+        run: gh release create "$PPOPS_VERSION" --verify-tag --generate-notes "$RUNNER_TEMP/ppops-sbom.cdx.json#CycloneDX SBOM"

@@ -13,6 +13,14 @@ services:
       - ./instance/data:/app/config/data
       - ./instance/secrets:/app/config/secrets:ro
     read_only: true
+    mem_limit: 4g
+    cpus: "2.0"
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     tmpfs:
       - /tmp:size=64m,mode=1777
     cap_drop:
