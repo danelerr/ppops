@@ -99,13 +99,18 @@ sampled V2 TXOs returned it as null in relevant cases.
 OBSERVED | CONFIRMED | FINALIZED | REVERTED
 ```
 
-Finality is one operator-selected policy per instance:
+Finality is one policy per instance:
 
 - `finalized`: transaction block is at or below the RPC's finalized tag.
 - `confirmations`: `latest - transactionBlock + 1` reaches the configured count.
 
-Non-final persisted settlements are rechecked by transaction receipt so a TXO
-that disappears from the wallet scan can be marked `REVERTED`.
+The Arbitrum mainnet profile requires `finalized`; confirmation-count finality
+is rejected even at a high count. Receipt, block and finalized-height reads use
+a majority quorum across all configured RPCs. Two configured providers must
+both agree; three tolerate one failure or inconsistent response. Height
+selection is conservative and excessive divergence fails closed. Non-final and
+recently finalized persisted settlements are rechecked by transaction receipt
+so a TXO that disappears from the wallet scan can be marked `REVERTED`.
 
 `poiStatus`:
 
@@ -145,6 +150,10 @@ separately and never counted as received.
 
 ## Idempotency and event delivery
 
+Intent creation requires an `Idempotency-Key`. SQLite stores a SHA-256 request
+fingerprint and the resulting intent in the same transaction. Identical retries
+return the original intent; reuse with a changed request is rejected.
+
 SQLite uniqueness enforces one settlement row per stable identifier. Immutable
 identity fields are compared on rediscovery; a collision with different data is
 rejected. Projection recalculation, revision increment and outbox insertion run
@@ -157,8 +166,12 @@ not include `externalReference`.
 For the optional outbound webhook:
 
 ```text
-signature = HMAC-SHA256(key, timestamp + "." + eventId + "." + rawPayload)
+signature = HMAC-SHA256(key, timestamp + "." + keyId + "." + eventId + "." + rawPayload)
 ```
+
+Deliveries include a configured key ID for receiver-side rotation. An
+authenticated endpoint can reschedule one explicitly selected dead-lettered
+event; it cannot change the webhook URL or replay an event that is still live.
 
 The URL exists only in operator configuration. There is no registration API.
 Non-loopback HTTP URLs are rejected; remote delivery requires HTTPS. Failed
@@ -202,6 +215,15 @@ Primitive gate:
 
 Compiled daemon smoke test on 2026-08-23:
 
+- Automated suite: 9 test files and 28 tests, including 1,000 property-based
+  runs across reconciliation conservation/order invariance and opaque memo
+  round trips. Enforced V8 coverage is 59.59% statements, 53.51% branches,
+  63.44% functions and 62.15% lines across all `src/**/*.ts`; core database,
+  reconciliation, descriptor and webhook paths are substantially higher than
+  the RAILGUN engine wrapper that requires the live gate.
+- Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
+  latest block `497576271`, finalized block `497572019`; both providers agreed
+  on the conservative finalized block and its hash.
 - Fresh strict Sepolia scan from the public fixture viewing key: 21.2 seconds,
   zero PPOps-format references as expected.
 - Restart scan against the same encrypted LevelDB: 9.9 seconds, zero duplicate
@@ -230,20 +252,21 @@ Machine-readable reports:
 ## Dependencies and residual operational risk
 
 The pinned RAILGUN packages are a large security-sensitive dependency. As of
-this snapshot, `npm audit --omit=dev` reports 66 transitive findings: 3 critical,
-12 high, 35 moderate and 16 low. Critical paths originate in legacy
-`web3 -> web3-bzz -> swarm-js` dependencies pulled by the pinned RAILGUN engine;
-additional high findings originate in the wallet's GraphQL Mesh and Axios
-trees. PPOps does not exercise BZZ functionality, but package presence remains a
-supply-chain and future-reachability risk. PPOps overrides only the wallet's
-Axios `1.7.2` with compatible `1.19.0`; the runtime and primitive gate pass with
-that override. Blind `npm audit fix --force` proposes an incompatible RAILGUN
-change and is not applied.
+this snapshot, compatible transitive overrides reduce `npm audit --omit=dev` to
+36 findings: zero critical, zero high, 6 moderate and 30 low. Overrides cover
+Axios, WebSocket, form-data, tar, cookie/query parsers and YAML/object setters.
+The runtime, privacy gate and test suite pass with the override set. Legacy
+`web3 -> web3-bzz -> swarm-js` and wallet GraphQL/React-Native packages remain
+present even where PPOps does not exercise their features, so package presence
+is still a supply-chain and future-reachability risk. CI rejects high/critical
+production findings and exports a CycloneDX SBOM. Blind `npm audit fix --force`
+would still propose incompatible RAILGUN changes and is not applied.
 
 The SDK also leaves timeout resources scheduled after graceful cleanup. The
 daemon performs bounded cleanup and the finite CLI exits afterward. Both issues
 must be reassessed before a production claim or SDK upgrade.
 
-Docker packaging is present but was not executable in the authoring environment
-because Docker was unavailable. CI is configured to build the image on a Docker
-capable runner.
+Docker packaging is built in CI. The Node base image is digest-pinned, GitHub
+Actions are SHA-pinned, and a tag-triggered workflow publishes version and
+commit-addressed GHCR images. Compose bounds memory, CPU and PID usage; the
+production runbook defines readiness, metrics, alert and egress policy.

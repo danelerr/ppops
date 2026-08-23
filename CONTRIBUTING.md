@@ -8,10 +8,7 @@ Before submitting a change:
 
 ```bash
 npm ci
-npm run typecheck
-npm test
-npm run build
-npm run privacy:test
+npm run verify
 ```
 
 Never commit real viewing keys, API tokens, merchant signing keys, webhook keys,

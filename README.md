@@ -27,21 +27,27 @@ outbox -> timestamped HMAC webhook -> merchant backend
 - Derived `OPEN`, `PARTIAL`, `PAID`, `EXPIRED` and `PAID_LATE` intent state,
   including overpayment accounting.
 - Restart-safe settlement identity and transactional event outbox.
-- Localhost binding and Bearer authentication by default.
+- Localhost binding, Bearer authentication and bounded in-process rate limits by
+  default.
+- An unguessable, metadata-minimal checkout URL and machine-readable payer
+  request; it never accepts wallet secrets or submits a spend.
 - Optional outbound-only HMAC-SHA256 webhook with retries and dead lettering.
 - Offline backup/restore for SQLite, encrypted RAILGUN LevelDB and, only when
   explicitly requested, recovery secrets.
 
-There is no UI, Request Network adapter, HPKE, generic rail framework, Solidity
-contract or new cryptography in v0.1. Hardhat is not a product dependency; the
-patches under `patches/` only preserve the controlled upstream gate.
+There is no wallet custody, Request Network adapter, HPKE, generic rail
+framework, Solidity contract or new cryptography in v0.1. Hardhat is not a
+product dependency; the patches under `patches/` only preserve the controlled
+upstream gate.
 
 ## Requirements
 
 - Node.js 22 or newer (the tested runtime is Node 24).
 - A RAILGUN shareable viewing key for the merchant receiver.
-- RPC and PPOI endpoints for the configured RAILGUN network.
-- The address and decimals of the single ERC-20 token accepted by this instance.
+- At least two independently operated Arbitrum RPC origins and a production PPOI
+  endpoint for a mainnet instance.
+- Native Arbitrum USDC. The v0.1 production profile rejects other tokens,
+  confirmation-count finality and the documented test PPOI host.
 
 The viewing key is confidential financial metadata even though it cannot spend.
 Store it in a mode `0600` file. Do not pass a mnemonic or spending key to PPOps.
@@ -55,11 +61,13 @@ npm run build
 node dist/cli.js init \
   --config ./ppops.config.json \
   --viewing-key-file /secure/path/merchant.viewing-key \
-  --token-address 0xYourStablecoinAddress \
+  --network Arbitrum \
+  --token-address 0xaf88d065e77c8cC2239327C5EDb3A432268e5831 \
   --token-symbol USDC \
   --token-decimals 6 \
-  --rpc-url https://your-rpc.example \
-  --poi-node https://your-poi-node.example
+  --rpc-url https://your-first-rpc.example \
+  --rpc-url https://your-independent-rpc.example \
+  --poi-node https://your-production-poi.example
 ```
 
 `init` creates an API token, an independent merchant EIP-712 signing key and a
@@ -70,12 +78,16 @@ Validate and start:
 
 ```bash
 node dist/cli.js config-validate --config ./ppops.config.json
+node dist/cli.js preflight --config ./ppops.config.json
 node dist/cli.js serve --config ./ppops.config.json
 ```
 
-The server binds to `127.0.0.1:8787` by default. The unauthenticated health route
-reveals only readiness; every operational route requires the configured Bearer
-token.
+`preflight` verifies the configured chain ID and RPC quorum, including the
+`finalized` tag, without reading wallet secrets or starting the RAILGUN engine.
+
+The server binds to `127.0.0.1:8787` by default. Unauthenticated liveness and
+readiness routes reveal only process/scan state; every operational or metrics
+route requires the configured Bearer token.
 
 ## API
 
@@ -84,6 +96,7 @@ Create an intent:
 ```http
 POST /v1/intents
 Authorization: Bearer <local API token>
+Idempotency-Key: merchant-order-9248
 Content-Type: application/json
 
 {
@@ -93,8 +106,10 @@ Content-Type: application/json
 }
 ```
 
-The response includes a signed `PPOpsPaymentDescriptorV1`, the receiver's 0zk
-address and `ppops:v1:0x<32-byte-reference>` memo. The descriptor uses the EIP-712
+The response includes a stable `checkoutPath`, signed
+`PPOpsPaymentDescriptorV1`, the receiver's 0zk address and
+`ppops:v1:0x<32-byte-reference>` memo. Retrying the same idempotency key and body
+returns the same intent; changing the body returns `409`. The descriptor uses the EIP-712
 domain `PPOps Payment Descriptor`, version `1`, and is verified against the
 merchant signer known out of band—not merely the signer embedded in the
 descriptor.
@@ -103,7 +118,11 @@ Available routes:
 
 | Method | Route | Authentication |
 | --- | --- | --- |
-| `GET` | `/v1/health` | none; minimal response |
+| `GET` | `/v1/live` | none; liveness only |
+| `GET` | `/v1/ready` | none; `503` until scan-ready |
+| `GET` | `/v1/health` | none; minimal diagnostic state |
+| `GET` | `/pay/:id` | none; unguessable payer checkout |
+| `GET` | `/pay/:id/request.json` | none; metadata-minimal payment request |
 | `POST` | `/v1/intents` | Bearer |
 | `GET` | `/v1/intents` | Bearer |
 | `GET` | `/v1/intents/:id` | Bearer |
@@ -111,9 +130,30 @@ Available routes:
 | `GET` | `/v1/settlements` | Bearer |
 | `GET` | `/v1/events` | Bearer |
 | `GET` | `/v1/outbox` | Bearer |
+| `POST` | `/v1/outbox/:eventId/replay` | Bearer; dead letters only |
+| `GET` | `/v1/metrics` | Bearer; metadata-free Prometheus text |
 | `POST` | `/v1/descriptors/verify` | Bearer |
 
 There is deliberately no endpoint for registering arbitrary webhook URLs.
+
+### Payer flow
+
+The checkout is a safe handoff, not a custodial wallet. It shows the exact
+recipient, native-USDC amount, encrypted memo and signed descriptor and exposes
+the same data at `request.json`. The payer must use a separate RAILGUN spending
+wallet or integration that supports private ERC-20 transfers with `memoText`:
+
+1. obtain the expected merchant signer outside the checkout URL and verify the
+   descriptor;
+2. hold enough private native USDC for the amount and broadcaster fee;
+3. generate the private transfer proof in the payer's wallet and submit it,
+   normally through a RAILGUN Broadcaster;
+4. keep every mnemonic, spending key and wallet-encryption key off the PPOps
+   host.
+
+PPOps intentionally does not provide a “connect wallet” button in v0.1. A
+merchant cannot claim general consumer usability until its chosen payer wallet
+adapter has passed the mainnet gate.
 
 ## Settlement semantics
 
@@ -146,13 +186,14 @@ The configured endpoint receives the exact stored event JSON and these headers:
 ```text
 PPOps-Event-Id: <event ID>
 PPOps-Timestamp: <Unix seconds>
+PPOps-Key-Id: <configured rotation ID>
 PPOps-Signature: v1=<hex HMAC-SHA256>
 ```
 
 Verify the signature over:
 
 ```text
-timestamp + "." + eventId + "." + rawRequestBody
+timestamp + "." + keyId + "." + eventId + "." + rawRequestBody
 ```
 
 Events contain local intent IDs and settlement state, but not
@@ -205,8 +246,9 @@ still require outbound network access.
 npm run verify
 ```
 
-`verify` runs the type checker, all tests, the production build and the
-executable privacy-conformance report in one reproducible command.
+`verify` runs the type checker, coverage thresholds, all tests, the production
+build, executable privacy-conformance report and a production-dependency audit
+that rejects high or critical findings. CI also emits a CycloneDX SBOM.
 
 `privacy:test` creates an actual RAILGUN V2 encrypted note locally, decrypts it
 with an authorized view-only receiver, checks that the opaque reference and memo
@@ -216,7 +258,9 @@ through descriptor, log and event paths. Its machine-readable result is
 
 The earlier gate evidence is in `docs/PRIMITIVE-GATE.md` and
 `artifacts/primitive-gate-report.json`. The complete runtime semantics and
-measurements are in `docs/OPERATIONAL-PROFILE.md`.
+measurements are in `docs/OPERATIONAL-PROFILE.md`. A beta using real funds must
+also complete `docs/MAINNET-GATE.md`; operations and alerts are documented in
+`docs/PRODUCTION-RUNBOOK.md`.
 
 ## Security status and known limits
 
@@ -227,13 +271,15 @@ measurements are in `docs/OPERATIONAL-PROFILE.md`.
 - A compromised merchant host can read local commercial metadata and viewing
   material and can forge descriptors with the merchant identity key.
 - RAILGUN SDK `10.9.0` / engine `9.6.0` are pinned because the gate relies on a
-  direct TXO surface. Their large transitive dependency graph currently produces
-  npm audit findings, including critical findings in legacy Web3/BZZ packages.
-  This beta isolates the SDK but does not claim those findings are remediated.
+  direct TXO surface. Compatible transitive overrides reduce the current
+  production audit to 36 moderate/low findings and zero high/critical findings.
+  The legacy Web3/BZZ and GraphQL tree remains large and is still supply-chain
+  sensitive.
 - The pinned SDK leaves timeout resources after cleanup; the CLI forces process
   termination only after bounded graceful shutdown.
-- Docker files are supplied, but the local development environment used for this
-  snapshot had no Docker binary; CI is the intended build verification.
+- The base image and GitHub Actions are digest/SHA pinned. CI builds the Docker
+  image, emits an SBOM and publishes immutable GHCR tags when a `v*` Git tag is
+  deliberately pushed.
 
 See `SECURITY.md` and `docs/ppops-threat-model.md` before exposing PPOps beyond
 the documented single-merchant, local/private deployment.

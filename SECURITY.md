@@ -38,14 +38,16 @@ Run `npm run privacy:test` when changing any security-critical path.
 
 ## Known beta risks
 
-- The pinned RAILGUN SDK/engine dependency graph has unresolved npm audit
-  findings, including critical findings in legacy transitive Web3/BZZ packages.
+- The pinned RAILGUN SDK/engine dependency graph remains large. Compatible
+  overrides currently leave moderate/low findings only; CI rejects any new high
+  or critical production finding and publishes a CycloneDX SBOM.
 - Viewing-key or host compromise discloses payment history and memos.
 - RPC and PPOI endpoints observe network requests and timing and can affect
   availability or feed incomplete state.
-- There is no rate limiter. The documented deployment is local/private and
-  single-merchant; an Internet-facing proxy must add TLS, request limits and its
-  own access controls.
+- PPOps has bounded in-process API, authentication-failure and checkout rate
+  limits. The documented deployment is still local/private and single-merchant;
+  an Internet-facing proxy must add TLS, distributed limits and its own access
+  controls.
 - Backup bundles created with `--include-secrets` are sensitive and are not
   additionally encrypted by PPOps.
 - Backup SHA-256 inventories detect corruption but do not authenticate an
