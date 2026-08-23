@@ -25,6 +25,16 @@ const HttpUrlSchema = z
     message: "Expected an http(s) URL",
   });
 
+const isLoopbackUrl = (value: string): boolean => {
+  const hostname = new URL(value).hostname.toLowerCase();
+  return (
+    hostname === "localhost" ||
+    hostname === "::1" ||
+    hostname === "[::1]" ||
+    (isIP(hostname) === 4 && hostname.split(".")[0] === "127")
+  );
+};
+
 export const PPOpsConfigSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -124,12 +134,7 @@ export const PPOpsConfigSchema = z
     }
     if (config.webhook) {
       const url = new URL(config.webhook.url);
-      const webhookLoopback =
-        url.hostname === "localhost" ||
-        url.hostname === "::1" ||
-        url.hostname === "[::1]" ||
-        url.hostname.startsWith("127.");
-      if (url.protocol !== "https:" && !webhookLoopback) {
+      if (url.protocol !== "https:" && !isLoopbackUrl(config.webhook.url)) {
         context.addIssue({
           code: "custom",
           path: ["webhook", "url"],
@@ -137,6 +142,15 @@ export const PPOpsConfigSchema = z
         });
       }
     }
+    config.scanner.poiNodeUrls.forEach((value, index) => {
+      if (new URL(value).protocol !== "https:" && !isLoopbackUrl(value)) {
+        context.addIssue({
+          code: "custom",
+          path: ["scanner", "poiNodeUrls", index],
+          message: "Non-loopback PPOI nodes require HTTPS",
+        });
+      }
+    });
     if (config.network.chainId === ARBITRUM_MAINNET_CHAIN_ID) {
       if (config.network.railgunNetworkName !== "Arbitrum") {
         context.addIssue({

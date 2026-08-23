@@ -1,5 +1,7 @@
 # PPOps
 
+[![CI](https://github.com/danelerr/ppops/actions/workflows/ci.yml/badge.svg)](https://github.com/danelerr/ppops/actions/workflows/ci.yml)
+
 PPOps is an open-source, self-hosted RAILGUN payment reconciler. A merchant
 creates a local payment intent, gives the payer a signed descriptor containing
 an opaque reference, and receives a private RAILGUN transfer whose encrypted
@@ -52,6 +54,12 @@ upstream gate.
 The viewing key is confidential financial metadata even though it cannot spend.
 Store it in a mode `0600` file. Do not pass a mnemonic or spending key to PPOps.
 
+The RAILGUN Wallet SDK currently documents `https://ppoi.fdi.network` as a
+public community PPOI aggregator. It is an external availability/trust
+dependency, not PPOps infrastructure. Operators may instead configure another
+community node or a self-hosted compatible PPOI node; PPOps does not silently
+select one.
+
 ## Install and initialize
 
 ```bash
@@ -83,7 +91,9 @@ node dist/cli.js serve --config ./ppops.config.json
 ```
 
 `preflight` verifies the configured chain ID and RPC quorum, including the
-`finalized` tag, without reading wallet secrets or starting the RAILGUN engine.
+`finalized` tag, and requires at least one configured PPOI node to pass the
+official `ppoi_health` JSON-RPC check. It does so without reading wallet secrets
+or starting the RAILGUN engine, and does not print provider URLs.
 
 The server binds to `127.0.0.1:8787` by default. Unauthenticated liveness and
 readiness routes reveal only process/scan state; every operational or metrics

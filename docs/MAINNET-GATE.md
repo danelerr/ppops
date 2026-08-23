@@ -17,7 +17,8 @@ public Sepolia fixture is not sufficient.
 ## Evidence procedure
 
 1. Initialize PPOps exclusively from a shareable viewing key and record the
-   merchant signer. Preserve redacted `config-validate` output.
+   merchant signer. Preserve redacted `config-validate` and `preflight` output;
+   preflight must report a healthy RPC quorum and at least one healthy PPOI node.
 2. Create an intent with a unique `Idempotency-Key`. Retry the identical
    request and prove the same `pi_` identifier is returned. Reuse the key with
    a changed amount and prove HTTP `409`.

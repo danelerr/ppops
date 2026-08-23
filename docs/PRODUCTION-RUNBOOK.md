@@ -28,9 +28,13 @@ unit-test suite is not a substitute for completing the live gate in
    CI. Review all lockfile and RAILGUN SDK changes before upgrading.
 2. Validate the config with `ppops config-validate`, then run `ppops preflight`.
    The latter verifies actual RPC chain ID, quorum and finalized-tag support
-   without opening wallet secrets. Arbitrum mainnet refuses
+   plus PPOI JSON-RPC health without opening wallet secrets. Arbitrum mainnet refuses
    confirmation-count finality, non-native USDC, fewer than two RPC origins,
    and the documented test PPOI host.
+   The Wallet SDK currently documents `https://ppoi.fdi.network` as a public
+   community aggregator; using it creates an external availability/trust
+   dependency. Evaluate that dependency or operate an independent compatible
+   node before broad production use.
 3. Restore a backup into an isolated directory and run the restore checks.
 4. Verify the merchant signer through the merchant's independent identity
    channel. Do not teach customers to trust the signer displayed by checkout

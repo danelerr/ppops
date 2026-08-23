@@ -13,6 +13,7 @@ import { createBackup, restoreBackup } from "./backup.js";
 import { PPOpsConfigSchema, loadConfig, type PPOpsConfig } from "./config.js";
 import { PPOpsRuntime } from "./runtime.js";
 import { RpcQuorum } from "./railgun/rpc-quorum.js";
+import { preflightPPOINodes } from "./railgun/ppoi-preflight.js";
 import {
   parseSignedDescriptor,
   verifySignedDescriptor,
@@ -385,11 +386,17 @@ export const main = async (argv = process.argv.slice(2)): Promise<void> => {
         const context = await rpc.chainContext(
           config.network.finality.mode === "finalized",
         );
+        const ppoi = await preflightPPOINodes(
+          config.scanner.poiNodeUrls,
+          config.scanner.rpcTimeoutMs,
+        );
         process.stdout.write(
           `${JSON.stringify({
             ok: true,
             chainId: config.network.chainId,
             rpcProviderCount: config.network.rpcUrls.length,
+            ppoiConfiguredNodeCount: ppoi.configuredNodeCount,
+            ppoiHealthyNodeCount: ppoi.healthyNodeCount,
             latestBlock: context.latestBlock,
             ...(context.finalizedBlock === undefined
               ? {}

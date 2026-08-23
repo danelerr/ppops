@@ -3,6 +3,22 @@
   "version": "0.1.0-beta.0",
   "description": "Self-hosted, view-only RAILGUN payment reconciler",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danelerr/ppops.git"
+  },
+  "homepage": "https://github.com/danelerr/ppops#readme",
+  "bugs": {
+    "url": "https://github.com/danelerr/ppops/issues"
+  },
+  "keywords": [
+    "railgun",
+    "privacy",
+    "payments",
+    "reconciliation",
+    "arbitrum",
+    "usdc"
+  ],
   "type": "module",
   "license": "Apache-2.0",
   "bin": {

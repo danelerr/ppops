@@ -244,7 +244,7 @@ flowchart LR
 | Wallet-state JSON | Persistent state file | local filesystem → SDK wallet loader | Strict schema, private-file mode, fingerprint and address checks | `src/railgun/engine.ts` / `WalletStateSchema`, `loadOrCreateWallet` |
 | RAILGUN TXOs/memos | SDK scan | chain/SDK → reconciler | Positive ERC-20 and strict memo parser; RPC normalization concurrency capped | `src/railgun/scanner.ts` / `scan`, `normalizeTXO` |
 | RPC finality/receipt reads | Configured JSON-RPC URLs | external providers → scanner | Majority receipt/block/finality quorum, conservative height and divergence failure; no cryptographic proof | `src/railgun/rpc-quorum.ts`; `src/railgun/scanner.ts` |
-| PPOI statuses | RAILGUN SDK callbacks/state | external PPOI → eligibility logic | Explicit bucket mapping; unknown fails closed | `src/railgun/scanner.ts` / `bucketToPOIStatus` |
+| PPOI statuses | RAILGUN SDK callbacks/state | external PPOI → eligibility logic | HTTPS outside loopback; preflight health; explicit bucket mapping; unknown fails closed | `src/railgun/ppoi-preflight.ts`; `src/railgun/scanner.ts` / `bucketToPOIStatus` |
 | Artifact-store paths/data | RAILGUN SDK | dependency/network-derived SDK state → filesystem | Root-containment check and private mode | `src/railgun/engine.ts` / `safeArtifactPath`, `artifactStore` |
 | Webhook response/redirect | Outbound fetch | configured receiver → outbox worker | Remote HTTPS, redirect disabled, bounded timeout/retries | `src/events/webhook.ts` |
 | Backup manifest/files | `restore --input` | recovery media → local state/secrets | Strict inventory/path/digest/profile/fingerprint checks; checksums unauthenticated | `src/backup.ts` / `verifyBackup`, `restoreBackup` |

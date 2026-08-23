@@ -65,6 +65,20 @@ describe("secure configuration defaults", () => {
     expect(PPOpsConfigSchema.safeParse(config).success).toBe(false);
   });
 
+  it("requires HTTPS for non-loopback PPOI nodes", () => {
+    const remote = validConfig();
+    remote.scanner.poiNodeUrls = ["http://poi.example"];
+    expect(PPOpsConfigSchema.safeParse(remote).success).toBe(false);
+
+    const local = validConfig();
+    local.scanner.poiNodeUrls = ["http://127.0.0.1:3000"];
+    expect(PPOpsConfigSchema.safeParse(local).success).toBe(true);
+
+    const deceptive = validConfig();
+    deceptive.scanner.poiNodeUrls = ["http://127.attacker.example"];
+    expect(PPOpsConfigSchema.safeParse(deceptive).success).toBe(false);
+  });
+
   it("accepts only the strong Arbitrum USDC production profile", () => {
     const config = validConfig();
     config.network = {

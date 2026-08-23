@@ -215,15 +215,19 @@ Primitive gate:
 
 Compiled daemon smoke test on 2026-08-23:
 
-- Automated suite: 9 test files and 28 tests, including 1,000 property-based
+- Automated suite: 10 test files and 32 tests, including 1,000 property-based
   runs across reconciliation conservation/order invariance and opaque memo
-  round trips. Enforced V8 coverage is 59.59% statements, 53.51% branches,
-  63.44% functions and 62.15% lines across all `src/**/*.ts`; core database,
+  round trips. Enforced V8 coverage is 60.11% statements, 54.86% branches,
+  63.85% functions and 62.58% lines across all `src/**/*.ts`; core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
-  latest block `497576271`, finalized block `497572019`; both providers agreed
+  latest block `497581203`, finalized block `497576372`; both providers agreed
   on the conservative finalized block and its hash.
+- PPOI preflight against the community aggregator documented by the Wallet SDK:
+  `1/1` node returned the exact `ppoi_health` JSON-RPC success response on
+  2026-08-23. This proves reachability at that time, not future availability or
+  independence.
 - Fresh strict Sepolia scan from the public fixture viewing key: 21.2 seconds,
   zero PPOps-format references as expected.
 - Restart scan against the same encrypted LevelDB: 9.9 seconds, zero duplicate
