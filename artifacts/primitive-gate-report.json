@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-23T07:41:42Z",
+  "decision": "GO",
+  "decisionScope": "RAILGUN primitive feasibility for PPOps v0.1-R",
+  "productionReady": false,
+  "pinnedSources": {
+    "wallet": {
+      "version": "10.9.0",
+      "commit": "5c9d04c844879b8377d91775052e88c836b48730"
+    },
+    "engine": {
+      "version": "9.6.0",
+      "commit": "6e2614d53a106dd62abad91e7ce03ee4a3956138"
+    },
+    "sharedModels": {
+      "version": "8.0.1",
+      "commit": "dc3af7873305938f9f0771a24ad91f807f1b88e0"
+    },
+    "contracts": {
+      "commit": "36bcf5ed7cf94bfafb6e1a303e1832c769c16780"
+    }
+  },
+  "gateResults": {
+    "controlledPrivateTransfer": {
+      "status": "PASS",
+      "environment": "Hardhat chain 31337, RAILGUN V2 contract, real Groth16 1x2 proof",
+      "memoFormat": "ppops:v1:0x<32-byte-reference>",
+      "tokenAddress": "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+      "amountAtomic": "10",
+      "transactionHash": "0x2e88db54218b30547ca65bb7d5cc43d1afbe56963d69d460a5eb0ff79e351235",
+      "tree": 0,
+      "position": 1,
+      "uniqueSettlementId": "31337:V2_PoseidonMerkle:0x2e88db54218b30547ca65bb7d5cc43d1afbe56963d69d460a5eb0ff79e351235:0:1",
+      "rawPPOIStatuses": {
+        "test_list": "Valid"
+      },
+      "balanceBucket": "Spendable"
+    },
+    "viewOnlyIsolation": {
+      "status": "PASS",
+      "importedFromShareableViewingKey": true,
+      "mnemonicAcceptedByReceiver": false,
+      "fullWalletAccessorRejected": true,
+      "signatureGenerationRejected": true,
+      "encryptedDatabaseRestart": true
+    },
+    "liveViewOnlyDiscovery": {
+      "status": "PASS",
+      "network": "Ethereum_Sepolia",
+      "chainId": 11155111,
+      "latestBlockAtRun": 11548626,
+      "finalizedBlockAtRun": 11548540,
+      "receivedERC20TXOs": 70,
+      "memoBearingTXOs": 2,
+      "observedBuckets": {
+        "MissingExternalPOI": 9,
+        "ShieldPending": 15,
+        "Spent": 46
+      },
+      "fieldsRecovered": [
+        "tokenAddress",
+        "amountAtomic",
+        "memoText",
+        "transactionHash",
+        "txidVersion",
+        "tree",
+        "position",
+        "blockNumber",
+        "rawPPOIStatuses",
+        "balanceBucket"
+      ]
+    },
+    "restartExactOnce": {
+      "status": "PASS",
+      "fixture": "two real Sepolia memo-bearing TXOs, memo values hashed",
+      "firstRun": {
+        "rediscovered": 2,
+        "newlyEmitted": 2,
+        "persisted": 2
+      },
+      "secondRun": {
+        "rediscovered": 2,
+        "newlyEmitted": 0,
+        "persisted": 2
+      }
+    },
+    "noSpend": {
+      "status": "PASS",
+      "method": "ViewOnlyWallet.sign rejected and full-wallet accessor rejected"
+    }
+  },
+  "derivedContract": {
+    "uniqueSettlementId": "chainId:txidVersion:normalizedPublicTransactionHash:tree:position",
+    "railgunTxidRequired": false,
+    "reason": "transactCreationRailgunTxid was null in both local and sampled live V2 TXOs; public transaction hash plus output coordinates was stable across restart"
+  },
+  "knownRisks": [
+    "The live public fixture had no raw Valid PPOI entry; live buckets were still derivable. Spendable/Valid was demonstrated against the official test PPOI interface.",
+    "The pinned SDK leaves timeout resources scheduled after graceful provider and engine cleanup; the finite gate uses an explicit post-cleanup watchdog.",
+    "The scanner requires direct engine TXO access for tree and position because the high-level transaction history does not expose a sufficient per-output identifier.",
+    "Pinned upstream dependency trees include deprecated packages and npm audit findings; dependency isolation and review are required before production deployment.",
+    "node:sqlite is experimental in the Node version used for this gate; v0.1 should choose a supported SQLite driver or explicitly accept that runtime constraint."
+  ],
+  "artifactDigests": {
+    "scripts/encrypted-memo-leaf-gate.ts": "3432a1ec947e5b88cadd16116a6eaa9da9fea2c1864cd5d8e6c72802333c1684",
+    "scripts/export-public-fixture-viewing-key.ts": "5b70d32ccc3834865d0dd91d98f99ab677246786d036aeb3217d4f91fe22c6ed",
+    "scripts/kill-test-support.ts": "37c239fd55b3ef3afefe84c7d072dbd89186ba6004c75055d14975cd18c65136",
+    "scripts/railgun-view-only-scan.ts": "daac0c97d5f67526ea2fe27dcde9d041e1289c6a8e5ad9892bd15b38bf8bee18",
+    "scripts/structural-gate.ts": "e2336346ce9216b72b0c402cbceaa1ca78419a71e8f85469710863b0e9510f58",
+    "patches/railgun-contract-lightweight-gate.patch": "a4531600bf324af7d6511e46dd58a843f70f51352af13a04de8233602cc82f82",
+    "patches/railgun-engine-view-only-gate.patch": "88761de5d1409b78bb1d4c5d17ee9f0708470ae9daecb3d6a3811160187caca5"
+  }
+}

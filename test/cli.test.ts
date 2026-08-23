@@ -1,0 +1,80 @@
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { main } from "../src/cli.js";
+import { loadConfig } from "../src/config.js";
+import { readSecret } from "../src/security/secrets.js";
+
+const roots: string[] = [];
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  while (roots.length > 0) {
+    const root = roots.pop();
+    if (root) rmSync(root, { recursive: true, force: true });
+  }
+});
+
+describe("CLI initialization", () => {
+  it("creates file-based secrets and rejects spending-material options", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ppops-cli-test-"));
+    roots.push(root);
+    const viewingKeyFile = join(root, "merchant.viewing-key");
+    writeFileSync(viewingKeyFile, `0zk-viewing-${"a".repeat(80)}\n`, { mode: 0o600 });
+    if (process.platform !== "win32") chmodSync(viewingKeyFile, 0o600);
+    const configPath = join(root, "instance", "ppops.config.json");
+    const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(
+      main([
+        "init",
+        "--config",
+        configPath,
+        "--viewing-key-file",
+        viewingKeyFile,
+        "--token-address",
+        "0x00000000000000000000000000000000000000A1",
+        "--token-symbol",
+        "TESTUSD",
+        "--token-decimals",
+        "6",
+        "--rpc-url",
+        "https://rpc.example",
+        "--poi-node",
+        "https://poi.example",
+        "--spending-key",
+        "must-never-be-accepted",
+      ]),
+    ).rejects.toThrow(/Unsupported option --spending-key/);
+    expect(readFileSync(viewingKeyFile, "utf8")).not.toContain("must-never-be-accepted");
+
+    await main([
+      "init",
+      "--config",
+      configPath,
+      "--viewing-key-file",
+      viewingKeyFile,
+      "--token-address",
+      "0x00000000000000000000000000000000000000A1",
+      "--token-symbol",
+      "TESTUSD",
+      "--token-decimals",
+      "6",
+      "--rpc-url",
+      "https://rpc.example",
+      "--poi-node",
+      "https://poi.example",
+    ]);
+
+    const config = await loadConfig(configPath);
+    expect(config.server.host).toBe("127.0.0.1");
+    expect(config.network.chainId).toBe(11_155_111);
+    expect(await readSecret(config.secrets.apiTokenFile, "api-token")).toHaveLength(43);
+    expect(await readSecret(config.secrets.merchantSigningKeyFile, "merchant-private-key"))
+      .toMatch(/^0x[0-9a-f]{64}$/);
+    expect(output).toHaveBeenCalled();
+  });
+});
