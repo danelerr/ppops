@@ -64,7 +64,9 @@ node dist/cli.js preflight --config ./ppops.config.json
 
 The Wallet SDK currently documents `https://ppoi.fdi.network` as a public
 community aggregator. It passed PPOps `ppoi_health` preflight on 2026-08-23,
-but production availability and trust remain the operator's responsibility.
+but that health check proves only API compatibility and point-in-time
+reachability. Production availability, list policy and trust remain the
+operator's responsibility.
 
 For a self-pilot, start the local evidence receiver in a second terminal. It is
 loopback-only, verifies the exact HMAC body and headers, rejects event-ID/body

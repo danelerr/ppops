@@ -12,7 +12,8 @@ public Sepolia fixture is not sufficient.
 - Decimals: `6`
 - Finality: `finalized`
 - At least two RPC URLs with distinct origins
-- A production PPOI endpoint supplied through the RAILGUN builders channel
+- At least one compatible production PPOI endpoint selected and evaluated by
+  the operator; community and self-hosted nodes are both acceptable
 
 ## Evidence procedure
 
