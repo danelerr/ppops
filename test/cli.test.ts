@@ -19,6 +19,16 @@ afterEach(() => {
 });
 
 describe("CLI initialization", () => {
+  it("documents the complete mainnet evidence workflow", async () => {
+    const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await main(["help"]);
+    const help = output.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(help).toContain("mainnet-gate-replay");
+    expect(help).toContain("mainnet-gate-snapshot");
+    expect(help).toContain("mainnet-gate-verify");
+    expect(help).toContain("mainnet-gate-report-verify");
+  });
+
   it("creates file-based secrets and rejects spending-material options", async () => {
     const root = mkdtempSync(join(tmpdir(), "ppops-cli-test-"));
     roots.push(root);

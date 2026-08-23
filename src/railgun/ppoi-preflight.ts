@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { readResponseTextLimited } from "../security/http.js";
+
 const HealthResponseSchema = z
   .object({
     jsonrpc: z.literal("2.0"),
@@ -38,14 +40,23 @@ export const preflightPPOINodes = async (
         redirect: "error",
         signal: AbortSignal.timeout(timeoutMs),
       });
-      if (!response.ok) throw new Error("PPOI health request returned non-success HTTP");
-      const contentLength = Number(response.headers.get("content-length") ?? 0);
-      if (Number.isFinite(contentLength) && contentLength > 16_384) {
+      if (!response.ok) {
         await response.body?.cancel();
-        throw new Error("PPOI health response exceeded the size limit");
+        throw new Error("PPOI health request returned non-success HTTP");
       }
+      const responseText = await readResponseTextLimited(
+        response,
+        16_384,
+        "PPOI health response",
+      );
       const parsed = HealthResponseSchema.safeParse(
-        await response.json().catch(() => undefined),
+        (() => {
+          try {
+            return JSON.parse(responseText) as unknown;
+          } catch {
+            return undefined;
+          }
+        })(),
       );
       if (!parsed.success) throw new Error("PPOI health response was invalid");
     }),

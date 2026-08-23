@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { serve, type ServerType } from "@hono/node-server";
 
 import { createApiApp } from "./app.js";
@@ -18,6 +20,7 @@ export class PPOpsDaemon {
   private activeScan?: Promise<void>;
   private stopping = false;
   private readonly health: ReconciliationHealth;
+  private readonly instanceId = randomUUID();
   readonly failure: Promise<never>;
   private rejectFailure!: (error: unknown) => void;
 
@@ -38,6 +41,16 @@ export class PPOpsDaemon {
       database: this.runtime.database,
       apiToken: this.runtime.apiToken,
       health: () => this.health.snapshot(),
+      runtimeInfo: {
+        instanceId: this.instanceId,
+        chainId: this.runtime.config.network.chainId,
+        tokenAddress: this.runtime.config.network.tokenAddress,
+        tokenSymbol: this.runtime.config.network.tokenSymbol,
+        tokenDecimals: this.runtime.config.network.tokenDecimals,
+        finalityMode: this.runtime.config.network.finality.mode,
+        rpcProviderCount: this.runtime.config.network.rpcUrls.length,
+        ppoiConfiguredNodeCount: this.runtime.config.scanner.poiNodeUrls.length,
+      },
       ...(this.runtime.config.server.rateLimit
         ? { rateLimit: this.runtime.config.server.rateLimit }
         : {}),

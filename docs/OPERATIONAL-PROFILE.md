@@ -173,6 +173,20 @@ Deliveries include a configured key ID for receiver-side rotation. An
 authenticated endpoint can reschedule one explicitly selected dead-lettered
 event; it cannot change the webhook URL or replay an event that is still live.
 
+The controlled pilot receiver persists event IDs and counts duplicate delivery
+attempts per event type without retaining payloads. `mainnet-gate-replay` reconstructs and
+freshly signs the single confirmation event, then fails unless the receiver
+recognizes it as an identical persisted event. Three API-token-keyed redacted
+snapshots bind the paid state before restart, after restart and from an isolated
+restore; the final verifier requires distinct daemon instances and stable
+intent, settlement and confirmation fingerprints. Every capture also requeries
+the receipt and block through the configured RPC quorum and checks the current
+finalized height. The resulting redacted
+report is EIP-191 signed with the existing merchant identity key for public
+verification against the independently distributed signer. Operator snapshots
+retain exact amounts and timestamps and are private evidence; only the final
+metadata-minimal report is intended for publication.
+
 The URL exists only in operator configuration. There is no registration API.
 Non-loopback HTTP URLs are rejected; remote delivery requires HTTPS. Failed
 events use exponential retry and become dead-lettered at the configured maximum.
@@ -215,10 +229,10 @@ Primitive gate:
 
 Compiled daemon smoke test on 2026-08-23:
 
-- Automated suite: 11 test files and 34 tests, including 1,000 property-based
+- Automated suite: 12 test files and 38 tests, including 1,000 property-based
   runs across reconciliation conservation/order invariance and opaque memo
-  round trips. Enforced V8 coverage is 61.64% statements, 55.72% branches,
-  64.76% functions and 64.20% lines across all `src/**/*.ts`; core database,
+  round trips. Enforced V8 coverage is 64.41% statements, 59.39% branches,
+  69.00% functions and 66.88% lines across all `src/**/*.ts`; core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
@@ -239,6 +253,10 @@ Compiled daemon smoke test on 2026-08-23:
   `idempotent-replayed: false`; an identical retry returned `204` with
   `idempotent-replayed: true`; `/stats` retained exactly one
   `payment.confirmed` event and no payload.
+- Mainnet evidence tooling: authenticated redacted snapshots passed across
+  three distinct test daemon identities and separate restore origin; modified
+  state, reused instances and raw invoice/reference/transaction leakage were
+  rejected.
 - Offline state backup completed and produced an integrity manifest.
 
 These measurements use public third-party RPC/PPOI endpoints and are not latency

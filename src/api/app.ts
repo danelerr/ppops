@@ -126,6 +126,17 @@ type RateLimitConfig = {
   checkoutPerMinute: number;
 };
 
+export type RuntimeInfo = {
+  instanceId: string;
+  chainId: number;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  finalityMode: "finalized" | "confirmations";
+  rpcProviderCount: number;
+  ppoiConfiguredNodeCount: number;
+};
+
 const requestSource = (context: Context): string => {
   try {
     return getConnInfo(context).remote.address ?? "unknown";
@@ -139,6 +150,7 @@ export const createApiApp = (dependencies: {
   database: PPOpsDatabase;
   apiToken: string;
   health: () => HealthState;
+  runtimeInfo?: RuntimeInfo;
   rateLimit?: RateLimitConfig;
 }): Hono => {
   const app = new Hono();
@@ -263,6 +275,16 @@ export const createApiApp = (dependencies: {
       return context.json({ error: { code: "UNAUTHORIZED" } }, 401);
     }
     await next();
+  });
+
+  app.get("/v1/runtime", (context) => {
+    if (!dependencies.runtimeInfo) {
+      return context.json({ error: { code: "RUNTIME_INFO_UNAVAILABLE" } }, 503);
+    }
+    return context.json({
+      ...dependencies.runtimeInfo,
+      startedAt: dependencies.health().startedAt,
+    });
   });
 
   app.post("/v1/intents", async (context) => {

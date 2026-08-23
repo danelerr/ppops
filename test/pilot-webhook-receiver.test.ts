@@ -2,6 +2,7 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { webhookSignature } from "../src/events/webhook.js";
@@ -71,7 +72,11 @@ describe("pilot webhook receiver", () => {
     const stats = await app.request("/stats");
     expect(await stats.json()).toEqual({
       receivedEventCount: 1,
+      deliveryAttemptCount: 2,
+      duplicateDeliveryCount: 1,
       receivedEventsByType: { "payment.confirmed": 1 },
+      deliveryAttemptsByType: { "payment.confirmed": 2 },
+      duplicateDeliveriesByType: { "payment.confirmed": 1 },
       storesPayloads: false,
     });
 
@@ -86,6 +91,8 @@ describe("pilot webhook receiver", () => {
 
     const restarted = new PilotWebhookStore(stateFile);
     expect(restarted.count()).toBe(1);
+    expect(restarted.deliveryCount()).toBe(2);
+    expect(restarted.deliveryCountsByType()).toEqual({ "payment.confirmed": 2 });
     restarted.close();
   });
 
@@ -147,5 +154,42 @@ describe("pilot webhook receiver", () => {
       ).status,
     ).toBe(413);
     store.close();
+  });
+
+  it("migrates an existing receiver database and starts counting duplicate deliveries", () => {
+    const root = mkdtempSync(join(tmpdir(), "ppops-pilot-receiver-"));
+    roots.push(root);
+    const stateFile = join(root, "events.sqlite");
+    const legacy = new Database(stateFile);
+    legacy.exec(`
+      CREATE TABLE received_webhook (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        received_at INTEGER NOT NULL
+      ) STRICT;
+      INSERT INTO received_webhook VALUES (
+        'evt_12121212121212121212121212121212',
+        'payment.confirmed',
+        '${"ab".repeat(32)}',
+        1000
+      );
+    `);
+    legacy.close();
+
+    const migrated = new PilotWebhookStore(stateFile);
+    expect(migrated.count()).toBe(1);
+    expect(migrated.deliveryCount()).toBe(1);
+    expect(
+      migrated.accept(
+        "evt_12121212121212121212121212121212",
+        "payment.confirmed",
+        "ab".repeat(32),
+        2_000,
+      ),
+    ).toBe("duplicate");
+    expect(migrated.deliveryCount()).toBe(2);
+    expect(migrated.deliveryCountsByType()).toEqual({ "payment.confirmed": 2 });
+    migrated.close();
   });
 });

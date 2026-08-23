@@ -48,9 +48,18 @@ export class PilotWebhookStore {
         event_id TEXT PRIMARY KEY,
         event_type TEXT NOT NULL,
         payload_hash TEXT NOT NULL,
-        received_at INTEGER NOT NULL
+        received_at INTEGER NOT NULL,
+        delivery_count INTEGER NOT NULL DEFAULT 1
       ) STRICT
     `);
+    const columns = this.database
+      .prepare("PRAGMA table_info(received_webhook)")
+      .all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "delivery_count")) {
+      this.database.exec(
+        "ALTER TABLE received_webhook ADD COLUMN delivery_count INTEGER NOT NULL DEFAULT 1",
+      );
+    }
   }
 
   accept(
@@ -64,7 +73,13 @@ export class PilotWebhookStore {
         .prepare("SELECT payload_hash FROM received_webhook WHERE event_id = ?")
         .get(eventId) as StoredWebhook | undefined;
       if (existing) {
-        return existing.payload_hash === payloadHash ? "duplicate" : "conflict";
+        if (existing.payload_hash !== payloadHash) return "conflict";
+        this.database
+          .prepare(
+            "UPDATE received_webhook SET delivery_count = delivery_count + 1 WHERE event_id = ?",
+          )
+          .run(eventId);
+        return "duplicate";
       }
       this.database
         .prepare(
@@ -82,10 +97,26 @@ export class PilotWebhookStore {
     return result.count;
   }
 
+  deliveryCount(): number {
+    const result = this.database
+      .prepare("SELECT COALESCE(SUM(delivery_count), 0) AS count FROM received_webhook")
+      .get() as { count: number };
+    return result.count;
+  }
+
   countsByType(): Record<string, number> {
     const rows = this.database
       .prepare(
         "SELECT event_type, COUNT(*) AS count FROM received_webhook GROUP BY event_type ORDER BY event_type",
+      )
+      .all() as Array<{ event_type: string; count: number }>;
+    return Object.fromEntries(rows.map((row) => [row.event_type, row.count]));
+  }
+
+  deliveryCountsByType(): Record<string, number> {
+    const rows = this.database
+      .prepare(
+        "SELECT event_type, SUM(delivery_count) AS count FROM received_webhook GROUP BY event_type ORDER BY event_type",
       )
       .all() as Array<{ event_type: string; count: number }>;
     return Object.fromEntries(rows.map((row) => [row.event_type, row.count]));
@@ -109,13 +140,27 @@ export const createPilotWebhookReceiverApp = (dependencies: {
     await next();
   });
   app.get("/live", (context) => context.json({ status: "alive" }));
-  app.get("/stats", (context) =>
-    context.json({
-      receivedEventCount: dependencies.store.count(),
-      receivedEventsByType: dependencies.store.countsByType(),
+  app.get("/stats", (context) => {
+    const receivedEventCount = dependencies.store.count();
+    const deliveryAttemptCount = dependencies.store.deliveryCount();
+    const receivedEventsByType = dependencies.store.countsByType();
+    const deliveryAttemptsByType = dependencies.store.deliveryCountsByType();
+    const duplicateDeliveriesByType = Object.fromEntries(
+      Object.entries(deliveryAttemptsByType).map(([eventType, attempts]) => [
+        eventType,
+        attempts - (receivedEventsByType[eventType] ?? 0),
+      ]),
+    );
+    return context.json({
+      receivedEventCount,
+      deliveryAttemptCount,
+      duplicateDeliveryCount: deliveryAttemptCount - receivedEventCount,
+      receivedEventsByType,
+      deliveryAttemptsByType,
+      duplicateDeliveriesByType,
       storesPayloads: false,
-    }),
-  );
+    });
+  });
   app.post("/webhooks/ppops", async (context) => {
     const contentType = context.req
       .header("content-type")

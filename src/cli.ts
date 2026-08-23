@@ -11,6 +11,14 @@ import { Wallet, getAddress } from "ethers";
 import { PPOpsDaemon } from "./api/server.js";
 import { createBackup, restoreBackup } from "./backup.js";
 import { PPOpsConfigSchema, loadConfig, type PPOpsConfig } from "./config.js";
+import {
+  captureMainnetGateSnapshot,
+  replayConfirmedWebhookForGate,
+  signMainnetGateReport,
+  verifySignedMainnetGateReport,
+  verifyMainnetGateSnapshots,
+  type MainnetGatePhase,
+} from "./pilot/mainnet-gate.js";
 import { PPOpsRuntime } from "./runtime.js";
 import { RpcQuorum } from "./railgun/rpc-quorum.js";
 import { preflightPPOINodes } from "./railgun/ppoi-preflight.js";
@@ -38,6 +46,13 @@ Usage:
   ppops restore --input BACKUP_DIRECTORY [--force] [--config PATH]
   ppops config-validate [--config PATH]
   ppops preflight [--config PATH]
+  ppops mainnet-gate-replay --intent-id ID [--base-url URL] [--config PATH]
+  ppops mainnet-gate-snapshot --phase before|restart|restore --intent-id ID \\
+    --expected-signer ADDRESS --output NEW_FILE [--base-url URL] \\
+    [--receiver-stats-url URL] [--config PATH]
+  ppops mainnet-gate-verify --before FILE --restart FILE --restore FILE \\
+    --output NEW_FILE [--config PATH]
+  ppops mainnet-gate-report-verify --file FILE --expected-signer ADDRESS
 
 Security:
   PPOps accepts a RAILGUN shareable viewing key, never a spending key or mnemonic.
@@ -119,6 +134,56 @@ const ensureMissing = async (path: string): Promise<void> => {
     throw new Error(`Refusing to overwrite existing path: ${path}`);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+};
+
+const writeNewJson = async (path: string, value: unknown): Promise<void> => {
+  const output = resolve(path);
+  await ensureMissing(output);
+  await mkdir(dirname(output), { recursive: true, mode: 0o700 });
+  await writeFile(output, `${JSON.stringify(value, null, 2)}\n`, {
+    mode: 0o600,
+    flag: "wx",
+  });
+};
+
+const rpcQuorumFor = (config: PPOpsConfig): RpcQuorum =>
+  new RpcQuorum({
+    chainId: config.network.chainId,
+    rpcUrls: config.network.rpcUrls,
+    timeoutMs: config.scanner.rpcTimeoutMs,
+    maxBlockLag: config.scanner.maxRpcBlockLag,
+  });
+
+const preflightConfig = async (config: PPOpsConfig): Promise<{
+  rpcProviderCount: number;
+  ppoiConfiguredNodeCount: number;
+  ppoiHealthyNodeCount: number;
+  latestBlock: number;
+  finalizedBlock?: number;
+  finalityMode: "finalized" | "confirmations";
+}> => {
+  const rpc = rpcQuorumFor(config);
+  try {
+    const context = await rpc.chainContext(
+      config.network.finality.mode === "finalized",
+    );
+    const ppoi = await preflightPPOINodes(
+      config.scanner.poiNodeUrls,
+      config.scanner.rpcTimeoutMs,
+    );
+    return {
+      rpcProviderCount: config.network.rpcUrls.length,
+      ppoiConfiguredNodeCount: ppoi.configuredNodeCount,
+      ppoiHealthyNodeCount: ppoi.healthyNodeCount,
+      latestBlock: context.latestBlock,
+      ...(context.finalizedBlock === undefined
+        ? {}
+        : { finalizedBlock: context.finalizedBlock }),
+      finalityMode: config.network.finality.mode,
+    };
+  } finally {
+    await rpc.close();
   }
 };
 
@@ -376,37 +441,145 @@ export const main = async (argv = process.argv.slice(2)): Promise<void> => {
     case "preflight": {
       assertAllowed(options, ["config"]);
       const config = await loadConfig(configPathFor(options));
-      const rpc = new RpcQuorum({
-        chainId: config.network.chainId,
-        rpcUrls: config.network.rpcUrls,
-        timeoutMs: config.scanner.rpcTimeoutMs,
-        maxBlockLag: config.scanner.maxRpcBlockLag,
-      });
-      try {
-        const context = await rpc.chainContext(
-          config.network.finality.mode === "finalized",
-        );
-        const ppoi = await preflightPPOINodes(
-          config.scanner.poiNodeUrls,
-          config.scanner.rpcTimeoutMs,
-        );
-        process.stdout.write(
-          `${JSON.stringify({
-            ok: true,
-            chainId: config.network.chainId,
-            rpcProviderCount: config.network.rpcUrls.length,
-            ppoiConfiguredNodeCount: ppoi.configuredNodeCount,
-            ppoiHealthyNodeCount: ppoi.healthyNodeCount,
-            latestBlock: context.latestBlock,
-            ...(context.finalizedBlock === undefined
-              ? {}
-              : { finalizedBlock: context.finalizedBlock }),
-            finalityMode: config.network.finality.mode,
-          })}\n`,
-        );
-      } finally {
-        await rpc.close();
+      const result = await preflightConfig(config);
+      process.stdout.write(
+        `${JSON.stringify({
+          ok: true,
+          chainId: config.network.chainId,
+          ...result,
+        })}\n`,
+      );
+      break;
+    }
+    case "mainnet-gate-replay": {
+      assertAllowed(options, ["config", "base-url", "intent-id"]);
+      const config = await loadConfig(configPathFor(options));
+      if (!config.webhook || !config.secrets.webhookHmacKeyFile) {
+        throw new Error("Mainnet gate replay requires a configured webhook");
       }
+      const [apiToken, webhookHmacKeyHex] = await Promise.all([
+        readSecret(config.secrets.apiTokenFile, "api-token"),
+        readSecret(config.secrets.webhookHmacKeyFile, "webhook-hmac-key"),
+      ]);
+      const result = await replayConfirmedWebhookForGate({
+        baseUrl:
+          one(options, "base-url", {
+            defaultValue: `http://127.0.0.1:${config.server.port}`,
+          }) ?? "",
+        webhookUrl: config.webhook.url,
+        apiToken,
+        webhookHmacKeyHex,
+        keyId: config.webhook.keyId ?? "v1",
+        intentId: one(options, "intent-id", { required: true }) ?? "",
+        timeoutMs: config.webhook.timeoutMs,
+      });
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      break;
+    }
+    case "mainnet-gate-snapshot": {
+      assertAllowed(options, [
+        "config",
+        "phase",
+        "base-url",
+        "intent-id",
+        "expected-signer",
+        "receiver-stats-url",
+        "output",
+      ]);
+      const config = await loadConfig(configPathFor(options));
+      if (!config.webhook) {
+        throw new Error("Mainnet gate snapshot requires a configured webhook");
+      }
+      const preflight = await preflightConfig(config);
+      if (preflight.finalizedBlock === undefined) {
+        throw new Error("Mainnet gate requires finalized block preflight evidence");
+      }
+      const finalizedBlock = preflight.finalizedBlock;
+      const apiToken = await readSecret(config.secrets.apiTokenFile, "api-token");
+      const webhookOrigin = new URL(config.webhook.url).origin;
+      const snapshot = await (async () => {
+        const rpcQuorum = rpcQuorumFor(config);
+        try {
+          return await captureMainnetGateSnapshot({
+            phase: (one(options, "phase", { required: true }) ?? "") as MainnetGatePhase,
+            baseUrl:
+              one(options, "base-url", {
+                defaultValue: `http://127.0.0.1:${config.server.port}`,
+              }) ?? "",
+            receiverStatsUrl:
+              one(options, "receiver-stats-url", {
+                defaultValue: `${webhookOrigin}/stats`,
+              }) ?? "",
+            apiToken,
+            intentId: one(options, "intent-id", { required: true }) ?? "",
+            expectedSigner: one(options, "expected-signer", { required: true }) ?? "",
+            preflight: {
+              rpcProviderCount: preflight.rpcProviderCount,
+              ppoiConfiguredNodeCount: preflight.ppoiConfiguredNodeCount,
+              ppoiHealthyNodeCount: preflight.ppoiHealthyNodeCount,
+              latestBlock: preflight.latestBlock,
+              finalizedBlock,
+            },
+            rpcQuorum,
+            timeoutMs: config.scanner.rpcTimeoutMs,
+          });
+        } finally {
+          await rpcQuorum.close();
+        }
+      })();
+      const output = one(options, "output", { required: true }) ?? "";
+      await writeNewJson(output, snapshot);
+      process.stdout.write(
+        `${JSON.stringify({ ok: true, phase: snapshot.phase, result: snapshot.result, output: resolve(output) })}\n`,
+      );
+      break;
+    }
+    case "mainnet-gate-verify": {
+      assertAllowed(options, ["config", "before", "restart", "restore", "output"]);
+      const config = await loadConfig(configPathFor(options));
+      const [apiToken, merchantPrivateKey] = await Promise.all([
+        readSecret(config.secrets.apiTokenFile, "api-token"),
+        readSecret(config.secrets.merchantSigningKeyFile, "merchant-private-key"),
+      ]);
+      const readJson = async (name: "before" | "restart" | "restore") =>
+        JSON.parse(
+          await readFile(resolve(one(options, name, { required: true }) ?? ""), "utf8"),
+        ) as unknown;
+      const [before, restart, restore] = await Promise.all([
+        readJson("before"),
+        readJson("restart"),
+        readJson("restore"),
+      ]);
+      const unsignedReport = verifyMainnetGateSnapshots({
+        before,
+        restart,
+        restore,
+        apiToken,
+      });
+      const report = await signMainnetGateReport(unsignedReport, merchantPrivateKey);
+      const output = one(options, "output", { required: true }) ?? "";
+      await writeNewJson(output, report);
+      process.stdout.write(
+        `${JSON.stringify({ ok: true, result: report.result, output: resolve(output) })}\n`,
+      );
+      break;
+    }
+    case "mainnet-gate-report-verify": {
+      assertAllowed(options, ["file", "expected-signer"]);
+      const file = resolve(one(options, "file", { required: true }) ?? "");
+      const expectedSigner = one(options, "expected-signer", { required: true }) ?? "";
+      const report = verifySignedMainnetGateReport(
+        JSON.parse(await readFile(file, "utf8")) as unknown,
+        expectedSigner,
+      );
+      process.stdout.write(
+        `${JSON.stringify({
+          ok: true,
+          result: report.result,
+          signatureValid: true,
+          signer: report.reportSignature.signer,
+        })}\n`,
+      );
       break;
     }
     default:

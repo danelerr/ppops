@@ -134,6 +134,7 @@ Available routes:
 | `GET` | `/pay/:id` | none; unguessable payer checkout |
 | `GET` | `/pay/:id/request.json` | none; metadata-minimal payment request |
 | `POST` | `/v1/intents` | Bearer |
+| `GET` | `/v1/runtime` | Bearer; redacted runtime/profile identity |
 | `GET` | `/v1/intents` | Bearer |
 | `GET` | `/v1/intents/:id` | Bearer |
 | `GET` | `/v1/intents/:id/status` | Bearer |
@@ -283,6 +284,17 @@ The earlier gate evidence is in `docs/PRIMITIVE-GATE.md` and
 measurements are in `docs/OPERATIONAL-PROFILE.md`. A beta using real funds must
 follow `docs/PILOT-GUIDE.md` and complete `docs/MAINNET-GATE.md`; operations and
 alerts are documented in `docs/PRODUCTION-RUNBOOK.md`.
+
+The mainnet gate CLI produces keyed, identifier-redacted operator snapshots before
+restart, after restart and from an isolated restore. The snapshots still contain
+amounts and timestamps and must remain private. It rejects changed settlement/event
+state, reused daemon instances, an unisolated restore, missing webhook delivery
+or missing receiver deduplication. Each capture also requeries every matched
+transaction receipt and block hash through the configured RPC quorum and checks
+that the stored block is under the current finalized height. It still cannot replace the real private
+Arbitrum USDC transfer or operator records proving which processes were run. The
+final metadata-minimal public report is signed by the merchant identity key and can be checked
+with `mainnet-gate-report-verify` against the independently distributed signer.
 
 ## Security status and known limits
 

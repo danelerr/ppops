@@ -47,6 +47,41 @@ public Sepolia fixture is not sufficient.
 10. Restore the release backup into an isolated directory and verify the intent,
     settlement, projection and outbox state.
 
+## Automated private evidence and public report
+
+For the controlled self-pilot, use the commands documented in
+`PILOT-GUIDE.md`:
+
+```text
+mainnet-gate-replay
+mainnet-gate-snapshot --phase before
+mainnet-gate-snapshot --phase restart
+mainnet-gate-snapshot --phase restore
+mainnet-gate-verify
+```
+
+The snapshot collector reruns live RPC/PPOI preflight and validates the strict
+profile, descriptor against the independently pinned signer, payment projection,
+settlement eligibility, fresh quorum agreement on each receipt and block hash,
+the current finalized height, a single confirmation event/outbox record and
+durable receiver deduplication specifically for that confirmation type. The
+final verifier authenticates snapshots with the instance API
+secret, requires distinct daemon instances, requires a stable origin across
+restart and a different origin for restore, and compares redacted state
+fingerprints. It writes `artifacts/mainnet-gate-report.json` only after all
+three phases agree, then signs that report with the merchant identity key. The
+signature is publicly checkable with `mainnet-gate-report-verify` and the signer
+distributed outside PPOps; neither the API token nor wallet material is needed.
+
+The three snapshots contain exact amounts and timestamps despite omitting direct
+identifiers; keep them private with the API token. Only the final metadata-minimal,
+merchant-signed report is intended for publication.
+
+This automates state validation, not the private transfer itself and not the
+operator's procedural claim. Archive service/terminal records proving the
+restart and isolated restore alongside the redacted report. An external merchant
+may replace the pilot receiver evidence with equivalent durable backend records.
+
 ## Acceptance
 
 The gate passes only if the intent reaches `PAID` from a `FINALIZED` and

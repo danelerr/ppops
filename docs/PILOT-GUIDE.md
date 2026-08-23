@@ -159,12 +159,101 @@ After one successful payment and any number of identical delivery retries, it
 must show `payment.confirmed: 1`. `receivedEventCount` may be higher because
 PPOps also emits `settlement.observed` and legitimate state-transition events;
 each distinct event ID is still stored only once.
+`duplicateDeliveriesByType.payment.confirmed` must become at least `1` after the
+controlled replay below.
+
+Prove an actual duplicate delivery after the original confirmation has reached
+the receiver. This command reconstructs the exact stored event payload, signs a
+fresh delivery and fails unless the receiver replies that the event was already
+persisted:
+
+```bash
+node dist/cli.js mainnet-gate-replay \
+  --config ./ppops.config.json \
+  --intent-id pi_REPLACE_WITH_INTENT_ID
+```
+
+Then capture the pre-restart snapshot. `--expected-signer` must be the address
+that the payer pinned outside PPOps, not an address copied from checkout:
+
+```bash
+node dist/cli.js mainnet-gate-snapshot \
+  --config ./ppops.config.json \
+  --phase before \
+  --intent-id pi_REPLACE_WITH_INTENT_ID \
+  --expected-signer 0xREPLACE_WITH_PINNED_SIGNER \
+  --output ./pilot-evidence/before.json
+```
+
+The snapshot command reruns RPC/PPOI preflight and fails closed unless the
+runtime uses Arbitrum, native USDC, finalized-block finality, at least two RPC
+origins, a healthy PPOI node, only finalized/spendable/matched settlements,
+fresh quorum agreement on every settlement receipt and block hash, exactly one
+confirmation event, a delivered outbox entry and receiver-side deduplication for
+the confirmation type. Identifiers are represented by
+API-token-keyed fingerprints; invoice IDs, private references and transaction
+identifiers are omitted. These operator snapshots still disclose exact amounts
+and timestamps, so keep them private.
 
 ## 6. Finish the release gate
 
-Complete every item in `MAINNET-GATE.md`, including restart without duplicate
-events and an isolated backup restore. Preserve transaction identifiers and raw
-evidence privately; publish redacted evidence only. A successful self-payment
+Stop and restart PPOps with the original state, wait for `/v1/ready`, and capture
+the second phase with the same base URL:
+
+```bash
+node dist/cli.js mainnet-gate-snapshot \
+  --config ./ppops.config.json \
+  --phase restart \
+  --intent-id pi_REPLACE_WITH_INTENT_ID \
+  --expected-signer 0xREPLACE_WITH_PINNED_SIGNER \
+  --output ./pilot-evidence/restart.json
+```
+
+Create a release backup, restore it under an isolated configuration and start
+that restored daemon on another loopback port (for example `8788`). Once it is
+ready, capture the restore phase using the restored config and origin:
+
+```bash
+node dist/cli.js mainnet-gate-snapshot \
+  --config ./restore/ppops.config.json \
+  --base-url http://127.0.0.1:8788 \
+  --phase restore \
+  --intent-id pi_REPLACE_WITH_INTENT_ID \
+  --expected-signer 0xREPLACE_WITH_PINNED_SIGNER \
+  --output ./pilot-evidence/restore.json
+```
+
+Finally verify the three authenticated snapshots with the original instance
+secret set and write the release artifact:
+
+```bash
+node dist/cli.js mainnet-gate-verify \
+  --config ./ppops.config.json \
+  --before ./pilot-evidence/before.json \
+  --restart ./pilot-evidence/restart.json \
+  --restore ./pilot-evidence/restore.json \
+  --output ./artifacts/mainnet-gate-report.json
+```
+
+The verifier requires three distinct daemon-instance fingerprints, the same
+origin before/after restart, a different origin for restore, stable intent,
+settlement and single-confirmation fingerprints, and valid keyed attestations.
+It signs the final metadata-minimal report with the merchant identity key. A reviewer who
+obtained the expected signer independently can verify that signature without
+receiving the API token or any wallet secret:
+
+```bash
+node dist/cli.js mainnet-gate-report-verify \
+  --file ./artifacts/mainnet-gate-report.json \
+  --expected-signer 0xREPLACE_WITH_PINNED_SIGNER
+```
+
+The signature authenticates the merchant's report; it does not pretend to prove
+that the operator actually followed the commands. Retain terminal/service
+records alongside the report.
+
+Complete every remaining item in `MAINNET-GATE.md`. Preserve raw transaction
+evidence privately; publish only redacted evidence. A successful self-payment
 is engineering evidence. An Octant adoption claim additionally needs an
 independent merchant installation and real merchant feedback.
 

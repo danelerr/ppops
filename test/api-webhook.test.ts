@@ -52,7 +52,7 @@ const setup = () => {
 
 describe("local authenticated API", () => {
   it("protects operational routes and creates a signed descriptor", async () => {
-    const { database, intents } = setup();
+    const { database, intents, network } = setup();
     const app = createApiApp({
       database,
       intents,
@@ -65,6 +65,16 @@ describe("local authenticated API", () => {
         scansSucceeded: 0,
         scansFailed: 0,
       }),
+      runtimeInfo: {
+        instanceId: "27d80fce-12cd-4b63-aa01-b97d98946d42",
+        chainId: network.chainId,
+        tokenAddress: network.tokenAddress,
+        tokenSymbol: network.tokenSymbol,
+        tokenDecimals: network.tokenDecimals,
+        finalityMode: network.finality.mode,
+        rpcProviderCount: network.rpcUrls.length,
+        ppoiConfiguredNodeCount: 1,
+      },
     });
     const expiresAt = Math.floor(Date.now() / 1_000) + 3_600;
     const body = JSON.stringify({
@@ -86,6 +96,15 @@ describe("local authenticated API", () => {
         })
       ).status,
     ).toBe(401);
+    expect((await app.request("/v1/runtime")).status).toBe(401);
+    const runtime = await app.request("/v1/runtime", {
+      headers: { authorization: "Bearer test-api-token" },
+    });
+    expect(await runtime.json()).toMatchObject({
+      instanceId: "27d80fce-12cd-4b63-aa01-b97d98946d42",
+      chainId: network.chainId,
+      startedAt: 1_000,
+    });
 
     const created = await app.request("/v1/intents", {
       method: "POST",

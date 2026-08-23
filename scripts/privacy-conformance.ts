@@ -133,6 +133,8 @@ try {
     "src/railgun/scanner.ts",
     "src/runtime.ts",
     "src/cli.ts",
+    "src/api/server.ts",
+    "src/pilot/mainnet-gate.ts",
   ];
   const productionSource = (
     await Promise.all(sourceFiles.map((path) => readFile(join(repositoryRoot, path), "utf8")))

@@ -51,4 +51,17 @@ describe("PPOI preflight", () => {
       "requires at least one",
     );
   });
+
+  it("caps streamed response bodies even without a content-length header", async () => {
+    const fakeFetch = vi.fn(
+      async () =>
+        new Response("x".repeat(16_385), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    ) as unknown as typeof fetch;
+    await expect(
+      preflightPPOINodes(["https://poi.example"], 1_000, fakeFetch),
+    ).rejects.toThrow("No configured PPOI node passed");
+  });
 });
