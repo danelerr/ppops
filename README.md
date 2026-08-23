@@ -266,10 +266,13 @@ npm run verify
 ```
 
 `verify` runs the type checker, coverage thresholds, all tests, the production
-build, executable privacy-conformance report and a production-dependency audit
-that rejects high or critical findings. CI also emits a CycloneDX SBOM.
+build, executable privacy-conformance checks and a production-dependency audit
+that rejects high or critical findings. Its temporary privacy report is written
+under ignored `coverage/`, so routine verification leaves tracked evidence
+unchanged. CI also emits a CycloneDX SBOM.
 
-`privacy:test` creates an actual RAILGUN V2 encrypted note locally, decrypts it
+`privacy:test` refreshes `artifacts/privacy-report.json`, creates an actual
+RAILGUN V2 encrypted note locally, decrypts it
 with an authorized view-only receiver, checks that the opaque reference and memo
 are absent from the public commitment leaf, and exercises commercial canaries
 through descriptor, log and event paths. Its machine-readable result is

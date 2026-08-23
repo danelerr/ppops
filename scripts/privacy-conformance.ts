@@ -16,8 +16,21 @@ import { ReconciliationService } from "../src/reconciliation/service.js";
 
 const execute = promisify(execFile);
 const repositoryRoot = resolve(import.meta.dirname, "..");
+const argumentsList = process.argv.slice(2);
+if (
+  argumentsList.length !== 0 &&
+  !(
+    argumentsList.length === 2 &&
+    argumentsList[0] === "--output" &&
+    argumentsList[1]
+  )
+) {
+  throw new Error("Usage: privacy-conformance.ts [--output <report-path>]");
+}
+const reportPath = argumentsList[1]
+  ? resolve(argumentsList[1])
+  : join(repositoryRoot, "artifacts", "privacy-report.json");
 const runRoot = await mkdtemp(join(tmpdir(), "ppops-privacy-"));
-const reportPath = join(repositoryRoot, "artifacts", "privacy-report.json");
 const invoiceCanary = `TOP_SECRET_INVOICE_${Date.now()}`;
 const customerCanary = `SECRET_CUSTOMER_${Date.now()}`;
 
@@ -159,7 +172,7 @@ try {
     ],
   };
   await mkdir(dirname(reportPath), { recursive: true });
-  const temporaryReport = `${reportPath}.tmp`;
+  const temporaryReport = `${reportPath}.${process.pid}.tmp`;
   await writeFile(temporaryReport, `${JSON.stringify(report, null, 2)}\n`, {
     mode: 0o600,
   });
