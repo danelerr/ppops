@@ -59,6 +59,13 @@ type SettlementRow = {
   eligible_at: number | null;
 };
 
+type IdempotencyRow = {
+  idempotency_key: string;
+  request_fingerprint: string;
+  intent_id: string;
+  created_at: number;
+};
+
 export type OutboxRecord = {
   event: PPOpsEvent;
   payloadJson: string;
@@ -225,13 +232,27 @@ export class PPOpsDatabase {
       CREATE INDEX IF NOT EXISTS outbox_pending_idx
         ON outbox_events(delivered_at, next_attempt_at);
 
+      CREATE TABLE IF NOT EXISTS intent_idempotency (
+        idempotency_key TEXT PRIMARY KEY,
+        request_fingerprint TEXT NOT NULL,
+        intent_id TEXT NOT NULL UNIQUE REFERENCES payment_intents(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL
+      ) STRICT;
+
       INSERT OR IGNORE INTO schema_meta(version, applied_at)
       VALUES (1, unixepoch());
+
+      INSERT OR IGNORE INTO schema_meta(version, applied_at)
+      VALUES (2, unixepoch());
     `);
     const versions = this.sqlite
       .prepare("SELECT version FROM schema_meta ORDER BY version")
       .all() as Array<{ version: number }>;
-    if (versions.length !== 1 || versions[0]?.version !== 1) {
+    if (
+      versions.length !== 2 ||
+      versions[0]?.version !== 1 ||
+      versions[1]?.version !== 2
+    ) {
       throw new Error("Unsupported PPOps database schema version");
     }
   }
@@ -267,6 +288,35 @@ export class PPOpsDatabase {
         ) VALUES (?, 'OPEN', '0', '0', '0', 0, ?)
       `)
       .run(intent.id, intent.createdAt);
+  }
+
+  insertIntentIdempotency(
+    idempotencyKey: string,
+    requestFingerprint: string,
+    intentId: string,
+    createdAt: number,
+  ): void {
+    this.sqlite
+      .prepare(`
+        INSERT INTO intent_idempotency (
+          idempotency_key, request_fingerprint, intent_id, created_at
+        ) VALUES (?, ?, ?, ?)
+      `)
+      .run(idempotencyKey, requestFingerprint, intentId, createdAt);
+  }
+
+  getIntentIdempotency(idempotencyKey: string):
+  { requestFingerprint: string; intentId: string; createdAt: number } | undefined {
+    const row = this.sqlite
+      .prepare("SELECT * FROM intent_idempotency WHERE idempotency_key = ?")
+      .get(idempotencyKey) as IdempotencyRow | undefined;
+    return row
+      ? {
+          requestFingerprint: row.request_fingerprint,
+          intentId: row.intent_id,
+          createdAt: row.created_at,
+        }
+      : undefined;
   }
 
   getIntent(id: string): PaymentIntentRecord | undefined {
@@ -391,10 +441,17 @@ export class PPOpsDatabase {
     return rows.map(settlementFromRow);
   }
 
-  listNonFinalizedSettlements(): SettlementRecord[] {
+  listChainStateRecheckCandidates(
+    now: number,
+    finalizedRecheckSeconds: number,
+  ): SettlementRecord[] {
     const rows = this.sqlite
-      .prepare("SELECT * FROM settlements WHERE chain_status != 'FINALIZED'")
-      .all() as SettlementRow[];
+      .prepare(`
+        SELECT * FROM settlements
+        WHERE chain_status != 'FINALIZED'
+           OR (eligible_at IS NOT NULL AND eligible_at >= ?)
+      `)
+      .all(now - finalizedRecheckSeconds) as SettlementRow[];
     return rows.map(settlementFromRow);
   }
 
@@ -478,6 +535,36 @@ export class PPOpsDatabase {
     return row.count;
   }
 
+  operationalCounts(): {
+    intents: number;
+    settlements: number;
+    pendingEvents: number;
+    deadLetteredEvents: number;
+  } {
+    const row = this.sqlite
+      .prepare(`
+        SELECT
+          (SELECT COUNT(*) FROM payment_intents) AS intents,
+          (SELECT COUNT(*) FROM settlements) AS settlements,
+          (SELECT COUNT(*) FROM outbox_events
+            WHERE delivered_at IS NULL AND dead_lettered_at IS NULL) AS pending_events,
+          (SELECT COUNT(*) FROM outbox_events
+            WHERE dead_lettered_at IS NOT NULL) AS dead_lettered_events
+      `)
+      .get() as {
+      intents: number;
+      settlements: number;
+      pending_events: number;
+      dead_lettered_events: number;
+    };
+    return {
+      intents: row.intents,
+      settlements: row.settlements,
+      pendingEvents: row.pending_events,
+      deadLetteredEvents: row.dead_lettered_events,
+    };
+  }
+
   listEvents(limit = 100, offset = 0): PPOpsEvent[] {
     const rows = this.sqlite
       .prepare(
@@ -516,5 +603,51 @@ export class PPOpsDatabase {
         : { deadLetteredAt: row.dead_lettered_at }),
       ...(row.last_error === null ? {} : { lastError: row.last_error }),
     }));
+  }
+
+  getOutboxStatus(eventId: string): OutboxStatus | undefined {
+    const row = this.sqlite
+      .prepare(`
+        SELECT event_id, event_type, attempts, next_attempt_at,
+               delivered_at, dead_lettered_at, last_error
+        FROM outbox_events
+        WHERE event_id = ?
+      `)
+      .get(eventId) as
+      | {
+          event_id: string;
+          event_type: string;
+          attempts: number;
+          next_attempt_at: number;
+          delivered_at: number | null;
+          dead_lettered_at: number | null;
+          last_error: string | null;
+        }
+      | undefined;
+    return row
+      ? {
+          eventId: row.event_id,
+          eventType: row.event_type,
+          attempts: row.attempts,
+          nextAttemptAt: row.next_attempt_at,
+          ...(row.delivered_at === null ? {} : { deliveredAt: row.delivered_at }),
+          ...(row.dead_lettered_at === null
+            ? {}
+            : { deadLetteredAt: row.dead_lettered_at }),
+          ...(row.last_error === null ? {} : { lastError: row.last_error }),
+        }
+      : undefined;
+  }
+
+  replayDeadLetteredEvent(eventId: string, now: number): boolean {
+    const result = this.sqlite
+      .prepare(`
+        UPDATE outbox_events
+        SET attempts = 0, next_attempt_at = ?, delivered_at = NULL,
+            dead_lettered_at = NULL, last_error = NULL
+        WHERE event_id = ? AND dead_lettered_at IS NOT NULL
+      `)
+      .run(now, eventId);
+    return result.changes === 1;
   }
 }

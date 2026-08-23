@@ -12,7 +12,7 @@ import {
   refreshBalances,
   viewOnlyWalletForID,
 } from "@railgun-community/wallet";
-import { JsonRpcProvider, type TransactionReceipt } from "ethers";
+import type { TransactionReceipt } from "ethers";
 
 import type { PPOpsConfig } from "../config.js";
 import {
@@ -23,6 +23,7 @@ import {
   type SettlementRecord,
 } from "../domain.js";
 import { RailgunViewOnlyEngine, withTimeout } from "./engine.js";
+import { RpcQuorum } from "./rpc-quorum.js";
 
 const normalizeTransactionHash = (transactionHash: string): string => {
   const lower = transactionHash.toLowerCase();
@@ -81,18 +82,19 @@ export const bucketToPOIStatus = (
 };
 
 export class RailgunScanner {
-  private readonly rpc: JsonRpcProvider;
+  private readonly rpc: RpcQuorum;
   private scanning = false;
 
   constructor(
     private readonly engine: RailgunViewOnlyEngine,
     private readonly config: PPOpsConfig,
   ) {
-    this.rpc = new JsonRpcProvider(
-      config.network.rpcUrls[0],
-      config.network.chainId,
-      { staticNetwork: true },
-    );
+    this.rpc = new RpcQuorum({
+      chainId: config.network.chainId,
+      rpcUrls: config.network.rpcUrls,
+      timeoutMs: config.scanner.rpcTimeoutMs,
+      maxBlockLag: config.scanner.maxRpcBlockLag,
+    });
   }
 
   async scan(): Promise<NormalizedSettlement[]> {
@@ -151,7 +153,6 @@ export class RailgunScanner {
       return { ...settlement, chainStatus: "REVERTED" };
     }
     const block = await this.rpc.getBlock(receipt.blockNumber);
-    if (!block) throw new Error(`RPC omitted block ${receipt.blockNumber}`);
     return {
       ...settlement,
       blockNumber: receipt.blockNumber,
@@ -161,7 +162,7 @@ export class RailgunScanner {
   }
 
   async close(): Promise<void> {
-    await this.rpc.destroy();
+    await this.rpc.close();
   }
 
   private async normalizeTXO(
@@ -177,10 +178,7 @@ export class RailgunScanner {
     const blockNumber = receipt?.blockNumber ?? txo.blockNumber;
     let timestampPromise = timestampCache.get(blockNumber);
     if (!timestampPromise) {
-      timestampPromise = this.rpc.getBlock(blockNumber).then((block) => {
-        if (!block) throw new Error(`RPC omitted block ${blockNumber}`);
-        return block.timestamp;
-      });
+      timestampPromise = this.rpc.getBlock(blockNumber).then((block) => block.timestamp);
       timestampCache.set(blockNumber, timestampPromise);
     }
     const rawPPOIStatuses = rawStatusesFor(txo);
@@ -216,11 +214,7 @@ export class RailgunScanner {
   }
 
   private async chainContext(): Promise<{ latestBlock: number; finalizedBlock?: number }> {
-    const latestBlock = await this.rpc.getBlockNumber();
-    if (this.config.network.finality.mode === "confirmations") return { latestBlock };
-    const finalized = await this.rpc.getBlock("finalized");
-    if (!finalized) throw new Error("Configured RPC does not support the finalized block tag");
-    return { latestBlock, finalizedBlock: finalized.number };
+    return this.rpc.chainContext(this.config.network.finality.mode === "finalized");
   }
 
   private chainStatusFor(

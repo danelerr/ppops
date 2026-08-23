@@ -12,6 +12,7 @@ import { PPOpsDaemon } from "./api/server.js";
 import { createBackup, restoreBackup } from "./backup.js";
 import { PPOpsConfigSchema, loadConfig, type PPOpsConfig } from "./config.js";
 import { PPOpsRuntime } from "./runtime.js";
+import { RpcQuorum } from "./railgun/rpc-quorum.js";
 import {
   parseSignedDescriptor,
   verifySignedDescriptor,
@@ -28,13 +29,14 @@ const HELP = `PPOps v0.1.0-beta.0
 
 Usage:
   ppops init --viewing-key-file PATH --token-address ADDRESS --token-symbol SYMBOL \\
-    --token-decimals N --rpc-url URL --poi-node URL [--config PATH]
+    --token-decimals N --rpc-url URL --rpc-url URL --poi-node URL [--config PATH]
   ppops serve [--config PATH]
   ppops scan-once [--config PATH]
   ppops descriptor-verify --file PATH --expected-signer ADDRESS
   ppops backup --output NEW_DIRECTORY [--include-secrets] [--config PATH]
   ppops restore --input BACKUP_DIRECTORY [--force] [--config PATH]
   ppops config-validate [--config PATH]
+  ppops preflight [--config PATH]
 
 Security:
   PPOps accepts a RAILGUN shareable viewing key, never a spending key or mnemonic.
@@ -130,6 +132,7 @@ const init = async (options: ParsedOptions): Promise<void> => {
     "rpc-url",
     "poi-node",
     "confirmations",
+    "finality-mode",
     "port",
     "scan-interval-ms",
     "webhook-url",
@@ -157,6 +160,12 @@ const init = async (options: ParsedOptions): Promise<void> => {
   const poiNodeUrls = many(options, "poi-node", true);
   const confirmations = integerOption(options, "confirmations", { defaultValue: 12 });
   if (confirmations < 1) throw new Error("--confirmations must be at least 1");
+  const finalityMode = one(options, "finality-mode", {
+    defaultValue: network.chain.id === 42_161 ? "finalized" : "confirmations",
+  });
+  if (finalityMode !== "finalized" && finalityMode !== "confirmations") {
+    throw new Error("--finality-mode must be finalized or confirmations");
+  }
   const configRoot = dirname(configPath);
   const secretsRoot = resolve(configRoot, "secrets");
   const apiTokenFile = resolve(secretsRoot, "api-token");
@@ -180,7 +189,10 @@ const init = async (options: ParsedOptions): Promise<void> => {
       tokenDecimals,
       rpcUrls,
       deploymentBlock: network.deploymentBlock,
-      finality: { mode: "confirmations", confirmations },
+      finality:
+        finalityMode === "finalized"
+          ? { mode: "finalized" }
+          : { mode: "confirmations", confirmations },
     },
     storage: {
       sqlitePath: "./data/ppops.sqlite",
@@ -199,11 +211,16 @@ const init = async (options: ParsedOptions): Promise<void> => {
       intervalMs: integerOption(options, "scan-interval-ms", { defaultValue: 30_000 }),
       poiNodeUrls,
       providerPollingIntervalMs: 10_000,
+      rpcTimeoutMs: 20_000,
+      maxRpcBlockLag: 5,
+      finalizedRecheckSeconds: 604_800,
+      maxScanStalenessMs: 900_000,
     },
     ...(webhookUrl
       ? {
           webhook: {
             url: webhookUrl,
+            keyId: "v1",
             timeoutMs: 10_000,
             maxAttempts: 12,
             baseRetryMs: 5_000,
@@ -345,9 +362,44 @@ export const main = async (argv = process.argv.slice(2)): Promise<void> => {
           ok: true,
           chainId: config.network.chainId,
           tokenAddress: getAddress(config.network.tokenAddress),
+          tokenSymbol: config.network.tokenSymbol,
+          tokenDecimals: config.network.tokenDecimals,
+          finalityMode: config.network.finality.mode,
+          rpcProviderCount: config.network.rpcUrls.length,
+          poiConfigured: config.scanner.poiNodeUrls.length > 0,
           serverHost: config.server.host,
         })}\n`,
       );
+      break;
+    }
+    case "preflight": {
+      assertAllowed(options, ["config"]);
+      const config = await loadConfig(configPathFor(options));
+      const rpc = new RpcQuorum({
+        chainId: config.network.chainId,
+        rpcUrls: config.network.rpcUrls,
+        timeoutMs: config.scanner.rpcTimeoutMs,
+        maxBlockLag: config.scanner.maxRpcBlockLag,
+      });
+      try {
+        const context = await rpc.chainContext(
+          config.network.finality.mode === "finalized",
+        );
+        process.stdout.write(
+          `${JSON.stringify({
+            ok: true,
+            chainId: config.network.chainId,
+            rpcProviderCount: config.network.rpcUrls.length,
+            latestBlock: context.latestBlock,
+            ...(context.finalizedBlock === undefined
+              ? {}
+              : { finalizedBlock: context.finalizedBlock }),
+            finalityMode: config.network.finality.mode,
+          })}\n`,
+        );
+      } finally {
+        await rpc.close();
+      }
       break;
     }
     default:

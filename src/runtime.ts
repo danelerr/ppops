@@ -101,7 +101,12 @@ export class PPOpsRuntime {
     }
 
     let rechecked = 0;
-    for (const settlement of this.database.listNonFinalizedSettlements()) {
+    for (
+      const settlement of this.database.listChainStateRecheckCandidates(
+        now,
+        this.config.scanner.finalizedRecheckSeconds,
+      )
+    ) {
       if (seen.has(settlement.uniqueSettlementId)) continue;
       const refreshed: NormalizedSettlement =
         await this.scanner.refreshKnownChainState(settlement);

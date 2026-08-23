@@ -118,6 +118,28 @@ describe("signed payment descriptor", () => {
 });
 
 describe("reconciliation", () => {
+  it("replays an idempotent intent after expiry without creating a duplicate", async () => {
+    const { database, intents } = services();
+    const input = {
+      externalReference: "INV-IDEMPOTENT",
+      amountAtomic: "10",
+      expiresAt: 2_000,
+    };
+    const created = await intents.createIdempotent(input, "merchant-key-0001", 1_000);
+    const replayed = await intents.createIdempotent(input, "merchant-key-0001", 3_000);
+    expect(created.replayed).toBe(false);
+    expect(replayed).toMatchObject({ replayed: true });
+    expect(replayed.intent.id).toBe(created.intent.id);
+    expect(database.listIntents()).toHaveLength(1);
+    const storedKey = database.sqlite
+      .prepare("SELECT idempotency_key FROM intent_idempotency")
+      .pluck()
+      .get();
+    expect(storedKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(storedKey).not.toBe("merchant-key-0001");
+    database.close();
+  });
+
   it("handles partial and overpayment and is exact-once across restart", async () => {
     const { database, intents, reconciliation, path } = services();
     const intent = await intents.create(

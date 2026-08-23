@@ -1,7 +1,8 @@
 import { serve, type ServerType } from "@hono/node-server";
 
-import { createApiApp, type HealthState } from "./app.js";
+import { createApiApp } from "./app.js";
 import { logError, logInfo } from "../logging.js";
+import { ReconciliationHealth } from "../operations/health.js";
 import { PPOpsRuntime, type ScanResult } from "../runtime.js";
 
 const closeServer = (server: ServerType): Promise<void> =>
@@ -16,11 +17,15 @@ export class PPOpsDaemon {
   private scanTimer?: NodeJS.Timeout;
   private activeScan?: Promise<void>;
   private stopping = false;
-  private health: HealthState = { railgunReady: true };
+  private readonly health: ReconciliationHealth;
   readonly failure: Promise<never>;
   private rejectFailure!: (error: unknown) => void;
 
   constructor(readonly runtime: PPOpsRuntime) {
+    this.health = new ReconciliationHealth(
+      runtime.config.scanner.maxScanStalenessMs ??
+        Math.max(900_000, runtime.config.scanner.intervalMs * 3),
+    );
     this.failure = new Promise<never>((_resolve, reject) => {
       this.rejectFailure = reject;
     });
@@ -32,7 +37,10 @@ export class PPOpsDaemon {
       intents: this.runtime.intents,
       database: this.runtime.database,
       apiToken: this.runtime.apiToken,
-      health: () => ({ ...this.health }),
+      health: () => this.health.snapshot(),
+      ...(this.runtime.config.server.rateLimit
+        ? { rateLimit: this.runtime.config.server.rateLimit }
+        : {}),
     });
     this.server = serve(
       {
@@ -81,19 +89,14 @@ export class PPOpsDaemon {
   }
 
   private async executeScan(): Promise<void> {
+    const startedAtMs = Date.now();
+    this.health.scanStarted(startedAtMs);
     try {
       const result: ScanResult = await this.runtime.scanOnce();
-      this.health = {
-        railgunReady: true,
-        lastScanAt: Math.floor(Date.now() / 1_000),
-      };
+      this.health.scanSucceeded(startedAtMs);
       logInfo("scan.completed", result);
     } catch (error) {
-      this.health = {
-        ...this.health,
-        railgunReady: true,
-        lastScanError: "SCAN_FAILED",
-      };
+      this.health.scanFailed(startedAtMs);
       logError("scan.failed", error);
     }
   }

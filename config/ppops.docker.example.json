@@ -3,21 +3,26 @@
   "server": {
     "host": "0.0.0.0",
     "port": 8787,
-    "allowRemote": true
+    "allowRemote": true,
+    "rateLimit": {
+      "apiPerMinute": 120,
+      "authFailuresPerMinute": 10,
+      "checkoutPerMinute": 60
+    }
   },
   "network": {
-    "railgunNetworkName": "Ethereum_Sepolia",
-    "chainId": 11155111,
-    "tokenAddress": "REPLACE_WITH_THE_SINGLE_STABLECOIN_ADDRESS",
-    "tokenSymbol": "TESTUSD",
+    "railgunNetworkName": "Arbitrum",
+    "chainId": 42161,
+    "tokenAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "tokenSymbol": "USDC",
     "tokenDecimals": 6,
     "rpcUrls": [
-      "https://REPLACE_WITH_YOUR_RPC"
+      "https://REPLACE_WITH_RPC_PROVIDER_A",
+      "https://REPLACE_WITH_RPC_PROVIDER_B"
     ],
-    "deploymentBlock": 5784866,
+    "deploymentBlock": 56109834,
     "finality": {
-      "mode": "confirmations",
-      "confirmations": 12
+      "mode": "finalized"
     }
   },
   "storage": {
@@ -38,10 +43,15 @@
     "poiNodeUrls": [
       "https://REPLACE_WITH_YOUR_POI_NODE"
     ],
-    "providerPollingIntervalMs": 10000
+    "providerPollingIntervalMs": 10000,
+    "rpcTimeoutMs": 20000,
+    "maxRpcBlockLag": 5,
+    "finalizedRecheckSeconds": 604800,
+    "maxScanStalenessMs": 900000
   },
   "webhook": {
     "url": "https://REPLACE_WITH_YOUR_MERCHANT_BACKEND/ppops",
+    "keyId": "v1",
     "timeoutMs": 10000,
     "maxAttempts": 12,
     "baseRetryMs": 5000,

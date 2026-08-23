@@ -5,6 +5,11 @@ import { isIP } from "node:net";
 import { isAddress } from "ethers";
 import { z } from "zod";
 
+export const ARBITRUM_MAINNET_CHAIN_ID = 42_161;
+export const ARBITRUM_NATIVE_USDC =
+  "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
+const DOCUMENTED_TEST_POI_HOST = "ppoi-agg.horsewithsixlegs.xyz";
+
 const PortSchema = z.number().int().min(1).max(65_535);
 const PositiveIntegerSchema = z.number().int().positive();
 const AddressSchema = z
@@ -28,6 +33,13 @@ export const PPOpsConfigSchema = z
         host: z.string().min(1).default("127.0.0.1"),
         port: PortSchema.default(8787),
         allowRemote: z.boolean().default(false),
+        rateLimit: z
+          .object({
+            apiPerMinute: PositiveIntegerSchema.max(10_000).default(120),
+            authFailuresPerMinute: PositiveIntegerSchema.max(1_000).default(10),
+            checkoutPerMinute: PositiveIntegerSchema.max(10_000).default(60),
+          })
+          .optional(),
       })
       .default({ host: "127.0.0.1", port: 8787, allowRemote: false }),
     network: z.object({
@@ -64,15 +76,25 @@ export const PPOpsConfigSchema = z
         intervalMs: PositiveIntegerSchema.min(5_000).default(30_000),
         poiNodeUrls: z.array(HttpUrlSchema).default([]),
         providerPollingIntervalMs: PositiveIntegerSchema.min(1_000).default(10_000),
+        rpcTimeoutMs: PositiveIntegerSchema.min(1_000).max(120_000).default(20_000),
+        maxRpcBlockLag: PositiveIntegerSchema.max(100).default(5),
+        finalizedRecheckSeconds: PositiveIntegerSchema.max(2_592_000).default(604_800),
+        maxScanStalenessMs: PositiveIntegerSchema.min(60_000)
+          .max(7_200_000)
+          .optional(),
       })
       .default({
         intervalMs: 30_000,
         poiNodeUrls: [],
         providerPollingIntervalMs: 10_000,
+        rpcTimeoutMs: 20_000,
+        maxRpcBlockLag: 5,
+        finalizedRecheckSeconds: 604_800,
       }),
     webhook: z
       .object({
         url: HttpUrlSchema,
+        keyId: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/).optional(),
         timeoutMs: PositiveIntegerSchema.max(60_000).default(10_000),
         maxAttempts: PositiveIntegerSchema.max(100).default(12),
         baseRetryMs: PositiveIntegerSchema.default(5_000),
@@ -112,6 +134,65 @@ export const PPOpsConfigSchema = z
           code: "custom",
           path: ["webhook", "url"],
           message: "Non-loopback webhook delivery requires HTTPS",
+        });
+      }
+    }
+    if (config.network.chainId === ARBITRUM_MAINNET_CHAIN_ID) {
+      if (config.network.railgunNetworkName !== "Arbitrum") {
+        context.addIssue({
+          code: "custom",
+          path: ["network", "railgunNetworkName"],
+          message: "Arbitrum mainnet chain ID requires the RAILGUN Arbitrum profile",
+        });
+      }
+      if (config.network.tokenAddress.toLowerCase() !== ARBITRUM_NATIVE_USDC) {
+        context.addIssue({
+          code: "custom",
+          path: ["network", "tokenAddress"],
+          message: "PPOps v0.1 production profile supports native Arbitrum USDC only",
+        });
+      }
+      if (config.network.tokenSymbol !== "USDC" || config.network.tokenDecimals !== 6) {
+        context.addIssue({
+          code: "custom",
+          path: ["network", "tokenSymbol"],
+          message: "Native Arbitrum USDC must use symbol USDC and 6 decimals",
+        });
+      }
+      if (config.network.finality.mode !== "finalized") {
+        context.addIssue({
+          code: "custom",
+          path: ["network", "finality"],
+          message: "Arbitrum mainnet requires Ethereum-backed finalized block finality",
+        });
+      }
+      const rpcOrigins = config.network.rpcUrls.map((value) => new URL(value).origin);
+      if (
+        new Set(rpcOrigins).size < 2 ||
+        new Set(rpcOrigins).size !== rpcOrigins.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["network", "rpcUrls"],
+          message: "Arbitrum mainnet requires at least two RPC URLs and every origin must be unique",
+        });
+      }
+      if (config.scanner.poiNodeUrls.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["scanner", "poiNodeUrls"],
+          message: "Arbitrum mainnet requires a production PPOI endpoint",
+        });
+      }
+      if (
+        config.scanner.poiNodeUrls.some(
+          (value) => new URL(value).hostname === DOCUMENTED_TEST_POI_HOST,
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["scanner", "poiNodeUrls"],
+          message: "The documented test PPOI endpoint must not be used on mainnet",
         });
       }
     }

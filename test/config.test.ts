@@ -64,4 +64,43 @@ describe("secure configuration defaults", () => {
     };
     expect(PPOpsConfigSchema.safeParse(config).success).toBe(false);
   });
+
+  it("accepts only the strong Arbitrum USDC production profile", () => {
+    const config = validConfig();
+    config.network = {
+      railgunNetworkName: "Arbitrum",
+      chainId: 42_161,
+      tokenAddress: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      tokenSymbol: "USDC",
+      tokenDecimals: 6,
+      rpcUrls: ["https://rpc-a.example", "https://rpc-b.example"],
+      deploymentBlock: 56_109_834,
+      finality: { mode: "finalized", confirmations: 100 },
+    };
+    config.scanner.poiNodeUrls = ["https://production-poi.example"];
+    expect(PPOpsConfigSchema.safeParse(config).success).toBe(true);
+
+    const weakFinality = structuredClone(config);
+    weakFinality.network.finality = { mode: "confirmations", confirmations: 100 };
+    expect(PPOpsConfigSchema.safeParse(weakFinality).success).toBe(false);
+
+    const oneRpcOperator = structuredClone(config);
+    oneRpcOperator.network.rpcUrls = [
+      "https://same-rpc.example/key-a",
+      "https://same-rpc.example/key-b",
+    ];
+    expect(PPOpsConfigSchema.safeParse(oneRpcOperator).success).toBe(false);
+
+    const duplicatedVote = structuredClone(config);
+    duplicatedVote.network.rpcUrls = [
+      "https://rpc-a.example/first",
+      "https://rpc-a.example/second",
+      "https://rpc-b.example",
+    ];
+    expect(PPOpsConfigSchema.safeParse(duplicatedVote).success).toBe(false);
+
+    const testPoi = structuredClone(config);
+    testPoi.scanner.poiNodeUrls = ["https://ppoi-agg.horsewithsixlegs.xyz"];
+    expect(PPOpsConfigSchema.safeParse(testPoi).success).toBe(false);
+  });
 });

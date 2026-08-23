@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { MaxUint256, Wallet, getAddress } from "ethers";
 
@@ -20,6 +20,24 @@ export type CreateIntentInput = {
   expiresAt: number;
 };
 
+export class IdempotencyConflictError extends Error {
+  constructor() {
+    super("Idempotency key was already used with a different request");
+    this.name = "IdempotencyConflictError";
+  }
+}
+
+const fingerprintFor = (input: CreateIntentInput): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        externalReference: input.externalReference.trim(),
+        amountAtomic: input.amountAtomic,
+        expiresAt: input.expiresAt,
+      }),
+    )
+    .digest("hex");
+
 export class IntentService {
   readonly merchantSigner: string;
 
@@ -34,6 +52,44 @@ export class IntentService {
 
   async create(input: CreateIntentInput, now = Math.floor(Date.now() / 1_000)):
   Promise<PaymentIntentView> {
+    const result = await this.createRecord(input, now);
+    if (typeof result === "string") {
+      throw new Error("Non-idempotent intent creation unexpectedly replayed");
+    }
+    return result;
+  }
+
+  async createIdempotent(
+    input: CreateIntentInput,
+    idempotencyKey: string,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<{ intent: PaymentIntentView; replayed: boolean }> {
+    if (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
+      throw new Error("Invalid idempotency key");
+    }
+    const fingerprint = fingerprintFor(input);
+    const storageKey = createHash("sha256").update(idempotencyKey).digest("hex");
+    const existing = this.database.getIntentIdempotency(storageKey);
+    if (existing) {
+      if (existing.requestFingerprint !== fingerprint) {
+        throw new IdempotencyConflictError();
+      }
+      return { intent: this.requireView(existing.intentId), replayed: true };
+    }
+    const result = await this.createRecord(input, now, {
+      idempotencyKey: storageKey,
+      fingerprint,
+    });
+    return typeof result === "string"
+      ? { intent: this.requireView(result), replayed: true }
+      : { intent: result, replayed: false };
+  }
+
+  private async createRecord(
+    input: CreateIntentInput,
+    now: number,
+    idempotency?: { idempotencyKey: string; fingerprint: string },
+  ): Promise<PaymentIntentView | string> {
     const externalReference = input.externalReference.trim();
     if (externalReference.length === 0 || externalReference.length > 512) {
       throw new Error("externalReference must contain between 1 and 512 characters");
@@ -78,7 +134,28 @@ export class IntentService {
       descriptor,
       createdAt,
     };
-    this.database.transaction(() => this.database.insertIntent(record));
+    const existingIntentId = this.database.transaction(() => {
+      if (idempotency) {
+        const existing = this.database.getIntentIdempotency(idempotency.idempotencyKey);
+        if (existing) {
+          if (existing.requestFingerprint !== idempotency.fingerprint) {
+            throw new IdempotencyConflictError();
+          }
+          return existing.intentId;
+        }
+      }
+      this.database.insertIntent(record);
+      if (idempotency) {
+        this.database.insertIntentIdempotency(
+          idempotency.idempotencyKey,
+          idempotency.fingerprint,
+          record.id,
+          createdAt,
+        );
+      }
+      return undefined;
+    });
+    if (existingIntentId) return existingIntentId;
     return this.requireView(record.id);
   }
 

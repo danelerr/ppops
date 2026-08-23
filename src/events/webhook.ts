@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { PPOpsConfig } from "../config.js";
 import type { PPOpsDatabase } from "../db/database.js";
@@ -8,10 +8,50 @@ export const webhookSignature = (
   timestamp: number,
   eventId: string,
   payloadJson: string,
+  keyId = "v1",
 ): string =>
   `v1=${createHmac("sha256", Buffer.from(hmacKeyHex, "hex"))
-    .update(`${timestamp}.${eventId}.${payloadJson}`)
+    .update(`${timestamp}.${keyId}.${eventId}.${payloadJson}`)
     .digest("hex")}`;
+
+export const verifyWebhookSignature = (args: {
+  hmacKeyHex: string;
+  timestamp: number;
+  eventId: string;
+  keyId: string;
+  payloadJson: string;
+  signature: string;
+  now?: number;
+  toleranceSeconds?: number;
+}): boolean => {
+  const now = args.now ?? Math.floor(Date.now() / 1_000);
+  const toleranceSeconds = args.toleranceSeconds ?? 300;
+  if (
+    !/^[0-9a-f]{64}$/i.test(args.hmacKeyHex) ||
+    !Number.isSafeInteger(args.timestamp) ||
+    args.timestamp < 0 ||
+    !Number.isSafeInteger(toleranceSeconds) ||
+    toleranceSeconds < 0 ||
+    Math.abs(now - args.timestamp) > toleranceSeconds ||
+    !/^evt_[0-9a-f]{32}$/.test(args.eventId) ||
+    !/^[A-Za-z0-9._-]{1,64}$/.test(args.keyId) ||
+    !/^v1=[0-9a-f]{64}$/.test(args.signature)
+  ) {
+    return false;
+  }
+  const expected = Buffer.from(
+    webhookSignature(
+      args.hmacKeyHex,
+      args.timestamp,
+      args.eventId,
+      args.payloadJson,
+      args.keyId,
+    ),
+    "utf8",
+  );
+  const received = Buffer.from(args.signature, "utf8");
+  return expected.length === received.length && timingSafeEqual(expected, received);
+};
 
 export class WebhookDeliveryService {
   constructor(
@@ -32,17 +72,20 @@ export class WebhookDeliveryService {
       result.attempted += 1;
       try {
         const timestamp = Math.floor(Date.now() / 1_000);
+        const keyId = this.config.keyId ?? "v1";
         const response = await this.fetchImplementation(this.config.url, {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "ppops-event-id": record.event.eventId,
             "ppops-timestamp": timestamp.toString(),
+            "ppops-key-id": keyId,
             "ppops-signature": webhookSignature(
               this.hmacKeyHex,
               timestamp,
               record.event.eventId,
               record.payloadJson,
+              keyId,
             ),
           },
           body: record.payloadJson,

@@ -70,6 +70,9 @@ const configAt = (root: string, sourceSecrets?: string): { config: PPOpsConfig; 
       intervalMs: 30_000,
       poiNodeUrls: ["https://poi.example"],
       providerPollingIntervalMs: 10_000,
+      rpcTimeoutMs: 20_000,
+      maxRpcBlockLag: 5,
+      finalizedRecheckSeconds: 604_800,
     },
   };
   mkdirSync(root, { recursive: true });
