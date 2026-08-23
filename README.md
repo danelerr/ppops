@@ -163,7 +163,10 @@ wallet or integration that supports private ERC-20 transfers with `memoText`:
 
 PPOps intentionally does not provide a “connect wallet” button in v0.1. A
 merchant cannot claim general consumer usability until its chosen payer wallet
-adapter has passed the mainnet gate.
+adapter has passed the mainnet gate. The current Railway Wallet source exposes a
+private memo field and is the documented client for the controlled pilot; see
+[`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the exact receiver, payer and
+evidence procedure.
 
 ## Settlement semantics
 
@@ -269,8 +272,8 @@ through descriptor, log and event paths. Its machine-readable result is
 The earlier gate evidence is in `docs/PRIMITIVE-GATE.md` and
 `artifacts/primitive-gate-report.json`. The complete runtime semantics and
 measurements are in `docs/OPERATIONAL-PROFILE.md`. A beta using real funds must
-also complete `docs/MAINNET-GATE.md`; operations and alerts are documented in
-`docs/PRODUCTION-RUNBOOK.md`.
+follow `docs/PILOT-GUIDE.md` and complete `docs/MAINNET-GATE.md`; operations and
+alerts are documented in `docs/PRODUCTION-RUNBOOK.md`.
 
 ## Security status and known limits
 
