@@ -1,0 +1,53 @@
+{
+  "name": "ppops",
+  "version": "0.1.0-beta.0",
+  "description": "Self-hosted, view-only RAILGUN payment reconciler",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "ppops": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts serve",
+    "start": "node dist/cli.js serve",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run typecheck && npm test && npm run build && npm run privacy:test",
+    "privacy:report": "tsx scripts/privacy-conformance.ts",
+    "privacy:test": "npm run privacy:report && vitest run test/privacy.test.ts",
+    "kill:encrypted-leaf": "tsx scripts/encrypted-memo-leaf-gate.ts",
+    "kill:export-fixture-key": "tsx scripts/export-public-fixture-viewing-key.ts",
+    "kill:scan": "tsx scripts/railgun-view-only-scan.ts",
+    "kill:structural": "tsx scripts/structural-gate.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.1",
+    "@railgun-community/engine": "9.6.0",
+    "@railgun-community/shared-models": "8.0.1",
+    "@railgun-community/wallet": "10.9.0",
+    "better-sqlite3": "13.0.3",
+    "ethers": "6.14.3",
+    "hono": "4.13.3",
+    "leveldown": "6.1.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/leveldown": "4.0.6",
+    "@types/node": "24.10.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "@railgun-community/wallet": {
+      "axios": "1.19.0"
+    }
+  }
+}

@@ -1,0 +1,85 @@
+diff --git a/helpers/logic/artifacts.ts b/helpers/logic/artifacts.ts
+index a6824ac..efd9bde 100644
+--- a/helpers/logic/artifacts.ts
++++ b/helpers/logic/artifacts.ts
+@@ -1,8 +1,47 @@
+-import artifacts from 'railgun-circuit-test-artifacts';
++import { readFileSync } from 'node:fs';
+ import { getIPFSHash } from './artifactsIPFSHashes';
+-import type { Artifact, ArtifactConfig, VKey } from 'railgun-circuit-test-artifacts';
+ import { Verifier } from '../../typechain-types';
+ 
++type ArtifactConfig = {
++  nullifiers: number;
++  commitments: number;
++};
++
++type VKey = {
++  vk_alpha_1: string[];
++  vk_beta_2: string[][];
++  vk_gamma_2: string[][];
++  vk_delta_2: string[][];
++  IC: string[][];
++};
++
++type Artifact = {
++  vkey: VKey;
++};
++
++// PPOps primitive-gate patch: load only the 1-input/2-output verification key
++// already shipped in the pinned engine repository. This avoids downloading the
++// full ~1 GB upstream contract-test artifact bundle for one local transfer.
++const oneByTwoConfig: ArtifactConfig = { nullifiers: 1, commitments: 2 };
++const oneByTwoVKeyPath = process.env.PPOPS_VKEY_PATH;
++if (!oneByTwoVKeyPath) {
++  throw new Error('PPOPS_VKEY_PATH is required for the lightweight contract gate.');
++}
++const oneByTwoArtifact: Artifact = {
++  vkey: JSON.parse(readFileSync(oneByTwoVKeyPath, 'utf8')) as VKey,
++};
++const artifacts = {
++  getArtifact(nullifiers: number, commitments: number): Artifact {
++    if (nullifiers !== 1 || commitments !== 2) {
++      throw new Error(`Lightweight gate has no artifact for ${nullifiers}x${commitments}.`);
++    }
++    return oneByTwoArtifact;
++  },
++  listArtifacts(): ArtifactConfig[] {
++    return [oneByTwoConfig];
++  },
++};
++
+ export interface SolidityG1Point {
+   x: bigint;
+   y: bigint;
+@@ -46,18 +85,6 @@ const testingSubsetArtifactsConfigs = [
+     nullifiers: 1,
+     commitments: 2,
+   },
+-  {
+-    nullifiers: 2,
+-    commitments: 3,
+-  },
+-  {
+-    nullifiers: 8,
+-    commitments: 4,
+-  },
+-  {
+-    nullifiers: 12,
+-    commitments: 2,
+-  },
+ ];
+ 
+ /**
+diff --git a/package.json b/package.json
+index 2305513..c1accea 100644
+--- a/package.json
++++ b/package.json
+@@ -46,7 +46,6 @@
+     "hardhat-local-networks-config-plugin": "^0.0.6",
+     "prettier": "^2.8.3",
+     "prettier-plugin-solidity": "^1.1.1",
+-    "railgun-circuit-test-artifacts": "https://ipfs-lb.com/ipfs/QmPvs6Lws1MS4CTMAQ6P3WfyFpWFKGu7o6cSbWCu3vgXLW/railgun-circuit-test-artifacts-0.0.1.tgz",
+     "snarkjs": "^0.5.0",
+     "solhint": "^3.3.8",
+     "solhint-plugin-prettier": "^0.0.5",

@@ -1,0 +1,248 @@
+diff --git a/src/__tests__/railgun-engine.test.ts b/src/__tests__/railgun-engine.test.ts
+index 11607a0..a538eca 100644
+--- a/src/__tests__/railgun-engine.test.ts
++++ b/src/__tests__/railgun-engine.test.ts
+@@ -9,6 +9,7 @@ import { abi as erc20Abi } from '../test/test-erc20-abi.test';
+ import { config } from '../test/config.test';
+ import { abi as erc721Abi } from '../test/test-erc721-abi.test';
+ import { RailgunWallet } from '../wallet/railgun-wallet';
++import { ViewOnlyWallet } from '../wallet/view-only-wallet';
+ import {
+   awaitMultipleScans,
+   awaitScan,
+@@ -1038,18 +1039,28 @@ describe('railgun-engine', function test() {
+     ]);
+     expect(balance).to.equal(BigInt('109725000000000000000000'));
+ 
++    // PPOps receiver process: unload the full account-1 wallet and recreate it
++    // exclusively from its shareable viewing key before the private transfer.
++    const shareableViewingKey = wallet2.generateShareableViewingKey();
++    engine.unloadWallet(wallet2.id);
++    const viewOnlyReceiver: ViewOnlyWallet =
++      await engine.createViewOnlyWalletFromShareableViewingKey(
++        testEncryptionKey,
++        shareableViewingKey,
++        undefined,
++      );
++
+     // Create transaction
+     const transactionBatch = new TransactionBatch(chain);
+ 
+-    const memoText =
+-      'A really long memo with emojis 😐 👩🏾‍🔧 and other text, in order to test a major memo for a real live production use case.';
++    const memoText = `ppops:v1:0x${'4b'.repeat(32)}`;
+ 
+     const tokenData = getTokenDataERC20(tokenAddress);
+ 
+     // Add output for Transfer
+     transactionBatch.addOutput(
+       TransactNote.createTransfer(
+-        wallet2.addressKeys,
++        viewOnlyReceiver.addressKeys,
+         wallet.addressKeys,
+         10n,
+         tokenData,
+@@ -1059,21 +1070,6 @@ describe('railgun-engine', function test() {
+       ),
+     );
+ 
+-    const broadcasterMemoText = 'A short memo with only 32 chars.';
+-
+-    // Add output for mock Broadcaster
+-    transactionBatch.addOutput(
+-      TransactNote.createTransfer(
+-        wallet2.addressKeys,
+-        wallet.addressKeys,
+-        1n,
+-        tokenData,
+-        false, // showSenderAddressToRecipient
+-        OutputType.BroadcasterFee,
+-        broadcasterMemoText, // memoText
+-      ),
+-    );
+-
+     TestPOINodeInterface.overridePOIsListStatus = TXOPOIListStatus.Missing;
+ 
+     const { provedTransactions, preTransactionPOIsPerTxidLeafPerList } =
+@@ -1099,8 +1095,8 @@ describe('railgun-engine', function test() {
+       false, // useRelayAdapt
+       isV2Test() ? config.contracts.proxy : config.contracts.poseidonMerkleVerifierV3,
+       preTransactionPOIsPerTxidLeafPerList,
+-      wallet2.viewingKeyPair.privateKey,
+-      wallet2.addressKeys,
++      viewOnlyReceiver.viewingKeyPair.privateKey,
++      viewOnlyReceiver.addressKeys,
+       new TokenDataGetter(engine.db),
+     );
+     expect(isValidPOI.isValid).to.equal(true, isValidPOI.error);
+@@ -1110,27 +1106,38 @@ describe('railgun-engine', function test() {
+     if (isV2Test()) {
+       await Promise.all([
+         promiseTimeout(awaitMultipleScans(wallet, chain, 2), 15000, 'Timed out wallet1 scan'),
+-        promiseTimeout(awaitMultipleScans(wallet2, chain, 2), 15000, 'Timed out wallet2 scan'),
++        promiseTimeout(
++          awaitMultipleScans(viewOnlyReceiver, chain, 2),
++          15000,
++          'Timed out view-only receiver scan',
++        ),
+       ]);
+     } else {
+       await Promise.all([
+         promiseTimeout(awaitScan(wallet, chain), 15000, 'Timed out wallet1 scan'),
+-        promiseTimeout(awaitScan(wallet2, chain), 15000, 'Timed out wallet2 scan'),
++        promiseTimeout(
++          awaitScan(viewOnlyReceiver, chain),
++          15000,
++          'Timed out view-only receiver scan',
++        ),
+       ]);
+     }
+     TestPOINodeInterface.overridePOIsListStatus = TXOPOIListStatus.Valid;
+     await wallet.refreshPOIsForTXIDVersion(chain, txidVersion, true);
+-    await wallet2.refreshPOIsForAllTXIDVersions(chain, true);
++    await viewOnlyReceiver.refreshPOIsForTXIDVersion(chain, txidVersion, true);
+ 
+-    // BALANCE = shielded amount - 300(decimals) - 1
++    // BALANCE = shielded amount - 10 atomic units transferred.
+     const newBalance = await wallet.getBalanceERC20(txidVersion, chain, tokenAddress, [
+       WalletBalanceBucket.Spendable,
+     ]);
+-    expect(newBalance).to.equal(109724999999999999999989n, 'Failed to receive expected balance');
++    expect(newBalance).to.equal(109724999999999999999990n, 'Failed to receive expected balance');
+ 
+-    const newBalance2 = await wallet2.getBalanceERC20(txidVersion, chain, tokenAddress, [
+-      WalletBalanceBucket.Spendable,
+-    ]);
++    const newBalance2 = await viewOnlyReceiver.getBalanceERC20(
++      txidVersion,
++      chain,
++      tokenAddress,
++      [WalletBalanceBucket.Spendable],
++    );
+     expect(newBalance2).to.equal(BigInt(10));
+ 
+     // check the transactions log
+@@ -1158,7 +1165,7 @@ describe('railgun-engine', function test() {
+     expect(history[0].changeTokenAmounts).deep.eq([]);
+     expect(history[0].unshieldTokenAmounts).deep.eq([]);
+ 
+-    // Check second output: Unshield (broadcaster fee + change).
++    // Check second output: private transfer + change.
+     // NOTE: No receive token amounts should be logged by history.
+     expect(history[1].receiveTokenAmounts).deep.eq(
+       [],
+@@ -1172,28 +1179,18 @@ describe('railgun-engine', function test() {
+         outputType: OutputType.Transfer,
+         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+         walletSource: 'test wallet',
+-        recipientAddress: wallet2.getAddress(),
++        recipientAddress: viewOnlyReceiver.getAddress(),
+         memoText,
+         // eslint-disable-next-line no-unneeded-ternary
+         hasValidPOIForActiveLists: true,
+       },
+     ]);
+-    expect(history[1].broadcasterFeeTokenAmount).deep.eq({
+-      tokenData: getTokenDataERC20(tokenAddress),
+-      tokenHash: tokenFormatted,
+-      amount: BigInt(1),
+-      outputType: OutputType.BroadcasterFee,
+-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+-      walletSource: 'test wallet',
+-      memoText: broadcasterMemoText,
+-      // eslint-disable-next-line no-unneeded-ternary
+-      hasValidPOIForActiveLists: true,
+-    });
++    expect(history[1].broadcasterFeeTokenAmount).eq(undefined);
+     expect(history[1].changeTokenAmounts).deep.eq([
+       {
+         tokenData: getTokenDataERC20(tokenAddress),
+         tokenHash: tokenFormatted,
+-        amount: BigInt('109724999999999999999989'),
++        amount: BigInt('109724999999999999999990'),
+         outputType: OutputType.Change,
+         walletSource: 'test wallet',
+         memoText: undefined,
+@@ -1203,7 +1200,7 @@ describe('railgun-engine', function test() {
+     ]);
+     expect(history[1].unshieldTokenAmounts).deep.eq([]);
+ 
+-    const history2 = await wallet2.getTransactionHistory(chain, undefined);
++    const history2 = await viewOnlyReceiver.getTransactionHistory(chain, undefined);
+     expect(history2.length).to.equal(1);
+     expect(history2[0].receiveTokenAmounts).deep.eq([
+       {
+@@ -1216,21 +1213,63 @@ describe('railgun-engine', function test() {
+         balanceBucket: WalletBalanceBucket.Spendable,
+         hasValidPOIForActiveLists: true,
+       },
+-      {
+-        tokenData: getTokenDataERC20(tokenAddress),
+-        tokenHash: tokenFormatted,
+-        amount: BigInt(1),
+-        memoText: broadcasterMemoText,
+-        senderAddress: undefined,
+-        shieldFee: undefined,
+-        balanceBucket: WalletBalanceBucket.Spendable,
+-        hasValidPOIForActiveLists: true,
+-      },
+     ]);
+     expect(history2[0].transferTokenAmounts).deep.eq([]);
+     expect(history2[0].broadcasterFeeTokenAmount).eq(undefined);
+     expect(history2[0].changeTokenAmounts).deep.eq([]);
+     expect(history2[0].unshieldTokenAmounts).deep.eq([]);
++
++    expect(() => viewOnlyReceiver.sign({} as never, testEncryptionKey)).to.throw(
++      'View-Only wallet cannot generate signatures.',
++    );
++    const receiverTXOs = await viewOnlyReceiver.TXOs(txidVersion, chain);
++    const settlement = receiverTXOs.find((txo) => txo.note.memoText === memoText);
++    expect(settlement).to.not.equal(undefined);
++    if (!settlement) throw new Error('PPOps settlement note not found.');
++    expect(POI.getBalanceBucket(settlement)).to.equal(WalletBalanceBucket.Spendable);
++    const normalizedTransactionHash = settlement.txid.startsWith('0x')
++      ? settlement.txid.toLowerCase()
++      : `0x${settlement.txid.toLowerCase()}`;
++    const uniqueSettlementId =
++      `${chain.id}:${txidVersion}:${normalizedTransactionHash}:` +
++      `${settlement.tree}:${settlement.position}`;
++
++    const receiverWalletID = viewOnlyReceiver.id;
++    engine.unloadWallet(receiverWalletID);
++    const restartedReceiver = await engine.loadExistingViewOnlyWallet(
++      testEncryptionKey,
++      receiverWalletID,
++    );
++    const restartedSettlement = (await restartedReceiver.TXOs(txidVersion, chain)).find(
++      (txo) => txo.note.memoText === memoText,
++    );
++    expect(restartedSettlement).to.not.equal(undefined);
++    if (!restartedSettlement) throw new Error('Settlement missing after view-only restart.');
++    expect(
++      `${chain.id}:${txidVersion}:${normalizedTransactionHash}:` +
++        `${restartedSettlement.tree}:${restartedSettlement.position}`,
++    ).to.equal(uniqueSettlementId);
++
++    // Machine-readable proof surfaced to the PPOps gate runner.
++    // eslint-disable-next-line no-console
++    console.log(
++      `PPOPS_PRIMITIVE_GATE ${JSON.stringify({
++        ok: true,
++        receiverWalletType: 'view-only',
++        spendingRejected: true,
++        memoText,
++        tokenAddress: restartedSettlement.note.tokenData.tokenAddress,
++        amountAtomic: restartedSettlement.note.value.toString(),
++        transactionHash: restartedSettlement.txid,
++        railgunTxid: restartedSettlement.transactCreationRailgunTxid,
++        tree: restartedSettlement.tree,
++        position: restartedSettlement.position,
++        uniqueSettlementId,
++        rawPPOIStatuses: restartedSettlement.poisPerList,
++        balanceBucket: POI.getBalanceBucket(restartedSettlement),
++        restartRecoveredSameSettlement: true,
++      })}`,
++    );
+   }).timeout(90000);
+ 
+   it('[HH] Should shield NFTs, transfer & unshield NFTs, and pull formatted spend/receive NFT history', async function run() {

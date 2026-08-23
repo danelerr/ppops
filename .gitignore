@@ -1,0 +1,12 @@
+node_modules/
+dist/
+data/
+secrets/
+backups/
+ppops.config.json
+.ppops-kill-test/
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.viewing-key
