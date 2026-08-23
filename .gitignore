@@ -5,6 +5,10 @@ coverage/
 data/
 secrets/
 backups/
+instance/
+pilot/
+pilot-evidence/
+restore/
 ppops.config.json
 .ppops-kill-test/
 *.log
