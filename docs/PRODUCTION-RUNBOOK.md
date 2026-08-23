@@ -67,6 +67,9 @@ provider URLs. Preserve that property in log shipping.
 
 ## Webhook recovery and key rotation
 
+The repository's `pilot:webhook-receiver` is loopback-only evidence tooling. Do
+not deploy it as the merchant's production fulfillment backend.
+
 - Every delivery includes `ppops-event-id`, `ppops-timestamp`,
   `ppops-key-id`, and `ppops-signature`. Receivers must reject old timestamps
   and deduplicate event IDs before applying business state.

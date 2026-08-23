@@ -55,7 +55,8 @@ node dist/cli.js init \
   --token-decimals 6 \
   --rpc-url https://your-first-rpc.example \
   --rpc-url https://your-independent-rpc.example \
-  --poi-node https://your-compatible-ppoi.example
+  --poi-node https://your-compatible-ppoi.example \
+  --webhook-url http://127.0.0.1:8790/webhooks/ppops
 
 node dist/cli.js config-validate --config ./ppops.config.json
 node dist/cli.js preflight --config ./ppops.config.json
@@ -64,6 +65,23 @@ node dist/cli.js preflight --config ./ppops.config.json
 The Wallet SDK currently documents `https://ppoi.fdi.network` as a public
 community aggregator. It passed PPOps `ppoi_health` preflight on 2026-08-23,
 but production availability and trust remain the operator's responsibility.
+
+For a self-pilot, start the local evidence receiver in a second terminal. It is
+loopback-only, verifies the exact HMAC body and headers, rejects event-ID/body
+mismatches, persists event IDs and event types for deduplication, and never
+stores event payloads:
+
+```bash
+npm run pilot:webhook-receiver -- \
+  --key-file ./secrets/webhook-hmac-key \
+  --key-id v1 \
+  --state-file ./pilot/webhook-events.sqlite \
+  --port 8790
+```
+
+This receiver is gate tooling, not a production merchant backend. A real
+merchant must implement the same verification and durable event-ID dedupe in
+its fulfillment system.
 
 Publish the merchant signer printed by `init` through an authenticated channel
 that is independent of the checkout server. Start PPOps only after the payer or
@@ -128,7 +146,17 @@ matchStatus = MATCHED
 ```
 
 Only then may the intent become `PAID` or `PAID_LATE`. Verify the authenticated
-intent-status endpoint and exactly one valid `payment.confirmed` webhook.
+intent-status endpoint and exactly one valid `payment.confirmed` webhook. The
+pilot receiver exposes metadata-minimal evidence at:
+
+```bash
+curl --fail http://127.0.0.1:8790/stats
+```
+
+After one successful payment and any number of identical delivery retries, it
+must show `payment.confirmed: 1`. `receivedEventCount` may be higher because
+PPOps also emits `settlement.observed` and legitimate state-transition events;
+each distinct event ID is still stored only once.
 
 ## 6. Finish the release gate
 

@@ -40,6 +40,7 @@
     "sbom": "cyclonedx-npm --ignore-npm-errors --package-lock-only --omit dev --output-reproducible --output-format JSON --output-file -",
     "privacy:report": "tsx scripts/privacy-conformance.ts",
     "privacy:test": "npm run privacy:report && vitest run test/privacy.test.ts",
+    "pilot:webhook-receiver": "tsx scripts/pilot-webhook-receiver.ts",
     "kill:encrypted-leaf": "tsx scripts/encrypted-memo-leaf-gate.ts",
     "kill:export-fixture-key": "tsx scripts/export-public-fixture-viewing-key.ts",
     "kill:scan": "tsx scripts/railgun-view-only-scan.ts",

@@ -37,6 +37,8 @@ public Sepolia fixture is not sufficient.
    providers agree on the receipt, block hash and finalized height.
 7. Receive exactly one `payment.confirmed` webhook with a valid HMAC, timestamp,
    event ID and key ID. Retry delivery and prove receiver-side deduplication.
+   A self-pilot may use the loopback evidence receiver in `PILOT-GUIDE.md`; an
+   external merchant must prove deduplication in its own fulfillment backend.
 8. Stop the daemon, restart with the same encrypted databases, rescan, and prove
    no second confirmation event is created.
 9. Run `npm run privacy:test` with invoice/customer canaries and archive the

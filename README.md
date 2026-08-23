@@ -213,6 +213,12 @@ Events contain local intent IDs and settlement state, but not
 `externalReference`. Delivery is idempotent by event ID; non-2xx responses are
 retried with exponential backoff.
 
+`npm run pilot:webhook-receiver` starts a loopback-only reference receiver for
+the controlled gate. It verifies signatures and timestamp freshness and stores
+only event IDs, event types and payload hashes for durable deduplication. It is
+not a production fulfillment backend; usage is documented in
+[`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md).
+
 ## Backup and restore
 
 Stop PPOps first. An active runtime lock makes online backup fail closed.

@@ -215,10 +215,10 @@ Primitive gate:
 
 Compiled daemon smoke test on 2026-08-23:
 
-- Automated suite: 10 test files and 32 tests, including 1,000 property-based
+- Automated suite: 11 test files and 34 tests, including 1,000 property-based
   runs across reconciliation conservation/order invariance and opaque memo
-  round trips. Enforced V8 coverage is 60.11% statements, 54.86% branches,
-  63.85% functions and 62.58% lines across all `src/**/*.ts`; core database,
+  round trips. Enforced V8 coverage is 61.64% statements, 55.72% branches,
+  64.76% functions and 64.20% lines across all `src/**/*.ts`; core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
@@ -235,6 +235,10 @@ Compiled daemon smoke test on 2026-08-23:
 - Local API: unauthenticated operational request returned 401; intent creation
   returned 201; descriptor verification returned valid; webhook registration
   route returned 404; SIGINT completed graceful shutdown.
+- Loopback pilot receiver: the first correctly signed event returned `204` with
+  `idempotent-replayed: false`; an identical retry returned `204` with
+  `idempotent-replayed: true`; `/stats` retained exactly one
+  `payment.confirmed` event and no payload.
 - Offline state backup completed and produced an integrity manifest.
 
 These measurements use public third-party RPC/PPOI endpoints and are not latency
