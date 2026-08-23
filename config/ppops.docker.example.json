@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8787,
+    "allowRemote": true
+  },
+  "network": {
+    "railgunNetworkName": "Ethereum_Sepolia",
+    "chainId": 11155111,
+    "tokenAddress": "REPLACE_WITH_THE_SINGLE_STABLECOIN_ADDRESS",
+    "tokenSymbol": "TESTUSD",
+    "tokenDecimals": 6,
+    "rpcUrls": [
+      "https://REPLACE_WITH_YOUR_RPC"
+    ],
+    "deploymentBlock": 5784866,
+    "finality": {
+      "mode": "confirmations",
+      "confirmations": 12
+    }
+  },
+  "storage": {
+    "sqlitePath": "./data/ppops.sqlite",
+    "railgunDbPath": "./data/railgun-db",
+    "artifactsPath": "./data/artifacts",
+    "walletStatePath": "./data/railgun-wallet.json"
+  },
+  "secrets": {
+    "apiTokenFile": "./secrets/api-token",
+    "merchantSigningKeyFile": "./secrets/merchant-signing-key",
+    "railgunDbEncryptionKeyFile": "./secrets/railgun-db-encryption-key",
+    "viewingKeyFile": "./secrets/railgun-viewing-key",
+    "webhookHmacKeyFile": "./secrets/webhook-hmac-key"
+  },
+  "scanner": {
+    "intervalMs": 30000,
+    "poiNodeUrls": [
+      "https://REPLACE_WITH_YOUR_POI_NODE"
+    ],
+    "providerPollingIntervalMs": 10000
+  },
+  "webhook": {
+    "url": "https://REPLACE_WITH_YOUR_MERCHANT_BACKEND/ppops",
+    "timeoutMs": 10000,
+    "maxAttempts": 12,
+    "baseRetryMs": 5000,
+    "maxRetryMs": 3600000
+  }
+}

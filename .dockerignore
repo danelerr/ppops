@@ -1,0 +1,17 @@
+.git
+.github
+.ppops-kill-test
+artifacts
+data
+dist
+docs
+instance
+node_modules
+patches
+scripts
+test
+*.log
+*.sqlite*
+*.viewing-key
+octant_ppops_contexto_completo_2026-08-23
+octant_ppops_contexto_completo_2026-08-23.zip
