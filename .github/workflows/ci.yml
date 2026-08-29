@@ -17,14 +17,23 @@ jobs:
         with:
           node-version: 24.13.0
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tools/ppops-payer/package-lock.json
       - run: npm ci
-      - run: npm run verify
+      - run: npm run payer:install
+      - run: npm run verify:all
       - name: Generate CycloneDX SBOM
         run: npm run --silent sbom > "$RUNNER_TEMP/ppops-sbom.cdx.json"
+      - name: Generate payer CycloneDX SBOM
+        working-directory: tools/ppops-payer
+        run: ../../node_modules/.bin/cyclonedx-npm --ignore-npm-errors --package-lock-only --omit dev --output-reproducible --output-format JSON --output-file "$RUNNER_TEMP/ppops-payer-sbom.cdx.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ppops-sbom
-          path: ${{ runner.temp }}/ppops-sbom.cdx.json
+          name: ppops-sboms
+          path: |
+            ${{ runner.temp }}/ppops-sbom.cdx.json
+            ${{ runner.temp }}/ppops-payer-sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
 

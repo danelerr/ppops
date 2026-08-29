@@ -3,6 +3,15 @@
   "version": "0.1.0-alpha.0",
   "description": "Reproducible RAILGUN payer harness for PPOps",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danelerr/ppops.git",
+    "directory": "tools/ppops-payer"
+  },
+  "homepage": "https://github.com/danelerr/ppops/tree/main/tools/ppops-payer#readme",
+  "bugs": {
+    "url": "https://github.com/danelerr/ppops/issues"
+  },
   "type": "module",
   "license": "Apache-2.0",
   "bin": {

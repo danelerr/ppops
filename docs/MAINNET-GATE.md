@@ -28,8 +28,9 @@ public Sepolia fixture is not sufficient.
    expiry and memo.
 4. From a separate RAILGUN spending wallet, send a private native-USDC transfer
    to the receiver with the exact `ppops:v1:0x…` memo. Never place payer
-   spending material on the PPOps host. The controlled Railway Wallet procedure
-   is documented in `PILOT-GUIDE.md`.
+   spending material on the PPOps host. The reference path is the independently
+   executed `tools/ppops-payer` SDK harness documented in `PILOT-GUIDE.md`;
+   Railway Wallet is optional compatibility evidence only.
 5. Record the normalized settlement identifier `(chain, TXID version,
    transaction hash, tree, position)`, amount, token, decrypted memo,
    `FINALIZED` state, raw PPOI bucket and `SPENDABLE` state. Redact the opaque

@@ -30,7 +30,10 @@ the first test.
 
 ## 1. Verify the harness
 
+From the unified repository root, enter the independent payer package:
+
 ```bash
+cd tools/ppops-payer
 npm ci
 npm run verify
 npm run build
@@ -95,7 +98,10 @@ result includes a public Arbitrum transaction hash and the explicit warning
 
 Do not rerun blindly after an ambiguous RPC response. First inspect the public
 signer's nonce and PPOps settlements; a submitted transaction may exist even if
-the client did not receive the response.
+the client did not receive the response. The local write-ahead journal blocks
+reuse of the intent; inspect it with `submission-status --config
+./payer.config.json --intent-id INTENT_ID`. `SUBMITTING` without a hash is an
+ambiguous state, not permission to delete the record and retry.
 
 ## 5. Complete PPOps evidence
 

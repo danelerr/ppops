@@ -139,6 +139,7 @@ place its recovery mnemonic and a gas-funded Arbitrum self-signing key in
 owner-only local files, and synchronize:
 
 ```bash
+cd tools/ppops-payer
 node dist/cli.js sync --config ./payer.config.json
 ```
 

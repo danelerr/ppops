@@ -207,8 +207,8 @@ PPOps must not yet claim:
 
 ## Immediate actions
 
-1. Remove Railway Wallet from the critical path and import the payer into the
-   separate, local `ppops-payer` Wallet SDK harness.
+1. Keep Railway Wallet out of the critical path and run the payer through the
+   independent `tools/ppops-payer` Wallet SDK package on the payer host.
 2. Run the direct SDK sync from the recorded shield block and require native
    USDC in the `Spendable` bucket.
 3. Create a fresh intent only after that readiness condition holds.

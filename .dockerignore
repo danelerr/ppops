@@ -2,6 +2,7 @@
 .github
 .ppops-kill-test
 artifacts
+audit-context
 data
 dist
 docs
@@ -10,6 +11,12 @@ node_modules
 patches
 scripts
 test
+tools/ppops-payer/data
+tools/ppops-payer/artifacts
+tools/ppops-payer/dist
+tools/ppops-payer/node_modules
+tools/ppops-payer/payer.config.json
+tools/ppops-payer/secrets
 *.log
 *.sqlite*
 *.viewing-key

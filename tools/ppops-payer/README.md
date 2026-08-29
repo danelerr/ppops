@@ -4,6 +4,10 @@
 PPOps mainnet gate. It replaces Railway Wallet in the critical test path; it
 does not replace PPOps and it is not a general-purpose wallet.
 
+It shares the PPOps Git repository for reproducibility but remains an
+independent package and runtime. Run every command in this README from
+`tools/ppops-payer/` on the payer-controlled host.
+
 ```text
 PPOps request.json -> verify pinned merchant signer -> RAILGUN proof + memo
                   -> self-signed Arbitrum submission -> PPOps reconciliation
@@ -68,7 +72,7 @@ npm run build
 node dist/cli.js init \
   --config ./payer.config.json \
   --creation-block FIRST_PAYER_RAILGUN_BLOCK \
-  --from-ppops-config ../ppops/ppops.config.json
+  --from-ppops-config ../../ppops.config.json
 ```
 
 `init` creates only a new RAILGUN database-encryption key and an ignored local
@@ -122,6 +126,21 @@ request. `1000000000000000` wei is a maximum of `0.001 ETH`, not an estimate or
 target. Choose a bound you independently accept. Compare the locally returned
 RAILGUN address with the payer address before approving Gate A.
 
+Immediately before broadcast, the harness persists an owner-only write-ahead
+record for the intent. It changes from `SUBMITTING` to `SUBMITTED` after a hash
+is returned, and any later attempt to pay the same intent is rejected. Inspect
+the record without loading spending keys:
+
+```bash
+node dist/cli.js submission-status \
+  --config ./payer.config.json \
+  --intent-id INTENT_ID
+```
+
+If the status remains `SUBMITTING`, treat the result as ambiguous and inspect
+the public signer's nonce plus PPOps settlements. Never delete or alter the
+journal merely to make a retry pass.
+
 ## Evidence interpretation
 
 Gate A proves that Railway Wallet is not required for proof generation,
@@ -143,3 +162,7 @@ npm run build
 
 Runtime data, wallet databases, configurations, secrets and local evidence are
 ignored by Git.
+
+`sync` and `pay-self-signed` hold an owner-only runtime lock for the full wallet
+state. Two payer processes therefore cannot scan or submit concurrently from
+the same local wallet cache.

@@ -6,7 +6,8 @@ PPOps is an open-source, self-hosted RAILGUN payment reconciler. A merchant
 creates a local payment intent, gives the payer a signed descriptor containing
 an opaque reference, and receives a private RAILGUN transfer whose encrypted
 memo carries that reference. PPOps detects and reconciles the transfer from a
-view-only wallet; it never accepts a RAILGUN spending key or mnemonic.
+view-only wallet; the merchant daemon never accepts a RAILGUN spending key or
+mnemonic. The separately executed payer gate lives under `tools/ppops-payer`.
 
 This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and the daemon
 flow run, but this is not a production-readiness claim. Review the known risks
@@ -37,10 +38,26 @@ outbox -> timestamped HMAC webhook -> merchant backend
 - Offline backup/restore for SQLite, encrypted RAILGUN LevelDB and, only when
   explicitly requested, recovery secrets.
 
-There is no wallet custody, Request Network adapter, HPKE, generic rail
-framework, Solidity contract or new cryptography in v0.1. Hardhat is not a
-product dependency; the patches under `patches/` only preserve the controlled
-upstream gate.
+There is no wallet custody in the merchant daemon, Request Network adapter,
+HPKE, generic rail framework, Solidity contract or new cryptography in v0.1.
+Hardhat is not a product dependency; the patches under `patches/` only preserve
+the controlled upstream gate.
+
+## Repository layout
+
+```text
+src/                       merchant daemon; view-only RAILGUN reconciler
+tools/ppops-payer/         independent payer-side mainnet-gate harness
+scripts/                   privacy, primitive and operational checks
+test/                      merchant-daemon regression/property tests
+docs/                      threat model, runbooks and evidence policy
+artifacts/                 metadata-minimal reproducible gate reports
+```
+
+The payer shares the repository for reproducibility, not a runtime. It has an
+independent package, lockfile, encrypted database, configuration and secret
+directory. The root TypeScript build and Docker image exclude it, and
+`trust-boundary:check` rejects cross-boundary imports.
 
 ## Requirements
 
@@ -251,7 +268,9 @@ authenticated, access-controlled system.
 
 Copy `config/ppops.docker.example.json` to `instance/ppops.config.json`, replace
 every placeholder, create `instance/data` and `instance/secrets`, and ensure the
-container UID/GID can access them. The container listens on `0.0.0.0` internally,
+container UID/GID can access them. Keep the config and every secret file
+owner-only (`chmod 600`); PPOps rejects symlinks, oversized files and group/other
+permissions. The container listens on `0.0.0.0` internally,
 while Compose publishes it only as `127.0.0.1:8787` on the host.
 
 ```bash
@@ -273,6 +292,15 @@ build, executable privacy-conformance checks and a production-dependency audit
 that rejects high or critical findings. Its temporary privacy report is written
 under ignored `coverage/`, so routine verification leaves tracked evidence
 unchanged. CI also emits a CycloneDX SBOM.
+
+To install and verify both independently built components:
+
+```bash
+npm run payer:install
+npm run verify:all
+```
+
+CI publishes separate CycloneDX SBOMs for the merchant daemon and payer harness.
 
 `privacy:test` refreshes `artifacts/privacy-report.json`, creates an actual
 RAILGUN V2 encrypted note locally, decrypts it
@@ -340,6 +368,9 @@ with `mainnet-gate-report-verify` against the independently distributed signer.
   sensitive.
 - The pinned SDK leaves timeout resources after cleanup; the CLI forces process
   termination only after bounded graceful shutdown.
+- `tools/ppops-payer` deliberately accepts payer spending authority, but it is
+  excluded from the merchant build/container and must run on a payer-controlled
+  host. Gate A's public self-signer is linkable by design.
 - The base image and GitHub Actions are digest/SHA pinned. CI builds the Docker
   image, emits an SBOM and publishes immutable GHCR tags when a `v*` Git tag is
   deliberately pushed.
