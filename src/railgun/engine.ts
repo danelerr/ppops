@@ -27,7 +27,7 @@ import {
 import { z } from "zod";
 
 import type { PPOpsConfig } from "../config.js";
-import { assertPrivateFile } from "../security/secrets.js";
+import { readOwnerOnlyFile } from "../security/private-file.js";
 
 type WalletState = {
   schemaVersion: 1;
@@ -305,9 +305,13 @@ export class RailgunViewOnlyEngine {
     const fingerprint = viewingKeyFingerprint(this.shareableViewingKey);
     let state: WalletState | undefined;
     try {
-      await assertPrivateFile(this.config.storage.walletStatePath);
       state = WalletStateSchema.parse(
-        JSON.parse(await readFile(this.config.storage.walletStatePath, "utf8")) as unknown,
+        JSON.parse(
+          await readOwnerOnlyFile(this.config.storage.walletStatePath, {
+            label: "RAILGUN wallet state",
+            maxBytes: 64 * 1_024,
+          }),
+        ) as unknown,
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

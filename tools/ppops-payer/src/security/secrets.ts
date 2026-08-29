@@ -1,9 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
-import { access, chmod, lstat, mkdir, open, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { Mnemonic } from "ethers";
+
+import {
+  assertOwnerOnlyRegularFile,
+  readOwnerOnlyFile,
+} from "./private-file.js";
 
 export type SecretKind = "db-encryption-key" | "mnemonic" | "evm-private-key";
 
@@ -17,21 +22,7 @@ const exists = async (path: string): Promise<boolean> => {
 };
 
 export const assertPrivateFile = async (path: string): Promise<void> => {
-  const metadata = await lstat(path);
-  if (metadata.isSymbolicLink() || !metadata.isFile()) {
-    throw new Error(`Secret path must be a regular, non-symlink file: ${path}`);
-  }
-  if (metadata.size > 4_096) throw new Error(`Secret file is unexpectedly large: ${path}`);
-  if (process.platform !== "win32" && (metadata.mode & 0o077) !== 0) {
-    throw new Error(`Secret file must not be accessible by group or others: ${path}`);
-  }
-  if (
-    process.platform !== "win32" &&
-    typeof process.getuid === "function" &&
-    metadata.uid !== process.getuid()
-  ) {
-    throw new Error(`Secret file must be owned by the current user: ${path}`);
-  }
+  await assertOwnerOnlyRegularFile(path, { label: "Secret file", maxBytes: 4_096 });
 };
 
 const normalizeMnemonic = (value: string): string => value.trim().replace(/\s+/g, " ");
@@ -53,18 +44,11 @@ const validateSecret = (raw: string, kind: SecretKind, path: string): string => 
 };
 
 export const readSecret = async (path: string, kind: SecretKind): Promise<string> => {
-  await assertPrivateFile(path);
-  const noFollow = "O_NOFOLLOW" in constants ? constants.O_NOFOLLOW : 0;
-  const handle = await open(path, constants.O_RDONLY | noFollow);
-  try {
-    const metadata = await handle.stat();
-    if (!metadata.isFile() || metadata.size > 4_096) {
-      throw new Error(`Secret path changed while opening: ${path}`);
-    }
-    return validateSecret(await handle.readFile("utf8"), kind, path);
-  } finally {
-    await handle.close();
-  }
+  return validateSecret(
+    await readOwnerOnlyFile(path, { label: "Secret file", maxBytes: 4_096 }),
+    kind,
+    path,
+  );
 };
 
 export const writeNewSecret = async (path: string, value: string): Promise<void> => {

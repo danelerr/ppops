@@ -1,6 +1,6 @@
 # PPOps threat model
 
-Date: 2026-08-23  
+Date: 2026-08-29
 Version modeled: `0.1.0-beta.0`
 
 ## Executive summary
@@ -28,6 +28,9 @@ In scope:
   `.github/workflows/ci.yml`.
 - Tests and gate scripts only as evidence; they are not modeled as production
   entry points.
+- The independently executed `tools/ppops-payer` harness at the shared
+  repository, supply-chain and signed-request boundary only. Its payer host and
+  spending wallet remain outside the merchant-runtime trust domain.
 
 Out of scope:
 
@@ -36,6 +39,8 @@ Out of scope:
 - A globally observing timing adversary, payer endpoint compromise, voluntary
   merchant disclosure, post-payment spending behavior and operating-system or
   hypervisor compromise.
+- Payer mnemonic custody, public self-signer custody and operating-system state
+  on the separate payer host.
 - Hardhat and the files under `patches/`; they reproduce a controlled upstream
   gate and are not runtime dependencies.
 
@@ -102,22 +107,32 @@ and abuse monitoring before exposure.
 
 - **Merchant backend → API:** commercial reference, atomic amount, expiry and
   Bearer credential cross local HTTP. All operational routes require one Bearer
-  token; request bodies are limited and Zod-validated. There is no per-client
-  authorization or application TLS/rate limiter. Evidence: `src/api/app.ts`.
+  token; request bodies are limited and Zod-validated. PPOps has bounded
+  in-memory per-source limits, but no application TLS, per-client roles or
+  distributed rate limiter. Evidence: `src/api/app.ts` and
+  `src/security/rate-limit.ts`.
 - **API → intent engine → SQLite:** validated commercial metadata crosses an
   in-process boundary and is written through parameterized SQLite statements.
   File/directory modes restrict other local users, but commercial metadata is
   plaintext at the application layer. Evidence: `src/intents/service.ts` and
   `src/db/database.ts` (`insertIntent`).
-- **Secret files → runtime:** viewing capability, API token, merchant signing
-  key, RAILGUN DB key and optional webhook key cross the local filesystem
-  boundary. Files must be regular mode-`0600`-equivalent files on POSIX; values
-  are validated and never API-returned. Evidence: `src/security/secrets.ts` and
-  `src/runtime.ts`.
-- **PPOps → payer:** an EIP-712 descriptor and encrypted-memo reference leave the
-  merchant host through a delivery channel not implemented here. Authenticity
-  depends on the payer obtaining the expected signer independently. Evidence:
-  `src/security/descriptor.ts` and `README.md`.
+- **Private files → runtime:** configuration, wallet state, viewing
+  capability, API token, merchant signing key, RAILGUN DB key and optional
+  webhook key cross the local filesystem boundary. They must be bounded regular
+  files owned by the current user without group/other access on POSIX. PPOps
+  rejects symlinks, opens with `O_NOFOLLOW` where available and rechecks the
+  opened descriptor identity before parsing; secret values are validated and
+  never API-returned. Evidence: `src/security/private-file.ts`,
+  `src/security/secrets.ts` and `src/runtime.ts`.
+- **PPOps → payer:** an EIP-712 descriptor and encrypted-memo reference leave
+  the merchant host through the public checkout/request endpoint or a local
+  request file. Authenticity depends on the payer obtaining the expected signer
+  independently. The reference payer verifies every duplicated request field,
+  serializes wallet access with a local runtime lock and reserves an intent in
+  an owner-only write-ahead submission journal before broadcasting. Evidence:
+  `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
+  `tools/ppops-payer/src/security/runtime-lock.ts` and
+  `tools/ppops-payer/src/security/submission-journal.ts`.
 - **Payer → RAILGUN/blockchain:** the payer submits the private transfer. Public
   chain artifacts are outside PPOps control; the privacy gate demonstrates that
   the plaintext reference/memo is absent from the V2 commitment leaf. Evidence:
@@ -239,8 +254,8 @@ flowchart LR
 | Operational API | `/v1/intents`, `/runtime`, `/settlements`, `/events`, `/outbox`, `/metrics` | backend/client → daemon | Single Bearer role; 64 KiB body cap; socket-address rate limits | `src/api/app.ts`; `src/security/auth.ts`; `src/security/rate-limit.ts` |
 | Descriptor parser/verifier | API or `descriptor-verify` CLI | payer/operator data → EIP-712 verifier | Strict Zod object and external expected signer | `src/security/descriptor.ts` |
 | CLI option parser | Local process arguments | operator shell → privileged runtime | Fixed allowlist; rejects spending-key option | `src/cli.ts` / `parseOptions`, `assertAllowed` |
-| Configuration JSON | `--config` file | local filesystem → runtime | Zod schema, loopback/HTTPS/path policy | `src/config.ts` / `loadConfig` |
-| Secret files | Configured paths | local filesystem → runtime memory | Mode checks and kind-specific formats | `src/security/secrets.ts` / `readSecret` |
+| Configuration JSON | `--config` file | local filesystem → runtime | Private-file identity/owner/size checks, Zod schema, loopback/HTTPS/path policy | `src/config.ts` / `loadConfig`; `src/security/private-file.ts` |
+| Secret files | Configured paths | local filesystem → runtime memory | Private-file identity/owner/size checks and kind-specific formats | `src/security/secrets.ts` / `readSecret`; `src/security/private-file.ts` |
 | Wallet-state JSON | Persistent state file | local filesystem → SDK wallet loader | Strict schema, private-file mode, fingerprint and address checks | `src/railgun/engine.ts` / `WalletStateSchema`, `loadOrCreateWallet` |
 | RAILGUN TXOs/memos | SDK scan | chain/SDK → reconciler | Positive ERC-20 and strict memo parser; RPC normalization concurrency capped | `src/railgun/scanner.ts` / `scan`, `normalizeTXO` |
 | RPC finality/receipt reads | Configured JSON-RPC URLs | external providers → scanner | Majority receipt/block/finality quorum, conservative height and divergence failure; no cryptographic proof | `src/railgun/rpc-quorum.ts`; `src/railgun/scanner.ts` |
@@ -295,11 +310,11 @@ flowchart LR
 
 | Threat ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TM-001 | Local malware, host intruder, malicious backup reader | Read access to the merchant host, process memory or recovery material | Exfiltrate the viewing key and correlate RAILGUN history with SQLite | Full receiver payment-graph disclosure; no direct spend | Viewing key, LevelDB, commercial metadata | Mode-`0600` secret files; separate encrypted RAILGUN DB key; no API/log return; view-only signature/full-wallet rejection (`src/security/secrets.ts`, `src/railgun/engine.ts`) | Process must hold the viewing key; no OS keyring/TEE; SQLite links remain plaintext | Require full-disk encryption, dedicated OS identity, restricted egress, secret-manager mounts and rotation/re-import procedure; consider isolating scanner in a least-privileged process | Alert on secret/config permission changes, unexpected outbound destinations, backup access and wallet fingerprint changes | Medium: host/backup compromise is realistic for self-hosted software, but requires local or supply-chain foothold | High: destroys the central privacy property for the receiver history | high |
+| TM-001 | Local malware, host intruder, malicious backup reader | Read access to the merchant host, process memory or recovery material | Exfiltrate the viewing key and correlate RAILGUN history with SQLite | Full receiver payment-graph disclosure; no direct spend | Viewing key, LevelDB, commercial metadata | Owner-only bounded regular files; symlink rejection, no-follow open and opened-file identity recheck; separate encrypted RAILGUN DB key; no API/log return; view-only signature/full-wallet rejection (`src/security/private-file.ts`, `src/security/secrets.ts`, `src/railgun/engine.ts`) | Process must hold the viewing key; no OS keyring/TEE; SQLite links remain plaintext | Require full-disk encryption, dedicated OS identity, restricted egress, secret-manager mounts and rotation/re-import procedure; consider isolating scanner in a least-privileged process | Alert on secret/config permission changes, unexpected outbound destinations, backup access and wallet fingerprint changes | Medium: host/backup compromise is realistic for self-hosted software, but requires local or supply-chain foothold | High: destroys the central privacy property for the receiver history | high |
 | TM-002 | Remote/local network attacker or compromised merchant app | API is exposed or Bearer token is stolen | Enumerate state, create intents or exhaust API resources using the single administrator credential | Commercial metadata disclosure and payment-workflow manipulation | API token, intents, settlement/event data, availability | Loopback default and explicit `allowRemote`; constant-time Bearer comparison; body/header/time limits; in-process rate limits; Docker host-loopback publish (`src/config.ts`, `src/api/app.ts`, `docker-compose.yml`) | No built-in TLS, token scopes, dual-token rotation or per-client audit identity; in-memory limits are per process | Keep loopback; if proxied, require TLS/mTLS or strong proxy auth, IP policy, distributed rate limits and request audit IDs | Alert on 401/413/429 rates, new source addresses, intent-create spikes and non-loopback binds | Low under stated local-only assumption; medium/high if public | High because the token exposes all merchant operational metadata | medium, conditional high if public |
 | TM-003 | Host intruder, checkout attacker with stolen signer | Merchant EIP-712 signing key is obtained, or payer learns expected signer through the compromised channel | Sign a descriptor for an attacker-controlled recipient/profile | Theft of future payer funds and merchant impersonation | Merchant signing key, expected-signer distribution, payer funds | Independent key from RAILGUN wallet; strict EIP-712 schema; recovered and embedded signer must match; instance profile/expiry checked (`src/security/descriptor.ts`, `src/intents/service.ts`) | Key is a plaintext file in process; trusted-signer distribution is outside repo; no rotation/key ID | Publish signer fingerprint over a separately authenticated channel; document rotation/revocation; move signer to KMS/HSM or offline signer before mainnet | Monitor unexpected signer/profile changes and descriptors not present in local intent DB | Medium: requires host/channel compromise, but signer is online for every intent | High: can redirect new payments even though existing RAILGUN funds remain safe | high |
 | TM-004 | Malicious/failed RPC or PPOI operator; network observer | A majority of RPC sources or inherited PPOI path is compromised, or endpoints observe timing | Omit, delay or falsify receipt/finality/PPOI data and observe scan timing | Payment censorship/delay, privacy leakage and potentially unsafe state | Settlement integrity/availability, request-timing privacy | Exact chain/deployment check; Arbitrum `finalized` enforcement; majority RPC quorum; matched + `FINALIZED` + `SPENDABLE` gate; unknown PPOI fails closed; recent-finalized receipt recheck (`src/config.ts`, `src/railgun/rpc-quorum.ts`, `src/railgun/scanner.ts`) | No cryptographic RPC proofs; PPOI is inherited trust; providers can correlate timing and a quorum can fail availability | Use administratively independent or self-hosted privacy-preserving RPCs, production PPOI and egress policy; investigate every divergence | Metadata-free ready/scan metrics, provider divergence failures, PPOI bucket age and confirmation latency | Medium: outages/inconsistency are common and provider observation is inherent | High: can censor fulfillment; integrity requires majority/PPOI compromise | high |
-| TM-005 | npm/action/base-image/artifact supply-chain attacker | A vulnerable/replaced dependency path is reachable during install/build/runtime | Execute code or write outside intended artifact state, then read secrets/alter reconciliation | Complete application confidentiality/integrity compromise, but still no RAILGUN spending key | All process-held secrets/state, build outputs | Exact lock/pins; compatible security overrides; high/critical audit gate; CycloneDX SBOM; SHA/digest-pinned Actions/base image; artifact containment; non-root read-only resource-bounded container (`package.json`, `src/railgun/engine.ts`, `Dockerfile`, `.github/workflows/ci.yml`) | 36 moderate/low findings and large unused legacy Web3/BZZ/GraphQL tree; install scripts and the SDK remain in the secret-bearing process | Obtain upstream dependency pruning/fixes; isolate the SDK process/container if the maintenance cost is accepted; enforce runtime egress allowlist; rerun primitive gate on every upgrade | Dependency-diff alerts, lockfile review, image/SBOM scanning and unexpected-module/egress monitoring | Medium: exploit reachability is unproven, but network-facing SDK code and stale packages remain | High: runtime code execution reaches viewing/signer/API keys and payment state | high |
+| TM-005 | npm/action/base-image/artifact supply-chain attacker | A vulnerable/replaced dependency path is reachable during install/build/runtime | Execute code or write outside intended artifact state, then read secrets/alter reconciliation | Complete application confidentiality/integrity compromise, but still no RAILGUN spending key | All process-held secrets/state, build outputs | Exact lock/pins; compatible security overrides; high/critical audit gate; CycloneDX SBOM; SHA/digest-pinned Actions/base image; artifact containment; non-root read-only resource-bounded container (`package.json`, `src/railgun/engine.ts`, `Dockerfile`, `.github/workflows/ci.yml`) | 6 moderate and 30 low findings in the legacy RAILGUN/Web3/BZZ tree; install scripts and the SDK remain in the secret-bearing process | Obtain upstream dependency pruning/fixes; isolate the SDK process/container if the maintenance cost is accepted; enforce runtime egress allowlist; rerun primitive gate on every upgrade | Dependency-diff alerts, lockfile review, image/SBOM scanning and unexpected-module/egress monitoring | Medium: exploit reachability is unproven, but network-facing SDK code and stale packages remain | High: runtime code execution reaches viewing/signer/API keys and payment state | high |
 | TM-006 | Stolen media, malicious backup writer, mistaken operator | Access to a backup or restore input; secret bundle option increases impact | Read included keys or replace files and recompute the unsigned SHA-256 inventory | Privacy/identity takeover, rollback or corrupted reconciliation state | Recovery bundle, all service keys, SQLite/LevelDB availability/integrity | Offline runtime lock; new-output/no-overwrite defaults; strict inventory/path checks; profile and high-entropy key fingerprints; move-aside restore (`src/backup.ts`, `src/security/runtime-lock.ts`) | Bundle is not encrypted/authenticated by PPOps; checksums do not resist malicious replacement; forced restore is multi-file, not globally atomic | Use external authenticated encryption and versioned immutable storage; require operator verification of signer/fingerprint through a second channel; test restores on isolated hosts | Audit backup creation/read/restore, alert on fingerprint/profile changes and retain pre-restore paths | Medium: backup mishandling is a common self-hosted failure mode | High when secrets are included; otherwise high integrity/availability impact | high |
 | TM-007 | Network observer with endpoint access, compromised webhook receiver | Valid request is captured or receiver does not enforce replay policy | Replay a signed event or exploit at-least-once retry after receiver success/PPOps failure | Duplicate fulfillment or disclosure of operational amount/status graph to receiver | Webhook key, fulfillment integrity, event metadata | Remote HTTPS required; redirects rejected; HMAC covers timestamp/key ID/event ID/raw body; stable event IDs, persisted outbox and dead-letter-only replay endpoint; loopback pilot receiver persists dedupe IDs and the gate requires an identical replay (`src/events/webhook.ts`, `src/db/database.ts`, `src/pilot/webhook-receiver.ts`, `src/pilot/mainnet-gate.ts`) | Production receiver verification, replay cache and dual-key acceptance remain outside repo; HMAC provides no confidentiality from receiver; operator records are needed to substantiate gate phases | Production receiver must enforce a timestamp window and durable event-ID dedupe; follow staged dual-key rotation in the runbook | Alert on duplicate event IDs, stale timestamps, signature failures, retry/dead-letter spikes | Medium: retries are normal and receiver mistakes are plausible | Medium: affects fulfillment and metadata, not spending authority | medium |
 | TM-008 | Remote note spammer or client of an exposed API | Attacker can pay/send notes or reach API; RAILGUN scanning is resource intensive | Generate strict-looking memos, oversized/request bursts or slow connections to consume scan/RPC/DB resources | Delayed confirmation and daemon availability loss | Scanner/API/SQLite availability | 64 KiB bodies; server timeouts/header cap; in-process rate limits; 8-way normalization cap; one active scan; pagination caps; readiness/metrics; Compose CPU/memory/PID limits (`src/api/app.ts`, `src/api/server.ts`, `src/railgun/scanner.ts`, `docker-compose.yml`) | No unmatched-settlement retention quota; note decryption cost is inherited; per-process rate limits need an edge control when scaled | Keep proxy limits if exposed, add retention after observing real volumes and maintain scan-lag/RSS/disk alerts | Monitor scan duration, unmatched/settlement growth, event-loop lag, RSS, disk and HTTP 413/429 | Medium: note spam is permissionless but costs the attacker; API risk depends on exposure | Medium: availability delay with fail-closed payment state | medium |
@@ -341,6 +356,7 @@ flowchart LR
 | `src/security/descriptor.ts` | Defines the payer-facing signed trust envelope and parser | TM-003 |
 | `src/intents/service.ts` | Couples signed descriptors to the configured merchant profile and local reference | TM-003, TM-009 |
 | `src/security/secrets.ts` | Enforces formats/permissions for every runtime secret | TM-001, TM-002, TM-003 |
+| `src/security/private-file.ts` | Establishes the no-symlink, owner-only and opened-file-identity boundary for sensitive local inputs | TM-001, TM-002, TM-003, TM-006 |
 | `src/api/app.ts` | Main network entry point, authentication coverage and sensitive response surface | TM-002, TM-008, TM-010 |
 | `src/events/webhook.ts` | External egress, HMAC construction and retry/dead-letter behavior | TM-007 |
 | `src/pilot/mainnet-gate.ts` | Reads sensitive operational state and decides whether redacted restart/restore evidence is internally consistent | TM-002, TM-007, TM-009, TM-010 |
@@ -348,6 +364,8 @@ flowchart LR
 | `src/config.ts` | Controls binding, endpoint trust and all storage/secret paths | TM-002, TM-004, TM-006 |
 | `package-lock.json` | Captures the large vulnerable upstream dependency surface | TM-005 |
 | `Dockerfile` | Defines runtime privilege, copied dependencies and base-image trust | TM-005, TM-008 |
+| `scripts/trust-boundary-check.ts` | Prevents payer spending code from entering the merchant build/image boundary | TM-001, TM-003, TM-005 |
+| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents an automatic second spend after an ambiguous payer submission | TM-003, TM-009 |
 
 ## Quality check
 

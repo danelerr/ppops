@@ -54,3 +54,15 @@ export const assertGasCostWithinLimit = (
   }
   return cost;
 };
+
+export const assertRequestStillOpen = (
+  expiresAt: number,
+  now = Math.floor(Date.now() / 1_000),
+): void => {
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
+    throw new SafeFailure(
+      "REQUEST_INVALID",
+      "Payment request expired while preparing the transfer",
+    );
+  }
+};

@@ -33,6 +33,7 @@ import {
   readSecret,
   writeNewSecret,
 } from "./security/secrets.js";
+import { safeCliFailureResult } from "./security/failures.js";
 
 const HELP = `PPOps v0.1.0-beta.0
 
@@ -597,8 +598,7 @@ if (invokedPath === import.meta.url) {
       }
     })
     .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : "Unknown PPOps failure";
-      process.stderr.write(`${JSON.stringify({ ok: false, error: message })}\n`, () => {
+      process.stderr.write(`${JSON.stringify(safeCliFailureResult(error))}\n`, () => {
         process.exit(1);
       });
     });

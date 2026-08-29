@@ -50,4 +50,17 @@ describe("payer configuration", () => {
     ];
     expect(PayerConfigSchema.safeParse(duplicated).success).toBe(false);
   });
+
+  it("rejects embedded URL credentials", () => {
+    const rpcCredentials = config();
+    rpcCredentials.network.rpcUrls = [
+      "https://user:password@rpc-a.example",
+      "https://rpc-b.example",
+    ];
+    expect(PayerConfigSchema.safeParse(rpcCredentials).success).toBe(false);
+
+    const poiCredentials = config();
+    poiCredentials.poiNodeUrls = ["https://user:password@poi.example"];
+    expect(PayerConfigSchema.safeParse(poiCredentials).success).toBe(false);
+  });
 });

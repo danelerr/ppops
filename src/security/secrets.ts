@@ -1,7 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { access, chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname } from "node:path";
+
+import {
+  assertOwnerOnlyRegularFile,
+  readOwnerOnlyFile,
+} from "./private-file.js";
 
 export type SecretKind =
   | "api-token"
@@ -20,12 +25,7 @@ const exists = async (path: string): Promise<boolean> => {
 };
 
 export const assertPrivateFile = async (path: string): Promise<void> => {
-  if (process.platform === "win32") return;
-  const metadata = await stat(path);
-  if (!metadata.isFile()) throw new Error(`Secret path is not a regular file: ${path}`);
-  if ((metadata.mode & 0o077) !== 0) {
-    throw new Error(`Secret file must not be accessible by group or others: ${path}`);
-  }
+  await assertOwnerOnlyRegularFile(path, { label: "Secret file", maxBytes: 4_096 });
 };
 
 const validateSecret = (value: string, kind: SecretKind, path: string): string => {
@@ -51,8 +51,9 @@ const validateSecret = (value: string, kind: SecretKind, path: string): string =
 };
 
 export const readSecret = async (path: string, kind: SecretKind): Promise<string> => {
-  await assertPrivateFile(path);
-  const value = (await readFile(path, "utf8")).trim();
+  const value = (
+    await readOwnerOnlyFile(path, { label: "Secret file", maxBytes: 4_096 })
+  ).trim();
   return validateSecret(value, kind, path);
 };
 

@@ -3,6 +3,35 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PPOpsConfig } from "../config.js";
 import type { PPOpsDatabase } from "../db/database.js";
 
+export type WebhookFailureCode =
+  | "TIMEOUT"
+  | "HTTP_4XX"
+  | "HTTP_5XX"
+  | "HTTP_OTHER"
+  | "NETWORK"
+  | "DELIVERY_FAILED";
+
+export const classifyWebhookFailure = (error: unknown): WebhookFailureCode => {
+  if (!(error instanceof Error)) return "DELIVERY_FAILED";
+  if (error.name === "AbortError" || error.name === "TimeoutError") return "TIMEOUT";
+  const status = /Webhook returned HTTP ([0-9]{3})/.exec(error.message)?.[1];
+  if (status) {
+    if (status.startsWith("4")) return "HTTP_4XX";
+    if (status.startsWith("5")) return "HTTP_5XX";
+    return "HTTP_OTHER";
+  }
+  const code = String((error as NodeJS.ErrnoException).code ?? "").toUpperCase();
+  if (
+    ["ECONNREFUSED", "ECONNRESET", "ENETUNREACH", "ENOTFOUND", "EAI_AGAIN"].includes(
+      code,
+    ) ||
+    error instanceof TypeError
+  ) {
+    return "NETWORK";
+  }
+  return "DELIVERY_FAILED";
+};
+
 export const webhookSignature = (
   hmacKeyHex: string,
   timestamp: number,
@@ -97,9 +126,9 @@ export class WebhookDeliveryService {
         this.database.markEventDelivered(record.event.eventId, now);
         result.delivered += 1;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Webhook delivery failed";
+        const failureCode = classifyWebhookFailure(error);
         if (record.attempts + 1 >= this.config.maxAttempts) {
-          this.database.markEventDeadLettered(record.event.eventId, now, message);
+          this.database.markEventDeadLettered(record.event.eventId, now, failureCode);
           result.deadLettered += 1;
         } else {
           const exponential = this.config.baseRetryMs * 2 ** record.attempts;
@@ -107,7 +136,11 @@ export class WebhookDeliveryService {
             1,
             Math.ceil(Math.min(exponential, this.config.maxRetryMs) / 1_000),
           );
-          this.database.markEventFailed(record.event.eventId, now + retrySeconds, message);
+          this.database.markEventFailed(
+            record.event.eventId,
+            now + retrySeconds,
+            failureCode,
+          );
           result.failed += 1;
         }
       }

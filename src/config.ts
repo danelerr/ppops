@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { isIP } from "node:net";
 
 import { isAddress } from "ethers";
 import { z } from "zod";
+
+import { readOwnerOnlyFile } from "./security/private-file.js";
 
 export const ARBITRUM_MAINNET_CHAIN_ID = 42_161;
 export const ARBITRUM_NATIVE_USDC =
@@ -23,7 +24,11 @@ const HttpUrlSchema = z
   .url()
   .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
     message: "Expected an http(s) URL",
-  });
+  })
+  .refine((value) => {
+    const url = new URL(value);
+    return !url.username && !url.password;
+  }, "URL credentials are forbidden");
 
 const isLoopbackUrl = (value: string): boolean => {
   const hostname = new URL(value).hostname.toLowerCase();
@@ -250,7 +255,10 @@ const resolveConfigPaths = (config: PPOpsConfig, configPath: string): PPOpsConfi
 
 export const loadConfig = async (path: string): Promise<PPOpsConfig> => {
   const configPath = resolve(path);
-  const source = await readFile(configPath, "utf8");
+  const source = await readOwnerOnlyFile(configPath, {
+    label: "PPOps config",
+    maxBytes: 64 * 1_024,
+  });
   const parsed = PPOpsConfigSchema.parse(JSON.parse(source) as unknown);
   const resolved = resolveConfigPaths(parsed, configPath);
   const protectedPaths = [

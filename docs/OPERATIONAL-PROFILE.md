@@ -227,12 +227,13 @@ Primitive gate:
 - Live Sepolia fixture: 70 ERC-20 TXOs and real PPOI-derived buckets; test-only
   journal emitted two memo outputs on first run and zero on restart.
 
-Compiled daemon smoke test on 2026-08-23:
+Verification evidence:
 
-- Automated suite: 12 test files and 38 tests, including 1,000 property-based
+- Automated merchant suite on 2026-08-29: 17 test files and 52 tests, including
+  1,000 property-based
   runs across reconciliation conservation/order invariance and opaque memo
-  round trips. Enforced V8 coverage is 64.41% statements, 59.39% branches,
-  69.00% functions and 66.88% lines across all `src/**/*.ts`; core database,
+  round trips. Enforced V8 coverage is 64.63% statements, 60.60% branches,
+  68.59% functions and 67.39% lines across all `src/**/*.ts`; core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,

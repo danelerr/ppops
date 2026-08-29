@@ -29,9 +29,14 @@ import { SafeFailure, writeEvent } from "../events.js";
 import {
   assertExpectedSelfSigner,
   assertGasCostWithinLimit,
+  assertRequestStillOpen,
   parseGasCostLimit,
 } from "../execution-guards.js";
 import type { PaymentRequest } from "../request.js";
+import {
+  SubmissionJournal,
+  submissionJournalPath,
+} from "../security/submission-journal.js";
 import type { PayerRailgunEngine } from "./engine.js";
 
 type ProviderContext = {
@@ -96,6 +101,10 @@ export const sendSelfSignedTransfer = async (input: {
     input.expectedSelfSigner,
   );
   const gasCostLimit = parseGasCostLimit(input.maxGasCostWei);
+  const submissionJournal = new SubmissionJournal(
+    submissionJournalPath(config.storage.walletStatePath),
+  );
+  await submissionJournal.assertUnused(request.id);
   const spendable = await engine.spendableBalance();
   if (spendable < amount) {
     throw new SafeFailure(
@@ -229,9 +238,12 @@ export const sendSelfSignedTransfer = async (input: {
       maxFeePerGas: providerContext.maxFeePerGas,
       maxPriorityFeePerGas: providerContext.maxPriorityFeePerGas,
     };
+    assertRequestStillOpen(request.expiresAt);
+    await submissionJournal.reserve(request, derivedSelfSigner);
     try {
       const response = await providerContext.signer.sendTransaction(transaction);
       writeEvent("transfer.submitted", { transactionHash: response.hash });
+      await submissionJournal.markSubmitted(request.id, response.hash);
       return {
         transactionHash: response.hash,
         selfSigner: providerContext.signer.address,

@@ -5,7 +5,6 @@ import {
   access,
   chmod,
   mkdir,
-  readFile,
   writeFile,
 } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -35,6 +34,15 @@ import {
   readSecret,
   writeNewSecret,
 } from "./security/secrets.js";
+import { readOwnerOnlyFile } from "./security/private-file.js";
+import {
+  PayerRuntimeLock,
+  payerRuntimeLockPath,
+} from "./security/runtime-lock.js";
+import {
+  SubmissionJournal,
+  submissionJournalPath,
+} from "./security/submission-journal.js";
 
 process.umask(0o077);
 
@@ -49,6 +57,7 @@ Commands:
   ppops-payer secrets-check --config PATH
   ppops-payer request-verify --request URL_OR_PATH --expected-signer ADDRESS
   ppops-payer sync --config PATH
+  ppops-payer submission-status --config PATH --intent-id pi_ID
   ppops-payer pay-self-signed --config PATH --request URL_OR_PATH \\
     --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
     --expected-payer 0zk_ADDRESS --expected-self-signer EVM_ADDRESS \\
@@ -144,7 +153,12 @@ const init = async (options: ParsedOptions): Promise<void> => {
       throw new Error("--from-ppops-config cannot be combined with RPC/POI options");
     }
     const source = PPOpsConfigSourceSchema.parse(
-      JSON.parse(await readFile(resolve(sourcePath), "utf8")) as unknown,
+      JSON.parse(
+        await readOwnerOnlyFile(resolve(sourcePath), {
+          label: "PPOps source config",
+          maxBytes: 64 * 1_024,
+        }),
+      ) as unknown,
     );
     rpcUrls = source.network.rpcUrls;
     poiNodeUrls = source.scanner.poiNodeUrls;
@@ -297,11 +311,39 @@ const requestVerify = async (options: ParsedOptions): Promise<void> => {
   });
 };
 
+const submissionStatus = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, ["config", "intent-id"]);
+  const config = await loadConfig(one(options, "config", { required: true }));
+  const intentId = one(options, "intent-id", { required: true });
+  if (!/^pi_[0-9a-f]{32}$/.test(intentId)) {
+    throw new SafeFailure("REQUEST_INVALID", "Intent ID is invalid");
+  }
+  const record = await new SubmissionJournal(
+    submissionJournalPath(config.storage.walletStatePath),
+  ).get(intentId);
+  output({
+    ok: true,
+    intentId,
+    recorded: record !== undefined,
+    ...(record
+      ? {
+          status: record.status,
+          ...(record.transactionHash
+            ? { transactionHash: record.transactionHash }
+            : {}),
+        }
+      : {}),
+  });
+};
+
 const withEngine = async <T>(
   config: PayerConfig,
   secrets: { dbEncryptionKey: string; mnemonic?: string },
   operation: (engine: PayerRailgunEngine) => Promise<T>,
 ): Promise<T> => {
+  const lock = await PayerRuntimeLock.acquire(
+    payerRuntimeLockPath(config.storage.walletStatePath),
+  );
   const engine = new PayerRailgunEngine(
     config,
     secrets.dbEncryptionKey,
@@ -311,7 +353,11 @@ const withEngine = async <T>(
     await engine.start();
     return await operation(engine);
   } finally {
-    await engine.stop().catch(() => undefined);
+    try {
+      await engine.stop().catch(() => undefined);
+    } finally {
+      await lock.release();
+    }
   }
 };
 
@@ -396,6 +442,9 @@ const main = async (): Promise<void> => {
       return;
     case "sync":
       await sync(options);
+      return;
+    case "submission-status":
+      await submissionStatus(options);
       return;
     case "pay-self-signed":
       await paySelfSigned(options);

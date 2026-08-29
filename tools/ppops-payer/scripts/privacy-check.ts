@@ -1,18 +1,22 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const sourceFiles = [
-  "src/cli.ts",
-  "src/events.ts",
-  "src/execution-guards.ts",
-  "src/railgun/engine.ts",
-  "src/railgun/self-signed-transfer.ts",
-  "src/security/secrets.ts",
-];
+const sourceFiles = async (directory: string): Promise<string[]> => {
+  const files: string[] = [];
+  for (const entry of await readdir(resolve(root, directory), { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...(await sourceFiles(path)));
+    if (entry.isFile() && entry.name.endsWith(".ts")) files.push(path);
+  }
+  return files;
+};
 
 const sources = await Promise.all(
-  sourceFiles.map(async (path) => ({ path, text: await readFile(resolve(root, path), "utf8") })),
+  (await sourceFiles("src")).map(async (path) => ({
+    path,
+    text: await readFile(resolve(root, path), "utf8"),
+  })),
 );
 const failures: string[] = [];
 for (const { path, text } of sources) {

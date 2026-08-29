@@ -1,4 +1,3 @@
-import { lstat, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import { z } from "zod";
@@ -11,12 +10,21 @@ import {
   PAYER_TOKEN_DECIMALS,
   PAYER_TOKEN_SYMBOL,
 } from "./constants.js";
+import { readOwnerOnlyFile } from "./security/private-file.js";
 
 const HttpUrlSchema = z
   .url()
   .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
     message: "Expected an http(s) URL",
-  });
+  })
+  .refine((value) => {
+    const url = new URL(value);
+    return !url.username && !url.password;
+  }, "URL credentials are forbidden");
+const HttpsUrlSchema = HttpUrlSchema.refine(
+  (value) => new URL(value).protocol === "https:",
+  "Expected an HTTPS URL",
+);
 const PositiveIntegerSchema = z.number().int().positive().safe();
 
 export const PayerConfigSchema = z
@@ -37,7 +45,7 @@ export const PayerConfigSchema = z
         rpcUrls: z.array(HttpUrlSchema).min(2),
       })
       .strict(),
-    poiNodeUrls: z.array(z.url().refine((value) => value.startsWith("https://"))).min(1),
+    poiNodeUrls: z.array(HttpsUrlSchema).min(1),
     storage: z
       .object({
         railgunDbPath: z.string().min(1),
@@ -115,15 +123,13 @@ const assertPathsDoNotOverlap = (config: PayerConfig): void => {
 
 export const loadConfig = async (path: string): Promise<PayerConfig> => {
   const configPath = resolve(path);
-  const metadata = await lstat(configPath);
-  if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > 64 * 1024) {
-    throw new Error("Payer config must be a regular, non-symlink file under 64 KiB");
-  }
-  if (process.platform !== "win32" && (metadata.mode & 0o077) !== 0) {
-    throw new Error("Payer config may contain RPC credentials and must be owner-only");
-  }
   const parsed = PayerConfigSchema.parse(
-    JSON.parse(await readFile(configPath, "utf8")) as unknown,
+    JSON.parse(
+      await readOwnerOnlyFile(configPath, {
+        label: "Payer config",
+        maxBytes: 64 * 1_024,
+      }),
+    ) as unknown,
   );
   const resolved = resolveConfigPaths(parsed, configPath);
   assertPathsDoNotOverlap(resolved);

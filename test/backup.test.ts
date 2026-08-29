@@ -78,7 +78,8 @@ const configAt = (root: string, sourceSecrets?: string): { config: PPOpsConfig; 
   };
   mkdirSync(root, { recursive: true });
   const path = join(root, "ppops.config.json");
-  writeFileSync(path, JSON.stringify(config));
+  writeFileSync(path, JSON.stringify(config), { mode: 0o600 });
+  if (process.platform !== "win32") chmodSync(path, 0o600);
   return { config, path };
 };
 

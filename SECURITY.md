@@ -1,8 +1,10 @@
 # Security policy
 
 PPOps v0.1 is beta software handling highly sensitive viewing capability and
-commercial payment metadata. It does not hold a RAILGUN spending key, but a
-compromise can still reveal the merchant's private payment graph.
+commercial payment metadata. The merchant daemon does not hold a RAILGUN
+spending key, but a compromise can still reveal the merchant's private payment
+graph. The separate `tools/ppops-payer` gate does hold payer spending authority
+and must run under a different trust domain.
 
 ## Reporting a vulnerability
 
@@ -22,10 +24,13 @@ production-ready.
 
 ## Security invariants
 
-- The runtime accepts a shareable RAILGUN viewing key, never a mnemonic or
-  spending key.
-- The viewing key, API token, merchant signing key, RAILGUN DB key and webhook
-  key are separate mode-`0600` files.
+- The merchant runtime accepts a shareable RAILGUN viewing key, never a mnemonic
+  or RAILGUN spending key.
+- The payer harness is excluded from the merchant TypeScript build and Docker
+  image and may communicate with PPOps only through a signed payment request.
+- Configuration, wallet state, viewing key, API token, merchant signing key,
+  RAILGUN DB key and webhook key are separate owner-only regular files. Symlinks,
+  oversized files and POSIX group/other access are rejected.
 - Commercial references remain in authenticated local API traffic and SQLite;
   they are absent from payer descriptors, public RAILGUN artifacts, application
   logs and outbound events.
@@ -35,6 +40,7 @@ production-ready.
 - Webhook URLs are operator configuration, not API input.
 
 Run `npm run privacy:test` when changing any security-critical path.
+Run `npm run verify:all` when changing the repository boundary or payer harness.
 
 ## Known beta risks
 
@@ -52,5 +58,15 @@ Run `npm run privacy:test` when changing any security-critical path.
   additionally encrypted by PPOps.
 - Backup SHA-256 inventories detect corruption but do not authenticate an
   attacker-controlled bundle.
+- Gate A self-signing links the payer's public EVM address to the RAILGUN
+  transaction. It is diagnostic evidence, not the final sender-privacy path;
+  Gate B still requires Broadcaster submission.
+- The payer's write-ahead journal blocks automatic reuse of an intent. A
+  `SUBMITTING` record left by a lost RPC response is intentionally ambiguous and
+  must be reconciled against the payer nonce, chain and PPOps before any new
+  intent is paid; deleting the journal to retry can double-pay.
+- A fresh end-to-end Arbitrum USDC mainnet payment, completed Mainnet Gate
+  artifact and external pilot evidence are still required before any
+  production-readiness claim.
 
 See `docs/OPERATIONAL-PROFILE.md` and `docs/ppops-threat-model.md` for detail.

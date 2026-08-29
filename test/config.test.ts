@@ -65,6 +65,28 @@ describe("secure configuration defaults", () => {
     expect(PPOpsConfigSchema.safeParse(config).success).toBe(false);
   });
 
+  it("rejects credentials embedded in provider and delivery URLs", () => {
+    const rpc = validConfig();
+    rpc.network.rpcUrls = ["https://user:password@rpc.example"];
+    expect(PPOpsConfigSchema.safeParse(rpc).success).toBe(false);
+
+    const webhook = {
+      ...validConfig(),
+      webhook: {
+        url: "https://user:password@merchant.example/webhook",
+        timeoutMs: 1_000,
+        maxAttempts: 3,
+        baseRetryMs: 1_000,
+        maxRetryMs: 10_000,
+      },
+      secrets: {
+        ...validConfig().secrets,
+        webhookHmacKeyFile: "./secrets/webhook-key",
+      },
+    };
+    expect(PPOpsConfigSchema.safeParse(webhook).success).toBe(false);
+  });
+
   it("requires HTTPS for non-loopback PPOI nodes", () => {
     const remote = validConfig();
     remote.scanner.poiNodeUrls = ["http://poi.example"];

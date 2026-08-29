@@ -5,6 +5,7 @@ import {
   assertExpectedPayerAddress,
   assertExpectedSelfSigner,
   assertGasCostWithinLimit,
+  assertRequestStillOpen,
   parseGasCostLimit,
 } from "../src/execution-guards.js";
 
@@ -38,5 +39,10 @@ describe("mainnet execution guards", () => {
     expect(() => assertGasCostWithinLimit(100n, 3n, 299n)).toThrow(
       /exceeds the explicit limit/,
     );
+  });
+
+  it("rechecks request expiry immediately before submission", () => {
+    expect(() => assertRequestStillOpen(2_000, 1_999)).not.toThrow();
+    expect(() => assertRequestStillOpen(2_000, 2_000)).toThrow(/expired/);
   });
 });

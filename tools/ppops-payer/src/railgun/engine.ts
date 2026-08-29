@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { WalletBalanceBucket } from "@railgun-community/engine";
@@ -38,7 +38,7 @@ import {
   PAYER_TXID_VERSION,
 } from "../constants.js";
 import { SafeFailure, writeEvent } from "../events.js";
-import { assertPrivateFile } from "../security/secrets.js";
+import { readOwnerOnlyFile } from "../security/private-file.js";
 import { createArtifactStore } from "./artifacts.js";
 
 const WalletStateSchema = z
@@ -266,9 +266,13 @@ export class PayerRailgunEngine {
 
   private async loadOrCreateWallet(): Promise<WalletState> {
     if (await exists(this.config.storage.walletStatePath)) {
-      await assertPrivateFile(this.config.storage.walletStatePath);
       const state = WalletStateSchema.parse(
-        JSON.parse(await readFile(this.config.storage.walletStatePath, "utf8")) as unknown,
+        JSON.parse(
+          await readOwnerOnlyFile(this.config.storage.walletStatePath, {
+            label: "Payer wallet state",
+            maxBytes: 64 * 1_024,
+          }),
+        ) as unknown,
       );
       if (state.walletCreationBlock !== this.config.network.walletCreationBlock) {
         throw new Error("Persisted wallet creation block does not match configuration");
