@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+payer.config.json
+data/
+secrets/
+artifacts/
+*.log
+*.sqlite
+*.key
+*.mnemonic
+*.seed
+*.backup
