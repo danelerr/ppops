@@ -66,7 +66,16 @@ describe("reconciliation readiness", () => {
     });
     health.scanStarted(2_000_000);
 
-    expect(health.snapshot(2_700_000).scanStalled).toBe(false);
-    expect(health.snapshot(2_700_000).syncProgress).toBeUndefined();
+    expect(health.snapshot(2_500_000).scanStalled).toBe(false);
+    expect(health.snapshot(2_500_000).syncProgress).toBeUndefined();
+  });
+
+  it("reports a stall when the SDK never emits its first progress event", () => {
+    const startedAt = 1_000_000;
+    const health = new ReconciliationHealth(60_000, startedAt, 600_000);
+    health.scanStarted(startedAt);
+
+    expect(health.snapshot(1_599_999).scanStalled).toBe(false);
+    expect(health.snapshot(1_600_001).scanStalled).toBe(true);
   });
 });

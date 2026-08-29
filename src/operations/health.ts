@@ -81,7 +81,8 @@ export class ReconciliationHealth {
     const stale =
       this.state.lastScanAt === undefined ||
       nowMs - this.state.lastScanAt * 1_000 > this.maxStalenessMs;
-    const lastProgressAt = this.state.syncProgress?.lastUpdatedAt;
+    const lastProgressAt =
+      this.state.syncProgress?.lastUpdatedAt ?? this.state.lastScanStartedAt;
     const scanStalled =
       this.state.scanInProgress &&
       lastProgressAt !== undefined &&
