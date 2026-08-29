@@ -42,6 +42,7 @@
     "privacy:check": "tsx scripts/privacy-conformance.ts --output coverage/privacy-report.json",
     "privacy:test": "npm run privacy:report && vitest run test/privacy.test.ts",
     "pilot:webhook-receiver": "tsx scripts/pilot-webhook-receiver.ts",
+    "pilot:railway-sync-doctor": "tsx scripts/railway-sync-doctor.ts",
     "kill:encrypted-leaf": "tsx scripts/encrypted-memo-leaf-gate.ts",
     "kill:export-fixture-key": "tsx scripts/export-public-fixture-viewing-key.ts",
     "kill:scan": "tsx scripts/railgun-view-only-scan.ts",

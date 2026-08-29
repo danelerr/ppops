@@ -22,7 +22,7 @@ import {
   type POIStatus,
   type SettlementRecord,
 } from "../domain.js";
-import { RailgunViewOnlyEngine, withTimeout } from "./engine.js";
+import { RailgunViewOnlyEngine } from "./engine.js";
 import { RpcQuorum } from "./rpc-quorum.js";
 
 const normalizeTransactionHash = (transactionHash: string): string => {
@@ -106,13 +106,13 @@ export class RailgunScanner {
         this.engine.walletID,
         this.engine.network.chain,
       );
+      // refreshBalances cannot be cancelled. Timing it out would only reject the
+      // wrapper while the SDK scan keeps running, allowing the daemon to start
+      // overlapping scans against the same LevelDB cache. Keep exactly one scan
+      // alive and expose its progress through the engine callbacks instead.
       await Promise.all([
-        withTimeout(
-          refreshBalances(this.engine.network.chain, [this.engine.walletID]),
-          600_000,
-          "RAILGUN balance scan",
-        ),
-        withTimeout(walletScanComplete, 600_000, "RAILGUN decrypt/PPOI refresh"),
+        refreshBalances(this.engine.network.chain, [this.engine.walletID]),
+        walletScanComplete,
       ]);
 
       const txos = (

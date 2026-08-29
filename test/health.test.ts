@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MerkletreeScanStatus } from "@railgun-community/shared-models";
 
 import { ReconciliationHealth } from "../src/operations/health.js";
 
@@ -34,5 +35,38 @@ describe("reconciliation readiness", () => {
       scansFailed: 1,
       lastScanError: "SCAN_FAILED",
     });
+  });
+
+  it("reports a live scan as stalled only after progress stops", () => {
+    const startedAt = 1_000_000;
+    const health = new ReconciliationHealth(60_000, startedAt, 600_000);
+    health.scanStarted(startedAt);
+    health.syncProgressUpdated({
+      utxo: {
+        status: MerkletreeScanStatus.Updated,
+        progressRatio: 0.5,
+        updatedAt: 1_000,
+      },
+      lastUpdatedAt: 1_000,
+    });
+
+    expect(health.snapshot(1_599_999).scanStalled).toBe(false);
+    expect(health.snapshot(1_600_001).scanStalled).toBe(true);
+  });
+
+  it("does not carry stale progress into a new scan", () => {
+    const health = new ReconciliationHealth(60_000, 1_000_000, 600_000);
+    health.syncProgressUpdated({
+      utxo: {
+        status: MerkletreeScanStatus.Complete,
+        progressRatio: 1,
+        updatedAt: 1_000,
+      },
+      lastUpdatedAt: 1_000,
+    });
+    health.scanStarted(2_000_000);
+
+    expect(health.snapshot(2_700_000).scanStalled).toBe(false);
+    expect(health.snapshot(2_700_000).syncProgress).toBeUndefined();
   });
 });

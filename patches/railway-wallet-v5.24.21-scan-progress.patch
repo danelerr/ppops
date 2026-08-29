@@ -1,0 +1,14 @@
+diff --git a/desktop/src/services/engine/engine.tsx b/desktop/src/services/engine/engine.tsx
+index 9d64f14..efb7fe2 100644
+--- a/desktop/src/services/engine/engine.tsx
++++ b/desktop/src/services/engine/engine.tsx
+@@ -226,8 +226,6 @@ const handleMerkletreeScanUpdate = debounce(async (
+   logDev(
+     `Scan status for ${merkletreeType} merkletree: ${scanStatus}, progress ${progressRounded}. Chain: ${chain.id}`,
+   );
+-  if (
+-    (progressDiff - currentProgress) < Constants.MIN_PROGRESS_UPDATE
+-  ) {
++  if (progressDiff < Constants.MIN_PROGRESS_UPDATE) {
+     return;
+   }

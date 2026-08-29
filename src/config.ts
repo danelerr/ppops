@@ -89,6 +89,9 @@ export const PPOpsConfigSchema = z
         rpcTimeoutMs: PositiveIntegerSchema.min(1_000).max(120_000).default(20_000),
         maxRpcBlockLag: PositiveIntegerSchema.max(100).default(5),
         finalizedRecheckSeconds: PositiveIntegerSchema.max(2_592_000).default(604_800),
+        scanStallThresholdMs: PositiveIntegerSchema.min(60_000)
+          .max(7_200_000)
+          .default(1_200_000),
         maxScanStalenessMs: PositiveIntegerSchema.min(60_000)
           .max(7_200_000)
           .optional(),
@@ -100,6 +103,7 @@ export const PPOpsConfigSchema = z
         rpcTimeoutMs: 20_000,
         maxRpcBlockLag: 5,
         finalizedRecheckSeconds: 604_800,
+        scanStallThresholdMs: 1_200_000,
       }),
     webhook: z
       .object({

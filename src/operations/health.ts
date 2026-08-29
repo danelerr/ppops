@@ -1,3 +1,6 @@
+import type { RailgunSyncProgress } from "../railgun/engine.js";
+import type { SafeErrorCode } from "../logging.js";
+
 export type HealthState = {
   railgunReady: boolean;
   startedAt: number;
@@ -8,7 +11,9 @@ export type HealthState = {
   lastScanDurationMs?: number;
   lastScanStartedAt?: number;
   lastScanAt?: number;
-  lastScanError?: string;
+  lastScanError?: SafeErrorCode;
+  syncProgress?: RailgunSyncProgress;
+  scanStalled?: boolean;
 };
 
 export class ReconciliationHealth {
@@ -17,6 +22,7 @@ export class ReconciliationHealth {
   constructor(
     private readonly maxStalenessMs: number,
     startedAtMs = Date.now(),
+    private readonly scanStallThresholdMs = 1_200_000,
   ) {
     this.state = {
       railgunReady: false,
@@ -28,11 +34,17 @@ export class ReconciliationHealth {
     };
   }
 
+  syncProgressUpdated(progress: RailgunSyncProgress): void {
+    this.state = { ...this.state, syncProgress: progress, scanStalled: false };
+  }
+
   scanStarted(startedAtMs = Date.now()): void {
     this.state = {
       ...this.state,
       scanInProgress: true,
       lastScanStartedAt: Math.floor(startedAtMs / 1_000),
+      syncProgress: undefined,
+      scanStalled: false,
     };
   }
 
@@ -49,7 +61,11 @@ export class ReconciliationHealth {
     };
   }
 
-  scanFailed(startedAtMs: number, failedAtMs = Date.now()): void {
+  scanFailed(
+    startedAtMs: number,
+    failedAtMs = Date.now(),
+    errorCode: SafeErrorCode = "SCAN_FAILED",
+  ): void {
     this.state = {
       ...this.state,
       railgunReady: false,
@@ -57,7 +73,7 @@ export class ReconciliationHealth {
       scanInProgress: false,
       consecutiveFailures: this.state.consecutiveFailures + 1,
       scansFailed: this.state.scansFailed + 1,
-      lastScanError: "SCAN_FAILED",
+      lastScanError: errorCode,
     };
   }
 
@@ -65,9 +81,15 @@ export class ReconciliationHealth {
     const stale =
       this.state.lastScanAt === undefined ||
       nowMs - this.state.lastScanAt * 1_000 > this.maxStalenessMs;
+    const lastProgressAt = this.state.syncProgress?.lastUpdatedAt;
+    const scanStalled =
+      this.state.scanInProgress &&
+      lastProgressAt !== undefined &&
+      nowMs - lastProgressAt * 1_000 > this.scanStallThresholdMs;
     return {
       ...this.state,
       railgunReady: this.state.railgunReady && !stale,
+      ...(this.state.scanInProgress ? { scanStalled } : { scanStalled: false }),
     };
   }
 }

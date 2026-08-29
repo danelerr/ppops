@@ -225,8 +225,10 @@ export const createApiApp = (dependencies: {
       railgunReady: health.railgunReady,
       scanInProgress: health.scanInProgress,
       consecutiveFailures: health.consecutiveFailures,
+      scanStalled: health.scanStalled ?? false,
       ...(health.lastScanAt ? { lastScanAt: health.lastScanAt } : {}),
-      ...(health.lastScanError ? { degraded: true } : {}),
+      ...(health.syncProgress ? { syncProgress: health.syncProgress } : {}),
+      ...(health.lastScanError || health.scanStalled ? { degraded: true } : {}),
     });
   });
 
@@ -241,6 +243,8 @@ export const createApiApp = (dependencies: {
         status: health.railgunReady ? "ready" : "not_ready",
         version: "0.1.0-beta.0",
         scanInProgress: health.scanInProgress,
+        scanStalled: health.scanStalled ?? false,
+        ...(health.syncProgress ? { syncProgress: health.syncProgress } : {}),
         ...(health.lastScanAt ? { lastScanAt: health.lastScanAt } : {}),
       },
       health.railgunReady ? 200 : 503,
@@ -399,6 +403,8 @@ export const createApiApp = (dependencies: {
       `ppops_ready ${health.railgunReady ? 1 : 0}`,
       "# TYPE ppops_scan_in_progress gauge",
       `ppops_scan_in_progress ${health.scanInProgress ? 1 : 0}`,
+      "# TYPE ppops_scan_stalled gauge",
+      `ppops_scan_stalled ${health.scanStalled ? 1 : 0}`,
       "# TYPE ppops_scans_succeeded_total counter",
       `ppops_scans_succeeded_total ${health.scansSucceeded}`,
       "# TYPE ppops_scans_failed_total counter",

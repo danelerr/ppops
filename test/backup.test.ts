@@ -73,6 +73,7 @@ const configAt = (root: string, sourceSecrets?: string): { config: PPOpsConfig; 
       rpcTimeoutMs: 20_000,
       maxRpcBlockLag: 5,
       finalizedRecheckSeconds: 604_800,
+      scanStallThresholdMs: 1_200_000,
     },
   };
   mkdirSync(root, { recursive: true });

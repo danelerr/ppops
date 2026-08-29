@@ -5,9 +5,11 @@ import { dirname, resolve, sep } from "node:path";
 
 import leveldown, { type LevelDown } from "leveldown";
 import {
+  MerkletreeScanStatus,
   NETWORK_CONFIG,
   NetworkName,
   type FallbackProviderJsonConfig,
+  type MerkletreeScanUpdateEvent,
 } from "@railgun-community/shared-models";
 import {
   ArtifactStore,
@@ -15,6 +17,8 @@ import {
   fullWalletForID,
   loadProvider,
   loadWalletByID,
+  setOnTXIDMerkletreeScanCallback,
+  setOnUTXOMerkletreeScanCallback,
   startRailgunEngine,
   stopRailgunEngine,
   unloadProvider,
@@ -31,6 +35,23 @@ type WalletState = {
   railgunAddress: string;
   viewingKeyFingerprint: string;
 };
+
+export type RailgunMerkletreeProgress = {
+  status: MerkletreeScanStatus;
+  progressRatio: number;
+  updatedAt: number;
+};
+
+export type RailgunSyncProgress = {
+  utxo?: RailgunMerkletreeProgress;
+  txid?: RailgunMerkletreeProgress;
+  lastUpdatedAt?: number;
+};
+
+type SyncProgressListener = (progress: RailgunSyncProgress) => void;
+
+export const normalizeMerkletreeProgressRatio = (progress: number): number =>
+  Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
 
 const WalletStateSchema = z
   .object({
@@ -121,6 +142,8 @@ export class RailgunViewOnlyEngine {
   private providerLoaded = false;
   private engineStarted = false;
   private walletState?: WalletState;
+  private syncProgress: RailgunSyncProgress = {};
+  private readonly syncProgressListeners = new Set<SyncProgressListener>();
 
   constructor(
     private readonly config: PPOpsConfig,
@@ -161,6 +184,21 @@ export class RailgunViewOnlyEngine {
     return this.walletState.railgunAddress;
   }
 
+  syncProgressSnapshot(): RailgunSyncProgress {
+    return {
+      ...(this.syncProgress.utxo ? { utxo: { ...this.syncProgress.utxo } } : {}),
+      ...(this.syncProgress.txid ? { txid: { ...this.syncProgress.txid } } : {}),
+      ...(this.syncProgress.lastUpdatedAt !== undefined
+        ? { lastUpdatedAt: this.syncProgress.lastUpdatedAt }
+        : {}),
+    };
+  }
+
+  onSyncProgress(listener: SyncProgressListener): () => void {
+    this.syncProgressListeners.add(listener);
+    return () => this.syncProgressListeners.delete(listener);
+  }
+
   async start(): Promise<void> {
     if (this.engineStarted) return;
     await mkdir(dirname(this.config.storage.railgunDbPath), {
@@ -183,6 +221,8 @@ export class RailgunViewOnlyEngine {
       false,
     );
     this.engineStarted = true;
+    setOnUTXOMerkletreeScanCallback((event) => this.updateSyncProgress("utxo", event));
+    setOnTXIDMerkletreeScanCallback((event) => this.updateSyncProgress("txid", event));
 
     try {
       this.walletState = await this.loadOrCreateWallet();
@@ -239,9 +279,26 @@ export class RailgunViewOnlyEngine {
         }
         this.engineStarted = false;
         this.walletState = undefined;
+        this.syncProgress = {};
       }
     }
     if (firstError) throw firstError;
+  }
+
+  private updateSyncProgress(
+    kind: "utxo" | "txid",
+    event: MerkletreeScanUpdateEvent,
+  ): void {
+    if (event.chain.id !== this.network.chain.id) return;
+    const updatedAt = Math.floor(Date.now() / 1_000);
+    const progressRatio = normalizeMerkletreeProgressRatio(event.progress);
+    this.syncProgress = {
+      ...this.syncProgress,
+      [kind]: { status: event.scanStatus, progressRatio, updatedAt },
+      lastUpdatedAt: updatedAt,
+    };
+    const snapshot = this.syncProgressSnapshot();
+    for (const listener of this.syncProgressListeners) listener(snapshot);
   }
 
   private async loadOrCreateWallet(): Promise<WalletState> {

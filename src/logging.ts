@@ -1,5 +1,39 @@
 type LogValue = string | number | boolean | null | undefined;
 
+export type SafeErrorCode =
+  | "TIMEOUT"
+  | "CONCURRENT_SCAN"
+  | "RPC_RATE_LIMITED"
+  | "RPC_NETWORK"
+  | "STORAGE_LOCKED"
+  | "STORAGE_CORRUPT"
+  | "PPOI_FAILED"
+  | "SCAN_FAILED";
+
+export const classifyError = (error: unknown): SafeErrorCode => {
+  if (!(error instanceof Error)) return "SCAN_FAILED";
+  const message = error.message.toLowerCase();
+  const systemCode = String((error as NodeJS.ErrnoException).code ?? "").toLowerCase();
+  if (message.includes("timed out") || systemCode === "etimedout") return "TIMEOUT";
+  if (message.includes("already in progress") || message.includes("scan in progress")) {
+    return "CONCURRENT_SCAN";
+  }
+  if (message.includes("429") || message.includes("rate limit")) return "RPC_RATE_LIMITED";
+  if (message.includes("lock") || systemCode === "eagain") return "STORAGE_LOCKED";
+  if (message.includes("corrupt") || message.includes("checksum")) return "STORAGE_CORRUPT";
+  if (message.includes("ppoi") || message.includes("proof of innocence")) return "PPOI_FAILED";
+  if (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("socket") ||
+    systemCode === "econnreset" ||
+    systemCode === "enotfound"
+  ) {
+    return "RPC_NETWORK";
+  }
+  return "SCAN_FAILED";
+};
+
 const writeLog = (
   level: "info" | "warn" | "error",
   event: string,
@@ -27,4 +61,5 @@ export const logWarn = (event: string, fields?: Record<string, LogValue>): void 
 export const logError = (event: string, error: unknown): void =>
   writeLog("error", event, {
     errorType: error instanceof Error ? error.constructor.name : "UnknownError",
+    errorCode: classifyError(error),
   });

@@ -6,8 +6,8 @@ data/
 secrets/
 backups/
 instance/
-pilot/
-pilot-evidence/
+/pilot/
+/pilot-evidence/
 restore/
 ppops.config.json
 .ppops-kill-test/

@@ -280,6 +280,7 @@ const init = async (options: ParsedOptions): Promise<void> => {
       rpcTimeoutMs: 20_000,
       maxRpcBlockLag: 5,
       finalizedRecheckSeconds: 604_800,
+      scanStallThresholdMs: 1_200_000,
       maxScanStalenessMs: 900_000,
     },
     ...(webhookUrl

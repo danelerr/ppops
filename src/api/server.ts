@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { serve, type ServerType } from "@hono/node-server";
 
 import { createApiApp } from "./app.js";
-import { logError, logInfo } from "../logging.js";
+import { classifyError, logError, logInfo } from "../logging.js";
 import { ReconciliationHealth } from "../operations/health.js";
 import { PPOpsRuntime, type ScanResult } from "../runtime.js";
 
@@ -21,6 +21,7 @@ export class PPOpsDaemon {
   private stopping = false;
   private readonly health: ReconciliationHealth;
   private readonly instanceId = randomUUID();
+  private readonly unsubscribeSyncProgress: () => void;
   readonly failure: Promise<never>;
   private rejectFailure!: (error: unknown) => void;
 
@@ -28,7 +29,12 @@ export class PPOpsDaemon {
     this.health = new ReconciliationHealth(
       runtime.config.scanner.maxScanStalenessMs ??
         Math.max(900_000, runtime.config.scanner.intervalMs * 3),
+      Date.now(),
+      runtime.config.scanner.scanStallThresholdMs,
     );
+    this.unsubscribeSyncProgress = runtime.engine.onSyncProgress((progress) => {
+      this.health.syncProgressUpdated(progress);
+    });
     this.failure = new Promise<never>((_resolve, reject) => {
       this.rejectFailure = reject;
     });
@@ -87,6 +93,7 @@ export class PPOpsDaemon {
         new Promise<void>((resolve) => setTimeout(resolve, 15_000)),
       ]);
     }
+    this.unsubscribeSyncProgress();
     await this.runtime.stop();
     logInfo("daemon.stopped");
   }
@@ -109,7 +116,7 @@ export class PPOpsDaemon {
       this.health.scanSucceeded(startedAtMs);
       logInfo("scan.completed", result);
     } catch (error) {
-      this.health.scanFailed(startedAtMs);
+      this.health.scanFailed(startedAtMs, Date.now(), classifyError(error));
       logError("scan.failed", error);
     }
   }
