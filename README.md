@@ -164,10 +164,12 @@ wallet or integration that supports private ERC-20 transfers with `memoText`:
 
 PPOps intentionally does not provide a “connect wallet” button in v0.1. A
 merchant cannot claim general consumer usability until its chosen payer wallet
-adapter has passed the mainnet gate. The current Railway Wallet source exposes a
-private memo field and is the documented client for the controlled pilot; see
-[`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the exact receiver, payer and
-evidence procedure.
+adapter has passed the mainnet gate. The reference pilot payer is the separate,
+minimal `ppops-payer` harness built directly on the official RAILGUN Wallet SDK.
+It verifies `request.json`, imports a full payer only on the payer host and sends
+the exact private ERC-20 transfer with `memoText`. Railway Wallet remains an
+optional manual compatibility client, not a critical PPOps dependency. See
+[`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the evidence procedure.
 
 ## Settlement semantics
 
@@ -284,6 +286,33 @@ The earlier gate evidence is in `docs/PRIMITIVE-GATE.md` and
 measurements are in `docs/OPERATIONAL-PROFILE.md`. A beta using real funds must
 follow `docs/PILOT-GUIDE.md` and complete `docs/MAINNET-GATE.md`; operations and
 alerts are documented in `docs/PRODUCTION-RUNBOOK.md`.
+
+The controlled mainnet pilot's observed onboarding/RPC limitations and current
+evidence boundary are recorded in `docs/PILOT-FINDINGS.md`. The evidence-gated
+public-good direction, proposed impact metrics and explicit Octant go/no-go are
+in `docs/IMPACT-ROADMAP.md`. Neither document expands the v0.1 product scope or
+converts an incomplete self-pilot into external traction.
+
+The controlled pilot originally used Railway Wallet and retained its diagnostic
+tooling as compatibility evidence. If testing that optional client, inspect
+cache activity without opening or reading the wallet database:
+
+```bash
+npm run pilot:railway-sync-doctor -- --quiet-seconds 1200 --observe-seconds 30
+```
+
+`CACHE_ADVANCING` means IndexedDB changed during the observation window.
+`RUNNING_NO_WRITE_OBSERVED` means Railway is open and its cache was written
+recently, but that short sample did not prove advancement; computation between
+writes is possible. `SUSPECTED_STALL` requires a running app with no cache write
+for the configured twenty-minute threshold and remains unchanged during the
+observation window. A single `PROLONGED_QUIET` snapshot is inconclusive;
+the pilot observed a compute phase longer than ten minutes followed by a 43 MB
+cache advance. `APP_NOT_RUNNING` is reported separately so a recent write
+cannot be mistaken for live synchronization.
+Railway `v5.24.21` also has a reproducible UI calculation that can leave
+displayed progress near 50%; see
+[`patches/railway-wallet-v5.24.21-scan-progress.patch`](patches/railway-wallet-v5.24.21-scan-progress.patch).
 
 The mainnet gate CLI produces keyed, identifier-redacted operator snapshots before
 restart, after restart and from an isolated restore. The snapshots still contain

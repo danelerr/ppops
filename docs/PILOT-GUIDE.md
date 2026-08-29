@@ -12,16 +12,17 @@ merchant.
 - **PPOps host:** stores the viewing key, encrypted RAILGUN database key,
   merchant identity key, API token and local reconciliation database. It cannot
   spend receiver funds.
-- **Payer wallet:** an independent full RAILGUN wallet with private native
-  Arbitrum USDC and enough balance for the Broadcaster fee.
+- **Payer wallet:** an independent full RAILGUN wallet with enough private native
+  Arbitrum USDC for Gate A. Its separate public self-signer needs Arbitrum ETH;
+  Gate B additionally needs private balance for the Broadcaster fee.
 - **External infrastructure:** two independent Arbitrum RPC origins, at least
   one compatible PPOI node, the RAILGUN indexing/artifact dependencies inherited
   by the Wallet SDK, and a RAILGUN Broadcaster/Waku path for payer submission.
 
-Railway Wallet is a practical current client for the controlled pilot. Its
-official source enables the private memo field on desktop and mobile and passes
-`memoText` into private-transfer proof generation. Treat that as client
-compatibility evidence, not an endorsement or availability guarantee.
+The reference payer is the separate `ppops-payer` diagnostic harness built
+directly on the official RAILGUN Wallet SDK. Railway Wallet remains optional
+compatibility evidence; its slow and ambiguous synchronization no longer blocks
+the PPOps mainnet gate.
 
 ## 1. Prepare the merchant receiver
 
@@ -95,6 +96,14 @@ node dist/cli.js serve --config ./ppops.config.json
 
 ## 3. Create the pilot intent
 
+Do not create a short-lived intent until the payer already has enough native
+USDC in the `Spendable` private balance bucket for the exact Gate A payment (and,
+for Gate B, the Broadcaster fee). A first-time shield enters RAILGUN's
+Unshield-Only Standby Period (initially about one hour) before it becomes
+spendable. Funding and
+shielding are onboarding, not checkout; complete them first. Otherwise the
+intent may expire while the payer is still in `ShieldPending`.
+
 Read the generated API token from its file into the merchant backend's secret
 store. Do not paste it into tickets or public evidence. Create an intent with a
 new idempotency key:
@@ -118,23 +127,56 @@ copy-paste JSON. `100000` atomic units is `0.10 USDC`. Retry the identical
 request and verify that PPOps returns the same intent. Keep the returned
 checkout path, recipient, memo and descriptor together.
 
-## 4. Pay from Railway Wallet
+For a deliberately late-payment test, use a separate intent and label that
+evidence explicitly. Do not accidentally turn the primary happy-path pilot
+into `PAID_LATE` by starting checkout before payer readiness.
 
-1. On the independent payer device, select Arbitrum and ensure the private
-   balance contains native USDC. A newly shielded balance may remain unavailable
-   during the PPOI standby period; wait until the wallet marks it spendable.
-2. Open the PPOps checkout and independently compare its merchant signer with
-   the pinned signer. Verify chain ID `42161`, token address, amount, recipient
-   and expiry.
-3. In Railway Wallet, start a **private send** to the exact `0zk` recipient for
-   the exact native-USDC amount.
-4. In the transaction review, paste the complete
-   `ppops:v1:0x<64 lowercase hex characters>` value into
-   **Private memo (optional)** and press **UPDATE**. Do not proceed until the
-   control reads **SAVED**.
-5. Recheck recipient, amount and memo, then submit through a Broadcaster. The
-   payer mnemonic, spending key and wallet database must remain off the PPOps
-   host.
+## 4. Pay with the reference SDK harness
+
+Run `ppops-payer` on the independent payer host, never inside the PPOps process.
+Initialize it with a creation block at or before the payer's first RAILGUN note,
+place its recovery mnemonic and a gas-funded Arbitrum self-signing key in
+owner-only local files, and synchronize:
+
+```bash
+node dist/cli.js sync --config ./payer.config.json
+```
+
+Stop unless the returned 0zk address is the independently expected payer and
+native USDC is in the `Spendable` bucket. Then verify the fresh request:
+
+```bash
+node dist/cli.js request-verify \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER
+```
+
+Gate A deliberately self-signs so Railway and Broadcaster behavior are excluded
+from the primitive test. It publicly links the supplied EVM signer to the
+otherwise encrypted transfer. Submit only with explicit identity, amount and gas
+bounds:
+
+```bash
+node dist/cli.js pay-self-signed \
+  --config ./payer.config.json \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS \
+  --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
+  --max-amount-atomic 100000 \
+  --max-gas-cost-wei 1000000000000000 \
+  --confirm-intent INTENT_ID
+```
+
+The example gas bound is `0.001 ETH`; it is a maximum, not a target or fee
+estimate. The harness validates the signed descriptor, exact native-USDC amount,
+recipient, memo, private balance, RAILGUN proxy target and zero ETH value before
+submission. Do not retry blindly after an ambiguous RPC result.
+
+After Gate A reaches `PAID`, Gate B replaces the public self-signer with a Waku
+Broadcaster. Only Gate B supports the final sender-unlinkability claim. The payer
+mnemonic, spending key and wallet database remain off the PPOps host in both
+modes.
 
 ## 5. Accept the payment
 
@@ -257,7 +299,13 @@ evidence privately; publish only redacted evidence. A successful self-payment
 is engineering evidence. An Octant adoption claim additionally needs an
 independent merchant installation and real merchant feedback.
 
-## Source evidence for Railway Wallet compatibility
+## Optional Railway Wallet compatibility
+
+Railway may still be tested manually by sending the exact amount and exact
+`ppops:v1` value in its **Private memo** field. That path is not the reference
+gate and a stalled Railway scan is not allowed to block SDK-level validation.
+
+### Source evidence
 
 - Current reviewed commit: [`a99f8ece`](https://github.com/Railway-Wallet/Railway-Wallet/commit/a99f8ece640afe10ee2b49db07dd0700b9742a39).
 - [Desktop enables the memo field](https://github.com/Railway-Wallet/Railway-Wallet/blob/a99f8ece640afe10ee2b49db07dd0700b9742a39/desktop/src/utils/constants.tsx#L13).
