@@ -118,7 +118,7 @@ funded attempt; increasing the fee ceiling is not.
   [GitHub Actions run 33337865296](https://github.com/danelerr/ppops/actions/runs/33337865296)
 - Full bounded workflow and outcome: [Gate B runbook](GATE-B.md)
 - Security disposition:
-  [Broadcaster differential review](../../../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md)
+  [Broadcaster differential review](../../../docs/security/DIFFERENTIAL-REVIEW-2026-08-30.md)
 
 The maintainers can reproduce the client-side boundary with
 `prepare-broadcaster`: it performs full proof/population and exact-call quorum

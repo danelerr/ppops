@@ -128,8 +128,8 @@ Evidence links:
 - [Primitive Gate report](../artifacts/primitive-gate-report.json)
 - [Operational profile](OPERATIONAL-PROFILE.md)
 - [Pilot findings](PILOT-FINDINGS.md)
-- [Threat model](ppops-threat-model.md)
-- [Broadcaster differential review](../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md)
+- [Threat model](THREAT-MODEL.md)
+- [Broadcaster differential review](security/DIFFERENTIAL-REVIEW-2026-08-30.md)
 
 ## Users and traction
 

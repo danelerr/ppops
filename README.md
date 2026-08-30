@@ -466,7 +466,7 @@ with `mainnet-gate-report-verify` against the independently distributed signer.
   and attaches the immutable image digest plus all three public gate reports to
   the GitHub release.
 
-See `SECURITY.md` and `docs/ppops-threat-model.md` before exposing PPOps beyond
+See `SECURITY.md` and `docs/THREAT-MODEL.md` before exposing PPOps beyond
 the documented single-merchant, local/private deployment.
 
 ## License

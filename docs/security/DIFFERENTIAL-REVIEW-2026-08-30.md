@@ -386,8 +386,8 @@ adopted until the corresponding gates pass.
 
 The review followed a repository-grounded differential process:
 
-- established architecture and trust assumptions from `audit-context/DOSSIER.md`
-  and its critical function records;
+- established architecture and trust assumptions from the canonical threat
+  model and operational profile;
 - inspected the full Git delta and relevant history;
 - mapped changed entry points, state transitions and direct call sites;
 - traced value, identity and recovery data across Waku, journal, full wallet,

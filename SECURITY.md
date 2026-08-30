@@ -75,4 +75,4 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
   evidence are still required before any sender-unlinkability or
   production-readiness claim.
 
-See `docs/OPERATIONAL-PROFILE.md` and `docs/ppops-threat-model.md` for detail.
+See `docs/OPERATIONAL-PROFILE.md` and `docs/THREAT-MODEL.md` for detail.

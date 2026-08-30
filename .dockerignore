@@ -2,7 +2,6 @@
 .github
 .ppops-kill-test
 artifacts
-audit-context
 data
 dist
 docs
@@ -20,5 +19,3 @@ tools/ppops-payer/secrets
 *.log
 *.sqlite*
 *.viewing-key
-octant_ppops_contexto_completo_2026-08-23
-octant_ppops_contexto_completo_2026-08-23.zip
