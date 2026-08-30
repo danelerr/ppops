@@ -2,7 +2,7 @@ import { getAddress, isHexString, type TransactionRequest } from "ethers";
 
 import { SafeFailure } from "../events.js";
 
-export type ValidatedPopulatedTransfer = {
+type ValidatedPopulatedTransfer = {
   to: string;
   data: string;
 };

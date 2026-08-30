@@ -368,5 +368,3 @@ export class RailgunViewOnlyEngine {
     return createdState;
   }
 }
-
-export { withTimeout };

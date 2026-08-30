@@ -162,7 +162,7 @@ export const simulatePopulatedTransferQuorum = async (
   }
 };
 
-export type QuorumReceipt = {
+type QuorumReceipt = {
   transactionHash: string;
   blockNumber: number;
   blockHash: string;

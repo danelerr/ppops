@@ -7,7 +7,7 @@ import type {
   PPOpsEventType,
 } from "../domain.js";
 
-export const eventIdFor = (dedupeKey: string): string =>
+const eventIdFor = (dedupeKey: string): string =>
   `evt_${createHash("sha256").update(dedupeKey).digest("hex").slice(0, 32)}`;
 
 export const createEvent = (args: {

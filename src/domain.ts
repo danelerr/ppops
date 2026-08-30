@@ -105,8 +105,6 @@ export type PPOpsEvent = {
 export const isPositiveAtomicAmount = (value: string): boolean =>
   /^(?:0|[1-9][0-9]*)$/.test(value) && BigInt(value) > 0n;
 
-export const normalizeHex = (value: string): string => value.toLowerCase();
-
 export const parsePPOpsReference = (memoText: string | undefined): string | undefined => {
   if (!memoText) return undefined;
   const match = /^ppops:v1:(0x[0-9a-f]{64})$/i.exec(memoText);

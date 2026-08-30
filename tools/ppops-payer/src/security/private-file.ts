@@ -29,7 +29,7 @@ const validateMetadata = (
   }
 };
 
-export const assertOwnerOnlyRegularFile = async (
+const assertOwnerOnlyRegularFile = async (
   path: string,
   policy: PrivateFilePolicy,
 ): Promise<Stats> => {

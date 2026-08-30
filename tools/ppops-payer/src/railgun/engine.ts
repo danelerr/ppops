@@ -4,7 +4,6 @@ import { dirname } from "node:path";
 
 import { WalletBalanceBucket } from "@railgun-community/engine";
 import {
-  EVMGasType,
   MerkletreeScanStatus,
   NETWORK_CONFIG,
   NetworkName,
@@ -424,5 +423,3 @@ export class PayerRailgunEngine {
     return state;
   }
 }
-
-export { EVMGasType };

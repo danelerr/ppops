@@ -1,4 +1,4 @@
-export type SafeCliFailureCode =
+type SafeCliFailureCode =
   | "INVALID_ARGUMENT"
   | "INVALID_INPUT"
   | "FILE_UNAVAILABLE"
@@ -12,7 +12,7 @@ const systemCode = (error: unknown): string =>
     ? String((error as NodeJS.ErrnoException).code ?? "").toUpperCase()
     : "";
 
-export const classifyCliFailure = (error: unknown): SafeCliFailureCode => {
+const classifyCliFailure = (error: unknown): SafeCliFailureCode => {
   if (!(error instanceof Error)) return "RUNTIME_FAILED";
   if (error.constructor.name === "ZodError" || error instanceof SyntaxError) {
     return "INVALID_INPUT";

@@ -3,12 +3,9 @@ import { access, chmod, mkdir, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname } from "node:path";
 
-import {
-  assertOwnerOnlyRegularFile,
-  readOwnerOnlyFile,
-} from "./private-file.js";
+import { readOwnerOnlyFile } from "./private-file.js";
 
-export type SecretKind =
+type SecretKind =
   | "api-token"
   | "merchant-private-key"
   | "railgun-db-encryption-key"
@@ -22,10 +19,6 @@ const exists = async (path: string): Promise<boolean> => {
   } catch {
     return false;
   }
-};
-
-export const assertPrivateFile = async (path: string): Promise<void> => {
-  await assertOwnerOnlyRegularFile(path, { label: "Secret file", maxBytes: 4_096 });
 };
 
 const validateSecret = (value: string, kind: SecretKind, path: string): string => {

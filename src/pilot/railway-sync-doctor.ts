@@ -1,9 +1,9 @@
 import { lstat, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-export type RailwayCacheState = "MISSING" | "EMPTY" | "ACTIVE" | "QUIET";
+type RailwayCacheState = "MISSING" | "EMPTY" | "ACTIVE" | "QUIET";
 
-export type RailwayCacheInspection = {
+type RailwayCacheInspection = {
   state: RailwayCacheState;
   cacheBytes: number;
   fileCount: number;
@@ -12,7 +12,7 @@ export type RailwayCacheInspection = {
   metadataOnly: true;
 };
 
-export type RailwayCacheObservation = {
+type RailwayCacheObservation = {
   initial: RailwayCacheInspection;
   current: RailwayCacheInspection;
   advanced: boolean;

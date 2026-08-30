@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PPOpsConfig } from "../config.js";
 import type { PPOpsDatabase } from "../db/database.js";
 
-export type WebhookFailureCode =
+type WebhookFailureCode =
   | "TIMEOUT"
   | "HTTP_4XX"
   | "HTTP_5XX"

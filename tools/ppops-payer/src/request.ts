@@ -19,7 +19,7 @@ import {
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 
-export const PaymentRequestSchema = z
+const PaymentRequestSchema = z
   .object({
     id: z.string().regex(/^pi_[0-9a-f]{32}$/),
     chainId: z.number().int().positive().safe(),

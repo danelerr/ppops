@@ -14,7 +14,7 @@ export const STATE_ROOT = resolve(
   process.env.PPOPS_KILL_STATE_DIR ?? ".ppops-kill-test",
 );
 
-export const DEFAULT_POI_NODE = "https://ppoi-agg.horsewithsixlegs.xyz";
+const DEFAULT_POI_NODE = "https://ppoi-agg.horsewithsixlegs.xyz";
 
 const exists = async (path: string): Promise<boolean> => {
   try {
@@ -25,7 +25,7 @@ const exists = async (path: string): Promise<boolean> => {
   }
 };
 
-export const createArtifactStore = (root: string): ArtifactStore =>
+const createArtifactStore = (root: string): ArtifactStore =>
   new ArtifactStore(
     async (path) => {
       try {

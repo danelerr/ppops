@@ -9,9 +9,9 @@ import {
   type SignedPaymentDescriptorV1,
 } from "../domain.js";
 
-export const DESCRIPTOR_DOMAIN_NAME = "PPOps Payment Descriptor";
+const DESCRIPTOR_DOMAIN_NAME = "PPOps Payment Descriptor";
 
-export const PAYMENT_DESCRIPTOR_TYPES = {
+const PAYMENT_DESCRIPTOR_TYPES = {
   PPOpsPaymentDescriptorV1: [
     { name: "version", type: "uint8" },
     { name: "chainId", type: "uint256" },
@@ -56,7 +56,7 @@ const domainFor = (chainId: number) => ({
   chainId,
 });
 
-export type CreateDescriptorInput = {
+type CreateDescriptorInput = {
   chainId: number;
   tokenAddress: string;
   decimals: number;

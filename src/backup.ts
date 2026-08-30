@@ -52,7 +52,7 @@ const BackupManifestSchema = z.object({
   files: z.array(FileEntrySchema),
 });
 
-export type BackupManifest = z.infer<typeof BackupManifestSchema>;
+type BackupManifest = z.infer<typeof BackupManifestSchema>;
 
 const pathExists = async (path: string): Promise<boolean> => {
   try {

@@ -126,7 +126,7 @@ type RateLimitConfig = {
   checkoutPerMinute: number;
 };
 
-export type RuntimeInfo = {
+type RuntimeInfo = {
   instanceId: string;
   chainId: number;
   tokenAddress: string;

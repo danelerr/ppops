@@ -48,7 +48,7 @@ import {
   simulatePopulatedTransferQuorum,
 } from "./rpc-quorum.js";
 
-export type BroadcasterTransferResult = {
+type BroadcasterTransferResult = {
   transactionHash?: string;
   reportedTransactionHash?: string;
   canonicalTransactionHashResolved: boolean;

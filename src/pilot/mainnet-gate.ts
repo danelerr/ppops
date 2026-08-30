@@ -133,7 +133,7 @@ const PreflightEvidenceSchema = z.object({
   finalizedBlock: z.number().int().nonnegative(),
 });
 
-export type MainnetPreflightEvidence = z.infer<typeof PreflightEvidenceSchema>;
+type MainnetPreflightEvidence = z.infer<typeof PreflightEvidenceSchema>;
 
 const SnapshotUnsignedSchema = z.object({
   schemaVersion: z.literal(1),
@@ -188,13 +188,13 @@ const SnapshotUnsignedSchema = z.object({
     .strict(),
 }).strict();
 
-export const MainnetGateSnapshotSchema = SnapshotUnsignedSchema.extend({
+const MainnetGateSnapshotSchema = SnapshotUnsignedSchema.extend({
   attestation: FingerprintSchema,
 });
 
-export type MainnetGateSnapshot = z.infer<typeof MainnetGateSnapshotSchema>;
+type MainnetGateSnapshot = z.infer<typeof MainnetGateSnapshotSchema>;
 
-export type SettlementRpcQuorum = {
+type SettlementRpcQuorum = {
   getTransactionReceipt: (transactionHash: string) => Promise<{
     hash: string;
     blockNumber: number;
@@ -703,7 +703,7 @@ const assertSnapshotAttestation = (
   }
 };
 
-export const MainnetGateReportSchema = z.object({
+const MainnetGateReportSchema = z.object({
   schemaVersion: z.literal(1),
   generatedAt: z.number().int().nonnegative(),
   result: z.literal("PASS"),
@@ -736,9 +736,9 @@ export const MainnetGateReportSchema = z.object({
   limitations: z.array(z.string().min(1)).min(1),
 }).strict();
 
-export type MainnetGateReport = z.infer<typeof MainnetGateReportSchema>;
+type MainnetGateReport = z.infer<typeof MainnetGateReportSchema>;
 
-export const SignedMainnetGateReportSchema = MainnetGateReportSchema.extend({
+const SignedMainnetGateReportSchema = MainnetGateReportSchema.extend({
   reportSignature: z.object({
     scheme: z.literal("EIP-191"),
     signer: AddressSchema,
@@ -746,7 +746,7 @@ export const SignedMainnetGateReportSchema = MainnetGateReportSchema.extend({
   }).strict(),
 });
 
-export type SignedMainnetGateReport = z.infer<typeof SignedMainnetGateReportSchema>;
+type SignedMainnetGateReport = z.infer<typeof SignedMainnetGateReportSchema>;
 
 export const verifyMainnetGateSnapshots = (args: {
   before: unknown;

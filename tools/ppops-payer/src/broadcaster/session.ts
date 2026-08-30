@@ -38,7 +38,7 @@ export type ValidatedBroadcaster = {
   fingerprint: string;
 };
 
-export type BroadcasterDiscovery = {
+type BroadcasterDiscovery = {
   selected?: ValidatedBroadcaster;
   validQuoteCount: number;
   uniqueBroadcasterCount: number;

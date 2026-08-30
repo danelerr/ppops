@@ -10,7 +10,7 @@ const HealthResponseSchema = z
   })
   .strict();
 
-export type PPOIPreflightResult = {
+type PPOIPreflightResult = {
   configuredNodeCount: number;
   healthyNodeCount: number;
 };

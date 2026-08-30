@@ -5,12 +5,9 @@ import { dirname } from "node:path";
 
 import { Mnemonic } from "ethers";
 
-import {
-  assertOwnerOnlyRegularFile,
-  readOwnerOnlyFile,
-} from "./private-file.js";
+import { readOwnerOnlyFile } from "./private-file.js";
 
-export type SecretKind = "db-encryption-key" | "mnemonic" | "evm-private-key";
+type SecretKind = "db-encryption-key" | "mnemonic" | "evm-private-key";
 
 const exists = async (path: string): Promise<boolean> => {
   try {
@@ -19,10 +16,6 @@ const exists = async (path: string): Promise<boolean> => {
   } catch {
     return false;
   }
-};
-
-export const assertPrivateFile = async (path: string): Promise<void> => {
-  await assertOwnerOnlyRegularFile(path, { label: "Secret file", maxBytes: 4_096 });
 };
 
 const normalizeMnemonic = (value: string): string => value.trim().replace(/\s+/g, " ");

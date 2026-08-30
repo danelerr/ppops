@@ -61,9 +61,6 @@ const writeLog = (
 export const logInfo = (event: string, fields?: Record<string, LogValue>): void =>
   writeLog("info", event, fields);
 
-export const logWarn = (event: string, fields?: Record<string, LogValue>): void =>
-  writeLog("warn", event, fields);
-
 export const logError = (event: string, error: unknown): void =>
   writeLog("error", event, {
     errorType: error instanceof Error ? error.constructor.name : "UnknownError",
