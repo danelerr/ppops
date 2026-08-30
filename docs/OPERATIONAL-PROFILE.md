@@ -230,6 +230,10 @@ Primitive gate:
 
 Verification evidence:
 
+- Public CI run
+  [`33335378295`](https://github.com/danelerr/ppops/actions/runs/33335378295)
+  passed both `verify` and `docker` for commit `835e792`, including the final
+  populated-calldata simulation remediation and documentation.
 - Automated merchant suite on 2026-08-30: 19 test files and 58 tests, including
   1,000 property-based runs across reconciliation conservation/order invariance
   and opaque memo round trips. Enforced V8 coverage is 67.54% statements,

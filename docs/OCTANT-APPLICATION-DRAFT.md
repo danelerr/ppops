@@ -109,7 +109,7 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed at `5d5752b` |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed at [`835e792`](https://github.com/danelerr/ppops/commit/835e7921f7918a89f3f3dda7a7687e5401e4470a) |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
