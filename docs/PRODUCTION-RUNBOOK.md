@@ -65,6 +65,26 @@ Page an operator when any of these conditions holds:
 Logs intentionally omit invoice identifiers, references, viewing material and
 provider URLs. Preserve that property in log shipping.
 
+## Safe shutdown
+
+- Before planned maintenance, check `/v1/ready` and wait until
+  `scanInProgress` is `false`. The RAILGUN Wallet SDK scan cannot be cancelled.
+- On `SIGTERM`, PPOps stops accepting HTTP traffic and scheduling new scans, then
+  drains any active scan before closing LevelDB, SQLite and the runtime lock.
+  Do not impose a conventional 30-second kill window; the Compose profile grants
+  30 minutes because an initial or recovery scan can be long.
+- PPOps pauses the Wallet SDK listener poller and owns one explicit scan
+  schedule. Do not add a second poller or another SDK process against the same
+  LevelDB; the SDK's historical refresh and deferred wallet event are different
+  completion models, and mixing them previously caused stalls and delayed TXID
+  work after shutdown.
+- A forced kill during a scan is an abnormal recovery event. Restart with the
+  same state, wait for a complete successful scan and verify readiness before
+  fulfilling payments or taking a backup.
+- Backup and restore commands remain offline operations and refuse an active
+  runtime lock. Never copy live LevelDB files as a substitute for the documented
+  backup flow.
+
 ## Webhook recovery and key rotation
 
 The repository's `pilot:webhook-receiver` is loopback-only evidence tooling. Do

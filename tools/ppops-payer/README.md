@@ -8,6 +8,11 @@ It shares the PPOps Git repository for reproducibility but remains an
 independent package and runtime. Run every command in this README from
 `tools/ppops-payer/` on the payer-controlled host.
 
+The CLI first unloads the provider, RAILGUN engine, and LevelDB, flushes its
+JSON output, and then exits explicitly. This final exit is required because
+the SDK prover can leave worker threads referenced after a clean shutdown; it
+does not interrupt an active scan, proof, database write, or submission.
+
 ```text
 PPOps request.json -> verify pinned merchant signer -> RAILGUN proof + memo
                   -> self-signed Arbitrum submission -> PPOps reconciliation
@@ -41,7 +46,8 @@ use a RAILGUN Broadcaster only after Gate A succeeds.
 - The CLI never returns secret values and reports failures using stable codes,
   not raw SDK/RPC errors.
 - `pay-self-signed` requires the exact intent ID and a separate maximum atomic
-  amount before it can submit anything.
+  amount before it can submit anything. It accepts only a live HTTP(S) request
+  and revalidates it after proof generation, immediately before signing.
 - Verify the merchant signer through a trusted channel independent of the
   checkout URL.
 
@@ -78,26 +84,37 @@ node dist/cli.js init \
 `init` creates only a new RAILGUN database-encryption key and an ignored local
 configuration. It does not copy or generate spending material.
 
-Create these two ignored files with a local editor, then restrict permissions:
+Create the ignored mnemonic file with a local editor, then restrict permissions:
 
 ```text
 secrets/payer.mnemonic
     the full RAILGUN payer recovery mnemonic, one line
-
-secrets/payer.evm-private-key
-    a 0x-prefixed 32-byte Arbitrum key holding enough ETH for Gate A gas
 ```
 
 ```bash
-chmod 600 ./secrets/payer.mnemonic ./secrets/payer.evm-private-key
+chmod 600 ./secrets/payer.mnemonic
+
+node dist/cli.js derive-self-signing-key \
+  --config ./payer.config.json \
+  --expected-address PINNED_PAYER_EVM_ADDRESS \
+  --derivation-index 0
 
 node dist/cli.js config-validate --config ./payer.config.json
 node dist/cli.js secrets-check --config ./payer.config.json
 ```
 
+`derive-self-signing-key` uses the same Railway-compatible path
+`m/44'/60'/0'/0/INDEX`, refuses an unexpected address or an existing different
+key, writes the result directly to the owner-only configured file and never
+prints the private key. The expected public address must come from the trusted
+wallet screen or another independent record, not from PPOps.
+
 An exported viewing key or a standalone EVM private key cannot reconstruct the
 full RAILGUN payer wallet. The recovery mnemonic is required for its private
-notes and spending authority.
+notes and spending authority. After the first successful `sync`, the encrypted
+wallet database can be loaded without rereading the mnemonic. Keep an offline
+backup, then remove the mnemonic from the operational payer host if desired;
+`secrets-check` reports whether it is still required and never deletes it.
 
 ## Gate A runbook
 
@@ -109,6 +126,15 @@ node dist/cli.js sync --config ./payer.config.json
 node dist/cli.js request-verify \
   --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
   --expected-signer PINNED_MERCHANT_SIGNER
+
+node dist/cli.js prepare-self-signed \
+  --config ./payer.config.json \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS \
+  --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
+  --max-amount-atomic 100000 \
+  --max-gas-cost-wei 1000000000000000
 
 node dist/cli.js pay-self-signed \
   --config ./payer.config.json \
@@ -126,10 +152,22 @@ request. `1000000000000000` wei is a maximum of `0.001 ETH`, not an estimate or
 target. Choose a bound you independently accept. Compare the locally returned
 RAILGUN address with the payer address before approving Gate A.
 
-Immediately before broadcast, the harness persists an owner-only write-ahead
-record for the intent. It changes from `SUBMITTING` to `SUBMITTED` after a hash
-is returned, and any later attempt to pay the same intent is rejected. Inspect
-the record without loading spending keys:
+`prepare-self-signed` runs sync, gas estimation, proof generation, transaction
+population, all bounds and the final live-request recheck, but does not sign,
+journal or broadcast a transaction. It returns `paymentSubmitted: false`. The
+subsequent payment intentionally repeats proof preparation against fresh state.
+
+The harness owns synchronization explicitly: it pauses the SDK listener poller,
+awaits `refreshBalances`, and reads the resulting PPOI buckets directly. It does
+not combine historical refresh with `awaitWalletScan`, whose deferred-event
+semantics can otherwise leave a finite CLI waiting for an unrelated later scan.
+
+Immediately before broadcast, the harness signs locally, computes the exact
+transaction hash and persists that hash plus nonce in an owner-only write-ahead
+record. It changes from `SUBMITTING` to `SUBMITTED` after the RPC accepts the raw
+transaction, then to `MINED` or `REVERTED` after a receipt. Any later attempt to
+pay the same intent is rejected. Inspect the record without loading spending
+keys:
 
 ```bash
 node dist/cli.js submission-status \
@@ -137,9 +175,10 @@ node dist/cli.js submission-status \
   --intent-id INTENT_ID
 ```
 
-If the status remains `SUBMITTING`, treat the result as ambiguous and inspect
-the public signer's nonce plus PPOps settlements. Never delete or alter the
-journal merely to make a retry pass.
+If the status remains `SUBMITTING` or `SUBMITTED`, use its precomputed public
+transaction hash plus PPOps state to resolve the result. A two-minute receipt
+timeout returns `PENDING`; it is not permission to retry. Never delete or alter
+the journal merely to make a retry pass.
 
 ## Evidence interpretation
 

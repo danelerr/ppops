@@ -1,6 +1,6 @@
 # Gate A: direct SDK self-signed payment
 
-Status: implementation ready; live evidence pending.
+Status: prepare-only mainnet proof passed; value-bearing submission pending.
 
 ## Objective
 
@@ -21,8 +21,9 @@ the first test.
 
 - PPOps preflight passes on Arbitrum One.
 - The payer has native USDC in RAILGUN's `Spendable` bucket.
-- The payer recovery mnemonic and a gas-funded Arbitrum EVM key exist only in
-  owner-only local files.
+- The payer recovery mnemonic is available for the first import and the
+  independently verified, derived Arbitrum EVM key has enough ETH for Gate A.
+  Both files are owner-only; the mnemonic may be removed after import.
 - The expected merchant EIP-712 signer is pinned through a trusted channel.
 - The payer creation block is at or before its first relevant RAILGUN note.
 - The payment intent is fresh and remains `OPEN` with zero received/pending
@@ -38,6 +39,10 @@ npm ci
 npm run verify
 npm run build
 node dist/cli.js config-validate --config ./payer.config.json
+node dist/cli.js derive-self-signing-key \
+  --config ./payer.config.json \
+  --expected-address PINNED_PAYER_EVM_ADDRESS \
+  --derivation-index 0
 node dist/cli.js secrets-check --config ./payer.config.json
 ```
 
@@ -54,6 +59,10 @@ The first run imports the full RAILGUN wallet into an encrypted local LevelDB.
 Subsequent runs load that database without rereading the mnemonic. Progress is
 emitted as structured events instead of a frozen percentage. The command must
 finish with a `Spendable` native-USDC balance at or above the planned amount.
+
+After the first successful sync, keep the mnemonic backup offline and remove it
+from the payer host if desired. `secrets-check` will report
+`mnemonicRequired: false`; PPOps never receives this material.
 
 Stop if the returned `railgunAddress` is not the expected payer address. Do not
 attempt to repair an identity mismatch by changing wallet state in place; use a
@@ -73,7 +82,36 @@ node dist/cli.js request-verify \
 Expected: `descriptorValid: true`, the exact chain/token/amount, and
 `paymentSubmitted: false`.
 
-## 4. Submit with explicit bounds
+## 4. Prepare without broadcast
+
+Run the full SDK path once without signing or broadcasting:
+
+```bash
+node dist/cli.js prepare-self-signed \
+  --config ./payer.config.json \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS \
+  --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
+  --max-amount-atomic 100000 \
+  --max-gas-cost-wei 1000000000000000
+```
+
+Expected: `mode: prepare-only`, `proofGenerated: true` and
+`paymentSubmitted: false`. This validates sync, proof, population, live-request
+freshness and gas bounds without reserving the intent or moving funds.
+
+Controlled result on 2026-08-30: a `0.01 USDC` request completed this command in
+7.8 seconds, confirmed sufficient spendable native USDC, generated the proof and
+bounded the populated transaction at `56190171212000` wei maximum gas cost. No
+submission-journal record was created and no transaction was broadcast. This
+is preparation evidence, not Gate A payment evidence.
+
+A final repeat after cleanup failures were made fatal completed in 10.7 seconds
+at `54286600000000` wei maximum gas cost and again returned `recorded: false`.
+These live values demonstrate the bound; they are not future fee estimates.
+
+## 5. Submit with explicit bounds
 
 For a `0.10 USDC` pilot:
 
@@ -91,19 +129,20 @@ node dist/cli.js pay-self-signed \
 
 The harness validates the signed request, payer and self-signer identities,
 amount limit, private spendable balance, explicit maximum gas cost, public gas
-balance, proxy destination and zero ETH value before sending. The example gas
-bound is `0.001 ETH`; choose a limit you independently accept. A successful
-result includes a public Arbitrum transaction hash and the explicit warning
-`public-self-signer-linked`.
+balance, proxy destination and zero ETH value before sending. After generating
+the proof it reloads the live request and refuses any status or field change.
+The example gas bound is `0.001 ETH`; choose a limit you independently accept.
+A successful result includes a public Arbitrum transaction hash, receipt status
+and the explicit warning `public-self-signer-linked`.
 
-Do not rerun blindly after an ambiguous RPC response. First inspect the public
-signer's nonce and PPOps settlements; a submitted transaction may exist even if
-the client did not receive the response. The local write-ahead journal blocks
-reuse of the intent; inspect it with `submission-status --config
-./payer.config.json --intent-id INTENT_ID`. `SUBMITTING` without a hash is an
-ambiguous state, not permission to delete the record and retry.
+Do not rerun blindly after an ambiguous RPC response. The payer computes and
+persists the transaction hash and nonce before broadcast, then records
+`SUBMITTED`, `MINED` or `REVERTED`. Inspect it with `submission-status --config
+./payer.config.json --intent-id INTENT_ID` and compare that hash with PPOps and
+Arbitrum. `SUBMITTING`, `SUBMITTED` or a returned `PENDING` receipt is not
+permission to delete the record and retry.
 
-## 5. Complete PPOps evidence
+## 6. Complete PPOps evidence
 
 Wait for PPOps to record:
 

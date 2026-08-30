@@ -31,6 +31,8 @@ public Sepolia fixture is not sufficient.
    spending material on the PPOps host. The reference path is the independently
    executed `tools/ppops-payer` SDK harness documented in `PILOT-GUIDE.md`;
    Railway Wallet is optional compatibility evidence only.
+   The harness must revalidate the live request immediately before signing and
+   persist the locally computed transaction hash before broadcast.
 5. Record the normalized settlement identifier `(chain, TXID version,
    transaction hash, tree, position)`, amount, token, decrypted memo,
    `FINALIZED` state, raw PPOI bucket and `SPENDABLE` state. Redact the opaque

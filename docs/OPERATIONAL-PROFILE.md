@@ -1,6 +1,6 @@
 # PPOps v0.1-R operational profile
 
-Date: 2026-08-23
+Date: 2026-08-30
 
 Status: beta implementation profile. This document describes behavior exercised
 by the repository; it is not a production-readiness or privacy-absoluteness
@@ -229,19 +229,25 @@ Primitive gate:
 
 Verification evidence:
 
-- Automated merchant suite on 2026-08-29: 17 test files and 52 tests, including
-  1,000 property-based
-  runs across reconciliation conservation/order invariance and opaque memo
-  round trips. Enforced V8 coverage is 64.63% statements, 60.60% branches,
-  68.59% functions and 67.39% lines across all `src/**/*.ts`; core database,
+- Automated merchant suite on 2026-08-30: 18 test files and 55 tests, including
+  1,000 property-based runs across reconciliation conservation/order invariance
+  and opaque memo round trips. Enforced V8 coverage is 66.21% statements,
+  62.51% branches, 70.41% functions and 68.97% lines across all `src/**/*.ts`;
+  core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
+- Automated reference-payer suite on 2026-08-30: 9 test files and 28 tests,
+  including request freshness, transaction bounds, submission-journal recovery,
+  no-broadcast preparation and clean CLI-process termination.
+- Dry-run npm tarballs contained no secret/config/data paths; the merchant
+  tarball contained no payer runtime and was limited to `dist`, package metadata,
+  README and license files.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
-  latest block `497581203`, finalized block `497576372`; both providers agreed
+  latest block `499967929`, finalized block `499964670`; both providers agreed
   on the conservative finalized block and its hash.
 - PPOI preflight against the community aggregator documented by the Wallet SDK:
   `1/1` node returned the exact `ppoi_health` JSON-RPC success response on
-  2026-08-23. This proves reachability at that time, not future availability or
+  2026-08-30. This proves reachability at that time, not future availability or
   independence.
 - Fresh strict Sepolia scan from the public fixture viewing key: 21.2 seconds,
   zero PPOps-format references as expected.
@@ -259,6 +265,19 @@ Verification evidence:
   state, reused instances and raw invoice/reference/transaction leakage were
   rejected.
 - Offline state backup completed and produced an integrity manifest.
+- Controlled Arbitrum payer preparation: direct SDK sync confirmed sufficient
+  spendable native USDC, generated a real proof and populated a bounded
+  `0.01 USDC` transaction in 7.8 seconds. A final repeat after cleanup failures
+  were made fatal completed in 10.7 seconds with maximum populated gas cost
+  `54286600000000` wei. Both commands reported `paymentSubmitted: false`; the
+  final status remained `recorded: false`, and no public transaction was
+  created. This is not a completed Mainnet Gate.
+- After moving to one explicit scan owner, the merchant reached readiness in
+  approximately 6 seconds and, after the final observability correction,
+  completed five subsequent scheduled scans at roughly 34-second cadence.
+  Earlier transient RPC-quorum failures had been mislabeled `STORAGE_LOCKED`
+  because the classifier matched `lock` inside the word `block`; no LevelDB
+  lock failure was established.
 
 These measurements use public third-party RPC/PPOI endpoints and are not latency
 SLOs. The live fixture had no fresh strict PPOps payment; the actual exact memo
@@ -289,9 +308,20 @@ is still a supply-chain and future-reachability risk. CI rejects high/critical
 production findings and exports a CycloneDX SBOM. Blind `npm audit fix --force`
 would still propose incompatible RAILGUN changes and is not applied.
 
-The SDK also leaves timeout resources scheduled after graceful cleanup. The
-daemon performs bounded cleanup and the finite CLI exits afterward. Both issues
-must be reassessed before a production claim or SDK upgrade.
+The pinned SDK's historical refresh defers the event consumed by
+`awaitWalletScan`, while its listener poller may schedule delayed TXID work.
+PPOps therefore does not combine those two completion models: it pauses the SDK
+listener poller, owns explicit refresh scheduling and reads current TXO/PPOI
+state after `refreshBalances`. The daemon drains its active refresh before
+LevelDB shutdown. The payer performs the same clean shutdown, flushes output,
+then terminates prover worker threads that otherwise keep a finite CLI alive.
+These lifecycle assumptions must be revalidated on every SDK upgrade.
+
+Operational progress treats an SDK `Complete` scan event as ratio `1` even when
+the wrapper omits its numeric progress field. RPC quorum disagreement is exposed
+as `RPC_QUORUM`, not as a storage fault. Every quorum read gets one bounded retry;
+persistent disagreement still fails closed and the next owned scan retries
+without loosening finality or accepting a single-provider answer.
 
 Docker packaging is built in CI. The Node base image is digest-pinned, GitHub
 Actions are SHA-pinned, and a tag-triggered workflow publishes version and

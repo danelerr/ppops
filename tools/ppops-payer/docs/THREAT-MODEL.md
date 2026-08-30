@@ -36,7 +36,7 @@ available.
 | Threat | Control | Residual risk |
 | --- | --- | --- |
 | Malicious checkout changes recipient or amount | Exact EIP-712 verification against an independently pinned signer; request/descriptor field equality | A compromised trusted merchant signing key can authorize a malicious request |
-| Accidental wrong/large/expired payment | Arbitrum/native-USDC pinning, fresh `OPEN` request, exact intent confirmation, independent maximum atomic amount and expiry recheck immediately before submission | Operator can deliberately confirm the wrong valid intent; mining can still occur after expiry |
+| Accidental wrong/large/expired payment | Arbitrum/native-USDC pinning, fresh `OPEN` request, exact intent confirmation, independent maximum atomic amount, and full live-request revalidation after proof generation | Operator can deliberately confirm the wrong valid intent; mining can still occur after expiry |
 | Secret disclosure through arguments/logs | File-only secrets, owner/permission/symlink checks, stable redacted failures, executable privacy check | Compromised host/dependencies can read process memory |
 | Secret committed to Git | `secrets/`, config, data and common key extensions ignored | Manually forcing an ignored file can still publish it |
 | Wrong payer wallet imported | Persistent wallet identity plus mandatory expected 0zk address at submission | Operator can copy an already-wrong address instead of checking it out of band |
@@ -45,7 +45,7 @@ available.
 | Concurrent payer processes | Owner-only runtime lock spans wallet load, sync, proof generation and submission | A stale lock whose PID was reused can require operator cleanup |
 | RPC outage or wrong chain | Two distinct configured RPC origins for SDK fallback; self-signer verifies chain ID and fee data | RAILGUN SDK fallback behavior and correlated providers remain dependencies |
 | PPOI delay/block | Balance buckets are reported; payment requires `Spendable` | External list policy and node availability are outside the harness |
-| Transaction response lost after submission | Owner-only write-ahead journal reserves the intent before broadcast, blocks reuse and records the hash when returned | An RPC failure after broadcast can leave `SUBMITTING` ambiguous and still requires nonce/chain inspection |
+| Transaction response lost after submission | The raw transaction is signed locally; its hash and nonce are persisted before broadcast, reuse is blocked, and receipt state advances through `SUBMITTED`, `MINED` or `REVERTED` | RPC/receipt failure still requires resolving the recorded public hash before any new intent is paid |
 | Public sender correlation | Explicit Gate A warning | Inherent to self-signing; Gate B Broadcaster is required for the final privacy claim |
 | Supply-chain compromise | Exact dependency lockfile, build/tests, audit gate | Official RAILGUN tree retains low/moderate legacy transitive findings and downloaded proving artifacts remain trusted inputs |
 

@@ -362,6 +362,14 @@ public-good direction, proposed impact metrics and explicit Octant go/no-go are
 in `docs/IMPACT-ROADMAP.md`. Neither document expands the v0.1 product scope or
 converts an incomplete self-pilot into external traction.
 
+On 2026-08-30 the direct SDK payer completed bounded Arbitrum prepare-only
+runs—sync, PPOI bucket recovery, proof generation and transaction population—in
+7.8 seconds and, after cleanup failures were made fatal, 10.7 seconds. Both
+returned `paymentSubmitted: false`; the final run left no submission record. The
+merchant reached readiness in about 6 seconds and completed repeated scans. This
+validates the non-broadcast path and lifecycle correction; it is not a completed
+mainnet payment or adoption claim.
+
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect
 cache activity without opening or reading the wallet database:
@@ -407,8 +415,10 @@ with `mainnet-gate-report-verify` against the independently distributed signer.
   production audit to 36 moderate/low findings and zero high/critical findings.
   The legacy Web3/BZZ and GraphQL tree remains large and is still supply-chain
   sensitive.
-- The pinned SDK leaves timeout resources after cleanup; the CLI forces process
-  termination only after bounded graceful shutdown.
+- The pinned SDK can leave prover workers referenced after graceful cleanup.
+  The daemon drains a non-cancellable active scan (with a 30-minute Compose
+  grace window); the finite payer bounds provider/engine cleanup, flushes
+  output, and exits explicitly. Retest this lifecycle on every SDK upgrade.
 - `tools/ppops-payer` deliberately accepts payer spending authority, but it is
   excluded from the merchant build/container and must run on a payer-controlled
   host. Gate A's public self-signer is linkable by design.

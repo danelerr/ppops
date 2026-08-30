@@ -1,6 +1,6 @@
 # Controlled pilot findings: privacy is an end-to-end property
 
-Date: 2026-08-23
+First recorded: 2026-08-23. Updated: 2026-08-30.
 
 Status: living pilot record. The mainnet payment gate is still in progress.
 This document distinguishes observations from upstream guarantees and future
@@ -42,6 +42,14 @@ a cryptographically private payment inaccessible or operationally unsafe.
   balance could become spendable.
 - A one-hour payment-intent lifetime was unsuitable for a first-time payer: the
   intent could expire while the newly shielded balance was still pending.
+- The direct SDK payer recovered enough native USDC in `Spendable` for the
+  bounded `10000`-atomic request, verified a live signed PPOps request,
+  generated a real transfer proof and populated a bounded `0.01 USDC`
+  self-signed transaction without signing or broadcasting it. After the
+  lifecycle correction in F-08, the complete
+  prepare-only run finished in 7.8 seconds; a final repeat after cleanup failures
+  were made fatal finished in 10.7 seconds. Both reported
+  `paymentSubmitted: false`, and the final submission status remained unrecorded.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -186,6 +194,57 @@ the pilot, Railway resumed after a compute interval slightly longer than ten
 minutes and grew the cache by roughly 43 MB, so ten minutes alone is not a safe
 stall threshold.
 
+### F-08: SDK completion and polling need one explicit owner
+
+The first direct-SDK preparation exposed two lifecycle mistakes in the initial
+PPOps integration:
+
+1. PPOps awaited both `refreshBalances` and `awaitWalletScan`. In the pinned SDK,
+   the historical refresh path decrypts with `deferCompletionEvent=true`, so
+   the event awaited by `awaitWalletScan` is not a reliable completion signal
+   for that operation. A secondary poller scan happened to emit it in some
+   runs, producing delays from seconds to several minutes.
+2. The SDK listener poller and PPOps' explicit scanner both owned
+   synchronization. The poller can schedule delayed TXID work after new UTXO
+   events. One prepare-only run completed correctly, but a delayed task then
+   accessed LevelDB after SDK shutdown and the process exited with an error.
+
+PPOps now has a single scan owner. Both runtimes pause the SDK listener poller,
+await the explicit `refreshBalances` promise, and then read TXOs/current PPOI
+buckets directly. The merchant daemon drains its owned scan before closing
+LevelDB. The finite payer unloads provider, engine and LevelDB before explicitly
+terminating the prover's remaining worker threads. Structured progress separates
+history completion, spendable balance, gas estimation, proof and preparation.
+
+Controlled results after the correction:
+
+- payer prepare-only: 7.8 seconds, sufficient spendable native USDC, proof
+  generated, transaction populated, no journal record and no broadcast; a final
+  cleanup-enforced repeat completed in 10.7 seconds with the same no-broadcast
+  result;
+- merchant first scan: approximately 6 seconds to readiness;
+- after the final observability correction, five following scheduled merchant
+  scans completed normally at roughly 34-second cadence.
+
+This does not prove future RPC/PPOI latency or a value-bearing payment. It does
+show that the earlier multi-minute behavior was not an unavoidable Groth16 cost:
+most of it came from incorrect completion/poller ownership around the SDK.
+
+### F-09: an RPC `block` error was mislabeled as a storage `lock`
+
+The safe error classifier originally searched for the substring `lock`. Every
+RPC quorum message mentioning a `block` therefore appeared as
+`STORAGE_LOCKED`, even though the process continued using the same open LevelDB
+and the next scan succeeded. This created a false storage-corruption narrative
+around transient two-provider quorum failures.
+
+The classifier now uses a word-bounded storage-lock match and a separate
+`RPC_QUORUM` code. Scan completion also normalizes to progress ratio `1` when
+the SDK emits `Complete` without a numeric progress value. These changes do not
+hide outages: each quorum read gets one bounded retry, then persistent
+disagreement still fails closed, degrades readiness, and is retried by the next
+single-owner scan.
+
 ## Claim discipline
 
 Until the mainnet and adoption gates pass, PPOps may claim:
@@ -194,7 +253,8 @@ Until the mainnet and adoption gates pass, PPOps may claim:
 - a working local intent, descriptor, reconciliation and evidence pipeline;
 - reproducible primitive/privacy tests;
 - a successfully initialized Arbitrum mainnet profile;
-- one observed mainnet shield and documented payer-onboarding findings.
+- one observed mainnet shield and documented payer-onboarding findings;
+- one bounded mainnet prepare-only proof run with no signature or broadcast.
 
 PPOps must not yet claim:
 
@@ -207,17 +267,15 @@ PPOps must not yet claim:
 
 ## Immediate actions
 
-1. Keep Railway Wallet out of the critical path and run the payer through the
-   independent `tools/ppops-payer` Wallet SDK package on the payer host.
-2. Run the direct SDK sync from the recorded shield block and require native
-   USDC in the `Spendable` bucket.
-3. Create a fresh intent only after that readiness condition holds.
-4. Complete Gate A with a bounded self-signed exact-memo transfer, then complete
-   the PPOps mainnet evidence gate.
-5. If Gate A passes, complete Gate B through a Waku Broadcaster and retain
+1. Keep Railway Wallet out of the critical path and retain the independent
+   `tools/ppops-payer` package as the reproducible payer.
+2. Complete Gate A with the already prepared, bounded self-signed exact-memo
+   transfer only after explicit operator confirmation, then complete the PPOps
+   mainnet evidence gate.
+3. If Gate A passes, complete Gate B through a Waku Broadcaster and retain
    Railway only as an optional compatibility client.
-6. Repeat with an independently operated merchant or payer.
-7. Capture onboarding time, provider failures, fees and support steps alongside
+4. Repeat with an independently operated merchant or payer.
+5. Capture onboarding time, provider failures, fees and support steps alongside
    the existing settlement evidence.
 
 ## Sources

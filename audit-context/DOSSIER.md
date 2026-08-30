@@ -6,6 +6,9 @@ tree through commits `9c42664` and `68b8c77`. Review began from root commit
 imported from commit
 `300bcb7c5a52ad7955ce317f15a120b3138c48e6`. This is an orientation record, not
 a vulnerability report, severity assessment, or production-readiness claim.
+The post-snapshot hardening delta is reviewed in
+[`SECURITY-REVIEW-2026-08-30.md`](./SECURITY-REVIEW-2026-08-30.md); where code or
+line references differ, that later review and the current source take priority.
 
 Ignored runtime state and secret/configuration contents were not opened. In
 particular, no contents under `secrets/`, `data/`, `instance/`, `backups/`,

@@ -6,6 +6,9 @@ Version: `0.1.0-beta.0` working tree after payer-repository unification
 
 Reviewer: repository-grounded automated review; not an independent third-party audit
 
+Post-review hardening is recorded separately in
+[`SECURITY-REVIEW-2026-08-30.md`](./SECURITY-REVIEW-2026-08-30.md).
+
 ## Outcome
 
 No confirmed Critical or High severity application finding remains after the

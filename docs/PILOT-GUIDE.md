@@ -135,11 +135,15 @@ into `PAID_LATE` by starting checkout before payer readiness.
 
 Run `ppops-payer` on the independent payer host, never inside the PPOps process.
 Initialize it with a creation block at or before the payer's first RAILGUN note,
-place its recovery mnemonic and a gas-funded Arbitrum self-signing key in
-owner-only local files, and synchronize:
+place its recovery mnemonic in an owner-only local file, derive the expected
+Railway-compatible public gas signer without printing its key, and synchronize:
 
 ```bash
 cd tools/ppops-payer
+node dist/cli.js derive-self-signing-key \
+  --config ./payer.config.json \
+  --expected-address PINNED_PAYER_EVM_ADDRESS \
+  --derivation-index 0
 node dist/cli.js sync --config ./payer.config.json
 ```
 
@@ -158,6 +162,15 @@ otherwise encrypted transfer. Submit only with explicit identity, amount and gas
 bounds:
 
 ```bash
+node dist/cli.js prepare-self-signed \
+  --config ./payer.config.json \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS \
+  --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
+  --max-amount-atomic 100000 \
+  --max-gas-cost-wei 1000000000000000
+
 node dist/cli.js pay-self-signed \
   --config ./payer.config.json \
   --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
@@ -172,7 +185,32 @@ node dist/cli.js pay-self-signed \
 The example gas bound is `0.001 ETH`; it is a maximum, not a target or fee
 estimate. The harness validates the signed descriptor, exact native-USDC amount,
 recipient, memo, private balance, RAILGUN proxy target and zero ETH value before
-submission. Do not retry blindly after an ambiguous RPC result.
+submission. It reloads the live request after proof generation, computes and
+journals the transaction hash before broadcast, and waits up to two minutes for
+a receipt. `PENDING`, `SUBMITTING` or `SUBMITTED` is not permission to retry;
+resolve the recorded hash first.
+
+The preparation command exercises sync, proof generation, population and every
+bound but returns `paymentSubmitted: false`; it neither signs nor journals a
+transaction. Inspect that result before running the value-bearing command.
+
+Controlled result on 2026-08-30: the direct SDK payer prepared a `0.01 USDC`
+Arbitrum transfer in 7.8 seconds, confirmed sufficient spendable native USDC,
+generated the proof and bounded the populated transaction at
+`56190171212000` wei maximum gas cost. It created no submission-journal record
+and broadcast no transaction. This validates the non-broadcast path only; Gate
+A remains pending until the explicitly approved value-bearing transaction is
+mined and PPOps reconciles it to `PAID`.
+
+A final repeat after cleanup failures were made fatal completed in 10.7 seconds,
+reported `54286600000000` wei maximum gas cost and again left
+`recorded: false`. The variance is expected from live fee and RPC conditions;
+neither value is a future gas quote.
+
+After a successful first sync, the encrypted payer wallet loads without the
+mnemonic. Keep the recovery backup offline and remove the mnemonic from the
+operational payer host if desired. Do not remove the encrypted database key or
+self-signing key needed by this diagnostic path.
 
 After Gate A reaches `PAID`, Gate B replaces the public self-signer with a Waku
 Broadcaster. Only Gate B supports the final sender-unlinkability claim. The payer
