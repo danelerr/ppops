@@ -56,6 +56,7 @@ node dist/cli.js init \
   --token-decimals 6 \
   --rpc-url https://your-first-rpc.example \
   --rpc-url https://your-independent-rpc.example \
+  --rpc-url https://your-third-rpc.example \
   --poi-node https://your-compatible-ppoi.example \
   --webhook-url http://127.0.0.1:8790/webhooks/ppops
 

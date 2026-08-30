@@ -135,6 +135,7 @@ node dist/cli.js init \
   --token-decimals 6 \
   --rpc-url https://your-first-rpc.example \
   --rpc-url https://your-independent-rpc.example \
+  --rpc-url https://your-third-rpc.example \
   --poi-node https://your-production-poi.example
 ```
 

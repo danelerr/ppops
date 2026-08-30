@@ -18,7 +18,8 @@
     "tokenDecimals": 6,
     "rpcUrls": [
       "https://REPLACE_WITH_RPC_PROVIDER_A",
-      "https://REPLACE_WITH_RPC_PROVIDER_B"
+      "https://REPLACE_WITH_RPC_PROVIDER_B",
+      "https://REPLACE_WITH_RPC_PROVIDER_C"
     ],
     "deploymentBlock": 56109834,
     "finality": {
