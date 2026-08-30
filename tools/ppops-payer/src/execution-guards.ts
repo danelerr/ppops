@@ -1,5 +1,6 @@
-import { MaxUint256, Wallet, getAddress } from "ethers";
+import { MaxUint256, Signature, Wallet, getAddress, keccak256 } from "ethers";
 import {
+  getShieldPrivateKeySignatureMessage,
   mnemonicTo0xPKey,
   validateRailgunAddress,
 } from "@railgun-community/wallet";
@@ -61,6 +62,27 @@ export const deriveExpectedSelfSigningKey = (
     address,
     derivationPath: `m/44'/60'/0'/0/${derivationIndex}`,
   };
+};
+
+/**
+ * RAILGUN shielding does not consume the 65-byte EVM signature directly.
+ * The SDK expects the 32-byte keccak256 digest of a signature over its fixed
+ * ownership marker. Keep this derivation in one tested boundary so callers
+ * cannot accidentally pass raw spending material or an incorrectly sized key.
+ */
+export const deriveShieldPrivateKey = async (signer: {
+  signMessage(message: string): Promise<string>;
+}): Promise<string> => {
+  try {
+    const signature = Signature.from(
+      await signer.signMessage(getShieldPrivateKeySignatureMessage()),
+    ).serialized;
+    return keccak256(signature);
+  } catch (error) {
+    throw new SafeFailure("SECRET_INVALID", "Unable to derive the RAILGUN shield key", {
+      cause: error,
+    });
+  }
 };
 
 export const parseGasCostLimit = (value: string): bigint => {

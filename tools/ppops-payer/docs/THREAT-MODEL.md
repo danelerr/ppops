@@ -15,6 +15,7 @@ network-layer anonymity.
 
 - payer RAILGUN recovery mnemonic and spending authority;
 - self-signing EVM private key and its Arbitrum ETH;
+- ephemeral shield ownership key when separate funding tooling is used;
 - encrypted RAILGUN wallet database and its encryption key;
 - payer RAILGUN address, balances, transaction history and private memos;
 - merchant signer identity and signed PPOps request;
@@ -44,6 +45,7 @@ available.
 | Malicious checkout changes recipient or amount | Exact EIP-712 verification against an independently pinned signer; request/descriptor field equality | A compromised trusted merchant signing key can authorize a malicious request |
 | Accidental wrong/large/expired payment | Arbitrum/native-USDC pinning, fresh `OPEN` request, exact intent confirmation, independent maximum atomic amount, and full live-request revalidation after proof generation | Operator can deliberately confirm the wrong valid intent; mining can still occur after expiry |
 | Secret disclosure through arguments/logs | File-only secrets, owner/permission/symlink checks, stable redacted failures, executable privacy check | Compromised host/dependencies can read process memory |
+| Incorrect shield-key derivation | Tested fixed-message signature validation followed by `keccak256`; raw signatures and derived keys are never printed | Public funding/shielding remains outside the payment harness and links its EVM sender onchain |
 | Secret committed to Git | `secrets/`, config, data and common key extensions ignored | Manually forcing an ignored file can still publish it |
 | Wrong payer wallet imported | Persistent wallet identity plus mandatory expected 0zk address at submission | Operator can copy an already-wrong address instead of checking it out of band |
 | Wrong public signer or excessive RPC fee | Mandatory expected EVM address, explicit maximum gas cost and public gas-balance check | A malicious dependency could still alter behavior after checks |

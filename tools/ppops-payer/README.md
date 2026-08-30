@@ -93,6 +93,20 @@ moderate transitive audit findings. `npm run verify` fails on high or critical
 findings. Do not run `npm audit fix --force`: its proposed package downgrades
 are breaking changes.
 
+## Funding boundary
+
+The reference payer starts from an existing `Spendable` private balance. A
+public swap, ERC-20 approval and shield are onboarding operations, not PPOps
+payments, and are intentionally outside the payment commands below. Their
+public EVM sender, asset and amount remain visible onchain.
+
+Direct SDK tooling must not pass the 65-byte EVM signature to RAILGUN as a
+shield key. The Wallet SDK expects `keccak256(signature)` for the fixed
+`RAILGUN_SHIELD` ownership marker. `deriveShieldPrivateKey` centralizes that
+derivation, validates the signature and returns only its 32-byte digest. Treat
+the digest as sensitive ephemeral material and never log it. See RAILGUN's
+[transaction utility reference](https://docs.railgun.org/developer-guide/wallet/transactions/transaction-utils).
+
 ## Initialize
 
 Use a block at or before the payer wallet's first relevant RAILGUN activity.

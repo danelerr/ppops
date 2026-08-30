@@ -1,4 +1,4 @@
-import { Wallet } from "ethers";
+import { Wallet, keccak256 } from "ethers";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +7,7 @@ import {
   assertGasCostWithinLimit,
   assertRequestStillOpen,
   deriveExpectedSelfSigningKey,
+  deriveShieldPrivateKey,
   parseGasCostLimit,
 } from "../src/execution-guards.js";
 
@@ -47,6 +48,22 @@ describe("mainnet execution guards", () => {
     expect(() =>
       deriveExpectedSelfSigningKey(mnemonic, 1_001, Wallet.createRandom().address),
     ).toThrow(/between 0 and 1000/);
+  });
+
+  it("hashes the fixed RAILGUN shield signature into a 32-byte private key", async () => {
+    const wallet = new Wallet(
+      "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    );
+    const signedMessage = await wallet.signMessage("RAILGUN_SHIELD");
+
+    await expect(deriveShieldPrivateKey(wallet)).resolves.toBe(keccak256(signedMessage));
+    await expect(deriveShieldPrivateKey(wallet)).resolves.toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
+  it("rejects malformed shield signatures without returning their contents", async () => {
+    await expect(
+      deriveShieldPrivateKey({ signMessage: async () => "not-a-signature" }),
+    ).rejects.toThrow(/Unable to derive the RAILGUN shield key/);
   });
 
   it("rejects malformed and uint256-overflowing gas bounds", () => {
