@@ -82,7 +82,16 @@ export const verifyWebhookSignature = (args: {
   return expected.length === received.length && timingSafeEqual(expected, received);
 };
 
+export type WebhookDeliveryResult = {
+  attempted: number;
+  delivered: number;
+  failed: number;
+  deadLettered: number;
+};
+
 export class WebhookDeliveryService {
+  private deliveryTail: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly database: PPOpsDatabase,
     private readonly config: NonNullable<PPOpsConfig["webhook"]>,
@@ -90,12 +99,18 @@ export class WebhookDeliveryService {
     private readonly fetchImplementation: typeof fetch = fetch,
   ) {}
 
-  async deliverPending(now = Math.floor(Date.now() / 1_000)): Promise<{
-    attempted: number;
-    delivered: number;
-    failed: number;
-    deadLettered: number;
-  }> {
+  deliverPending(
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<WebhookDeliveryResult> {
+    const operation = this.deliveryTail.then(() => this.deliverPendingExclusive(now));
+    this.deliveryTail = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }
+
+  private async deliverPendingExclusive(now: number): Promise<WebhookDeliveryResult> {
     const result = { attempted: 0, delivered: 0, failed: 0, deadLettered: 0 };
     for (const record of this.database.listPendingEvents(now)) {
       result.attempted += 1;

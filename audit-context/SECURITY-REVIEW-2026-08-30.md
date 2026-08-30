@@ -121,6 +121,19 @@ metadata/README/license files. The executable trust-boundary check requires the
 merchant allowlist, and final dry runs found no payer runtime or secret/config
 paths in the merchant tarball.
 
+### SEC-017 — Concurrent maintenance could overlap webhook delivery
+
+Severity: **Low**
+
+Status: **Fixed and regression-tested**
+
+`deliverPending` previously depended on the daemon's serial scheduler. Two
+programmatic maintenance calls could both select the same pending outbox rows
+before either marked them delivered, causing avoidable simultaneous retries.
+The delivery service now serializes its own passes. A concurrent regression
+holds the first HTTP request open, starts a second pass and proves that each
+stored event is sent once while the queued pass observes an empty outbox.
+
 ### Additional boundary hardening
 
 - Intent creation rejects unknown fields, including accidental mnemonic or key
@@ -135,7 +148,7 @@ paths in the merchant tarball.
 
 ## Verification evidence
 
-- Merchant: 18 test files, 55 tests, typecheck, build, privacy conformance,
+- Merchant: 18 test files, 56 tests, typecheck, build, privacy conformance,
   trust-boundary check and enforced coverage passed.
 - Payer: 9 test files, 28 tests, typecheck, build and privacy check passed.
 - Dependency gates: zero Critical/High production advisories; 6 Moderate and 30

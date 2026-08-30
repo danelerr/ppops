@@ -229,10 +229,10 @@ Primitive gate:
 
 Verification evidence:
 
-- Automated merchant suite on 2026-08-30: 18 test files and 55 tests, including
+- Automated merchant suite on 2026-08-30: 18 test files and 56 tests, including
   1,000 property-based runs across reconciliation conservation/order invariance
-  and opaque memo round trips. Enforced V8 coverage is 66.21% statements,
-  62.51% branches, 70.41% functions and 68.97% lines across all `src/**/*.ts`;
+  and opaque memo round trips. Enforced V8 coverage is 66.28% statements,
+  62.51% branches, 70.46% functions and 69.01% lines across all `src/**/*.ts`;
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.

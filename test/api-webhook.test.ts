@@ -354,6 +354,66 @@ describe("signed outbound webhook", () => {
     database.close();
   });
 
+  it("serializes concurrent delivery passes so one outbox record is not sent twice", async () => {
+    const { database, network, intents } = setup();
+    const intent = await intents.create(
+      { externalReference: "CONCURRENT-PRIVATE", amountAtomic: "10", expiresAt: 2_000 },
+      1_000,
+    );
+    new ReconciliationService(database).reconcile(
+      {
+        uniqueSettlementId: "concurrent-settlement",
+        chainId: network.chainId,
+        txidVersion: "V2_PoseidonMerkle",
+        tree: 0,
+        position: 8,
+        transactionHash: `0x${"78".repeat(32)}`,
+        tokenAddress: network.tokenAddress.toLowerCase(),
+        amountAtomic: "10",
+        blockNumber: 100,
+        blockTimestamp: 1_500,
+        balanceBucket: "Spendable",
+        rawPPOIStatuses: { list: "Valid" },
+        chainStatus: "FINALIZED",
+        poiStatus: "SPENDABLE",
+        reference: intent.reference,
+      },
+      1_600,
+    );
+
+    let releaseFirstDelivery: (() => void) | undefined;
+    const firstDeliveryBlocked = new Promise<void>((resolve) => {
+      releaseFirstDelivery = resolve;
+    });
+    const fakeFetch = vi.fn(async () => {
+      await firstDeliveryBlocked;
+      return new Response(null, { status: 204 });
+    }) as unknown as typeof fetch;
+    const delivery = new WebhookDeliveryService(
+      database,
+      {
+        url: "https://merchant.example/webhooks/ppops",
+        timeoutMs: 1_000,
+        maxAttempts: 3,
+        baseRetryMs: 1_000,
+        maxRetryMs: 10_000,
+      },
+      "ab".repeat(32),
+      fakeFetch,
+    );
+
+    const first = delivery.deliverPending(1_700);
+    const second = delivery.deliverPending(1_700);
+    await vi.waitFor(() => expect(fakeFetch).toHaveBeenCalledTimes(1));
+    releaseFirstDelivery?.();
+
+    expect(await first).toMatchObject({ attempted: 2, delivered: 2 });
+    expect(await second).toEqual({ attempted: 0, delivered: 0, failed: 0, deadLettered: 0 });
+    expect(fakeFetch).toHaveBeenCalledTimes(2);
+    expect(database.countUndeliveredEvents()).toBe(0);
+    database.close();
+  });
+
   it("replays only an explicitly selected dead-lettered event", async () => {
     const { database, network, intents } = setup();
     const intent = await intents.create(
