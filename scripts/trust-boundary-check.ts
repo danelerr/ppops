@@ -65,6 +65,30 @@ if (buildConfig.includes("tools/ppops-payer")) {
   failures.push("merchant build includes the payer package");
 }
 
+const merchantPackage = JSON.parse(
+  await readFile(resolve(root, "package.json"), "utf8"),
+) as { files?: unknown };
+if (
+  !Array.isArray(merchantPackage.files) ||
+  merchantPackage.files.length !== 1 ||
+  merchantPackage.files[0] !== "dist"
+) {
+  failures.push("merchant npm package is not restricted to its compiled runtime");
+}
+
+const merchantScanner = await readFile(resolve(merchantRoot, "railgun", "scanner.ts"), "utf8");
+const merchantEngine = await readFile(resolve(merchantRoot, "railgun", "engine.ts"), "utf8");
+const payerEngine = await readFile(resolve(payerSourceRoot, "railgun", "engine.ts"), "utf8");
+if (/awaitWalletScan\s*\(/.test(merchantScanner) || /awaitWalletScan\s*\(/.test(payerEngine)) {
+  failures.push("historical refresh depends on deferred awaitWalletScan event");
+}
+if (
+  !merchantEngine.includes("pauseAllPollingProviders();") ||
+  !payerEngine.includes("pauseAllPollingProviders();")
+) {
+  failures.push("explicit scanner does not exclusively own RAILGUN polling");
+}
+
 if (failures.length > 0) {
   process.stdout.write(`${JSON.stringify({ ok: false, failures })}\n`);
   process.exitCode = 1;
@@ -75,6 +99,7 @@ if (failures.length > 0) {
       result: "PASS",
       merchantRuntime: "view-only",
       payerRuntimeIncludedInMerchantBuild: false,
+      payerRuntimeIncludedInMerchantPackage: false,
     })}\n`,
   );
 }

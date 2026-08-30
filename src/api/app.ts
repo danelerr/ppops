@@ -21,7 +21,7 @@ const CreateIntentSchema = z.object({
   externalReference: z.string().min(1).max(512),
   amountAtomic: z.string().regex(/^[1-9][0-9]*$/),
   expiresAt: z.number().int().positive(),
-});
+}).strict();
 
 const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(250).default(100),

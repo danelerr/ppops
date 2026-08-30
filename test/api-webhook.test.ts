@@ -156,6 +156,22 @@ describe("local authenticated API", () => {
     });
     expect(conflict.status).toBe(409);
 
+    const unknownField = await app.request("/v1/intents", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-api-token",
+        "content-type": "application/json",
+        "idempotency-key": "intent-test-unknown-field",
+      },
+      body: JSON.stringify({
+        externalReference: "UNKNOWN-FIELD",
+        amountAtomic: "1",
+        expiresAt,
+        mnemonic: "must-never-be-accepted",
+      }),
+    });
+    expect(unknownField.status).toBe(400);
+
     const checkout = await app.request(payload.checkoutPath);
     expect(checkout.status).toBe(200);
     expect(checkout.headers.get("content-security-policy")).toContain(
