@@ -74,6 +74,16 @@ missing evidence.
 
 ## Impact positioning
 
+A concise product analogy is:
+
+> PPOps brings a BTCPay Server-style deployment model and a payment-intent
+> lifecycle to private USDC reconciliation on RAILGUN, without becoming a
+> custodian or third-party payment processor.
+
+The analogy describes the product category, not feature parity with BTCPay
+Server or Stripe. PPOps v0.1 is limited to one RAILGUN network and token and has
+no merchant SDK, wallet UI, QR checkout or commerce plugin.
+
 A defensible short description is:
 
 > PPOps is open infrastructure for evidence-based private payment operations.

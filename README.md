@@ -2,16 +2,57 @@
 
 [![CI](https://github.com/danelerr/ppops/actions/workflows/ci.yml/badge.svg)](https://github.com/danelerr/ppops/actions/workflows/ci.yml)
 
-PPOps is an open-source, self-hosted RAILGUN payment reconciler. A merchant
-creates a local payment intent, gives the payer a signed descriptor containing
-an opaque reference, and receives a private RAILGUN transfer whose encrypted
-memo carries that reference. PPOps detects and reconciles the transfer from a
-view-only wallet; the merchant daemon never accepts a RAILGUN spending key or
-mnemonic. The separately executed payer gate lives under `tools/ppops-payer`.
+PPOps brings a BTCPay Server-style, self-hosted payment model to private USDC on
+RAILGUN. A merchant runs the PPOps daemon, creates signed payment intents through
+its local API and receives an authenticated `payment.confirmed` webhook after
+PPOps independently verifies the private settlement.
+
+PPOps observes the merchant receiver through view-only access. The merchant
+daemon never accepts a RAILGUN spending key or mnemonic, never receives the
+payment on the merchant's behalf and never becomes a third-party payment
+processor. Its lifecycle is intentionally familiar to developers who use
+payment-intent APIs, while custody and infrastructure remain with the merchant.
 
 This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and the daemon
 flow run, but this is not a production-readiness claim. Review the known risks
 before using real financial data.
+
+## Product model
+
+The product is the long-running merchant daemon, not an SDK and not a payer
+wallet:
+
+```text
+merchant application -> PPOps API -> signed payment intent
+payer wallet -> RAILGUN private transfer with encrypted reference
+PPOps view-only scanner -> finality + PPOI + matching
+PPOps outbox -> payment.confirmed webhook -> merchant application
+```
+
+`tools/ppops-payer` is a separately executed reference client for the mainnet
+gate. It demonstrates how a spending wallet consumes a PPOps request without
+placing spending authority in the merchant daemon. A future `@ppops/sdk` would
+only wrap the existing HTTP API; it is not required to integrate PPOps.
+
+Available now:
+
+- self-hosted daemon and authenticated REST API;
+- signed, metadata-minimal payer request;
+- view-only RAILGUN reconciliation;
+- finality/PPOI-aware payment state;
+- idempotent event IDs and HMAC-authenticated webhook delivery;
+- reference payer and reproducible privacy/security evidence.
+
+Possible after the mainnet and adoption gates, but **not implemented today**:
+
+- merchant client SDKs;
+- QR or consumer wallet checkout UX;
+- WooCommerce or other commerce plugins;
+- wallet-native PPOps descriptor support;
+- additional networks, assets or privacy rails.
+
+See [`docs/PRODUCT-MODEL.md`](docs/PRODUCT-MODEL.md) for the product boundary,
+merchant integration example and current/future split.
 
 ## What v0.1 does
 
