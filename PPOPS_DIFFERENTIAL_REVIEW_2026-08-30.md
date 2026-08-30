@@ -301,11 +301,11 @@ protection was found.
 `npm run verify:all` passed after remediation:
 
 - public CI run
-  [`33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
-  passed its `verify` and `docker` jobs at `9374f5d`, including remediation
-  commit `d70057e`;
+  [`33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615)
+  passed its `verify` and `docker` jobs at `6f5a93c`, including Broadcaster and
+  shield-key remediations;
 - merchant: 19 test files, 58 tests;
-- reference payer: 15 test files, 79 tests;
+- reference payer: 15 test files, 81 tests;
 - TypeScript typechecks and production builds;
 - merchant coverage thresholds;
 - merchant and payer privacy checks;

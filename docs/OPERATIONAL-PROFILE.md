@@ -231,10 +231,10 @@ Primitive gate:
 Verification evidence:
 
 - Public CI run
-  [`33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
-  passed both `verify` and `docker` for commit `9374f5d`, including the final
-  populated-calldata simulation and prepare-time nullifier-admission
-  remediations.
+  [`33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615)
+  passed both `verify` and `docker` for commit `6f5a93c`, including the final
+  populated-calldata simulation, prepare-time nullifier admission and tested
+  shield-key derivation remediations.
 - Automated merchant suite on 2026-08-30: 19 test files and 58 tests, including
   1,000 property-based runs across reconciliation conservation/order invariance
   and opaque memo round trips. Enforced V8 coverage is 67.54% statements,
@@ -242,7 +242,7 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 15 test files and 79 tests,
+- Automated reference-payer suite on 2026-08-30: 15 test files and 81 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
   adversarial hash mismatch, proof-compatible quote rotation,
@@ -395,8 +395,7 @@ transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
 production runbook defines readiness, metrics, alert and egress policy.
 
 Public GitHub Actions
-[run `33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
-passed both the full verify job and the Docker build job for documentation
-commit `9374f5d`, which contains implementation remediation `d70057e`, on
-2026-08-30. This proves that commit's CI build, not the still-pending
-tag-triggered GHCR publication.
+[run `33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615)
+passed both the full verify job and the Docker build job for implementation
+commit `6f5a93c` on 2026-08-30. This proves that commit's CI build, not the
+still-pending tag-triggered GHCR publication.
