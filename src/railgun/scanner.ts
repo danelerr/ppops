@@ -7,7 +7,6 @@ import {
 } from "@railgun-community/engine";
 import { RailgunWalletBalanceBucket } from "@railgun-community/shared-models";
 import {
-  awaitWalletScan,
   parseRailgunTokenAddress,
   refreshBalances,
   viewOnlyWalletForID,
@@ -81,6 +80,10 @@ export const bucketToPOIStatus = (
   }
 };
 
+export const chainStatusWhenReceiptMissing = (
+  previous?: ChainStatus,
+): ChainStatus => previous === "FINALIZED" ? "REVERTED" : "OBSERVED";
+
 export class RailgunScanner {
   private readonly rpc: RpcQuorum;
   private scanning = false;
@@ -102,18 +105,13 @@ export class RailgunScanner {
     this.scanning = true;
     try {
       const wallet = viewOnlyWalletForID(this.engine.walletID);
-      const walletScanComplete = awaitWalletScan(
-        this.engine.walletID,
-        this.engine.network.chain,
-      );
       // refreshBalances cannot be cancelled. Timing it out would only reject the
       // wrapper while the SDK scan keeps running, allowing the daemon to start
-      // overlapping scans against the same LevelDB cache. Keep exactly one scan
-      // alive and expose its progress through the engine callbacks instead.
-      await Promise.all([
-        refreshBalances(this.engine.network.chain, [this.engine.walletID]),
-        walletScanComplete,
-      ]);
+      // overlapping scans against the same LevelDB cache. Also, awaitWalletScan
+      // is not a completion primitive for this path: the SDK deliberately uses
+      // deferCompletionEvent=true during historical refreshes. Await the owned
+      // refresh itself, then read the decrypted TXOs and current PPOI buckets.
+      await refreshBalances(this.engine.network.chain, [this.engine.walletID]);
 
       const txos = (
         await Promise.all(
@@ -149,7 +147,13 @@ export class RailgunScanner {
   ): Promise<NormalizedSettlement> {
     const chainContext = await this.chainContext();
     const receipt = await this.rpc.getTransactionReceipt(settlement.transactionHash);
-    if (!receipt || receipt.status !== 1) {
+    if (!receipt) {
+      return {
+        ...settlement,
+        chainStatus: chainStatusWhenReceiptMissing(settlement.chainStatus),
+      };
+    }
+    if (receipt.status !== 1) {
       return { ...settlement, chainStatus: "REVERTED" };
     }
     const block = await this.rpc.getBlock(receipt.blockNumber);
@@ -205,9 +209,11 @@ export class RailgunScanner {
       blockTimestamp: await timestampPromise,
       balanceBucket,
       rawPPOIStatuses,
-      chainStatus: receipt && receipt.status === 1
-        ? this.chainStatusFor(receipt, chainContext)
-        : "REVERTED",
+      chainStatus: receipt
+        ? receipt.status === 1
+          ? this.chainStatusFor(receipt, chainContext)
+          : "REVERTED"
+        : chainStatusWhenReceiptMissing(),
       poiStatus: bucketToPOIStatus(balanceBucket, rawPPOIStatuses),
       reference,
     };

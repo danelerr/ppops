@@ -19,6 +19,12 @@ type RpcQuorumOptions = {
 
 type ChainContext = { latestBlock: number; finalizedBlock?: number };
 
+const QUORUM_ATTEMPTS = 2;
+const QUORUM_RETRY_DELAY_MS = 250;
+
+const waitForQuorumRetry = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, QUORUM_RETRY_DELAY_MS));
+
 const timeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -134,43 +140,58 @@ export class RpcQuorum {
     operation: (provider: RpcProviderLike) => Promise<T>,
     keyFor: (value: T) => string,
   ): Promise<T> {
-    const results = await Promise.allSettled(
-      this.providers.map((provider) => timeout(operation(provider), this.options.timeoutMs)),
-    );
-    const groups = new Map<string, T[]>();
-    for (const result of results) {
-      if (result.status !== "fulfilled") continue;
-      const key = keyFor(result.value);
-      groups.set(key, [...(groups.get(key) ?? []), result.value]);
+    for (let attempt = 1; attempt <= QUORUM_ATTEMPTS; attempt += 1) {
+      const results = await Promise.allSettled(
+        this.providers.map((provider) =>
+          timeout(operation(provider), this.options.timeoutMs),
+        ),
+      );
+      const groups = new Map<string, T[]>();
+      for (const result of results) {
+        if (result.status !== "fulfilled") continue;
+        const key = keyFor(result.value);
+        groups.set(key, [...(groups.get(key) ?? []), result.value]);
+      }
+      const winner = [...groups.values()].sort(
+        (left, right) => right.length - left.length,
+      )[0];
+      if (winner && winner.length >= this.quorum) {
+        const value = winner[0];
+        if (value === undefined) throw new Error(`RPC quorum returned no ${label}`);
+        return value;
+      }
+      if (attempt < QUORUM_ATTEMPTS) await waitForQuorumRetry();
     }
-    const winner = [...groups.values()].sort((left, right) => right.length - left.length)[0];
-    if (!winner || winner.length < this.quorum) {
-      throw new Error(`RPC quorum could not agree on ${label}`);
-    }
-    const value = winner[0];
-    if (value === undefined) throw new Error(`RPC quorum returned no ${label}`);
-    return value;
+    throw new Error(`RPC quorum could not agree on ${label}`);
   }
 
   private async consensusHeight(
     label: string,
     operation: (provider: RpcProviderLike) => Promise<number>,
   ): Promise<number> {
-    const results = await Promise.allSettled(
-      this.providers.map((provider) => timeout(operation(provider), this.options.timeoutMs)),
-    );
-    const heights = results
-      .filter((result): result is PromiseFulfilledResult<number> => result.status === "fulfilled")
-      .map((result) => result.value)
-      .filter((height) => Number.isSafeInteger(height) && height >= 0)
-      .sort((left, right) => left - right);
-    for (let start = 0; start < heights.length; start += 1) {
-      const base = heights[start];
-      if (base === undefined) continue;
-      const cluster = heights.filter(
-        (height) => height >= base && height - base <= this.options.maxBlockLag,
+    for (let attempt = 1; attempt <= QUORUM_ATTEMPTS; attempt += 1) {
+      const results = await Promise.allSettled(
+        this.providers.map((provider) =>
+          timeout(operation(provider), this.options.timeoutMs),
+        ),
       );
-      if (cluster.length >= this.quorum) return base;
+      const heights = results
+        .filter(
+          (result): result is PromiseFulfilledResult<number> =>
+            result.status === "fulfilled",
+        )
+        .map((result) => result.value)
+        .filter((height) => Number.isSafeInteger(height) && height >= 0)
+        .sort((left, right) => left - right);
+      for (let start = 0; start < heights.length; start += 1) {
+        const base = heights[start];
+        if (base === undefined) continue;
+        const cluster = heights.filter(
+          (height) => height >= base && height - base <= this.options.maxBlockLag,
+        );
+        if (cluster.length >= this.quorum) return base;
+      }
+      if (attempt < QUORUM_ATTEMPTS) await waitForQuorumRetry();
     }
     throw new Error(`RPC quorum could not agree on ${label}`);
   }

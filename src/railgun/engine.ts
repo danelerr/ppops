@@ -17,6 +17,7 @@ import {
   fullWalletForID,
   loadProvider,
   loadWalletByID,
+  pauseAllPollingProviders,
   setOnTXIDMerkletreeScanCallback,
   setOnUTXOMerkletreeScanCallback,
   startRailgunEngine,
@@ -50,8 +51,13 @@ export type RailgunSyncProgress = {
 
 type SyncProgressListener = (progress: RailgunSyncProgress) => void;
 
-export const normalizeMerkletreeProgressRatio = (progress: number): number =>
-  Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+export const normalizeMerkletreeProgressRatio = (
+  progress: number,
+  status?: MerkletreeScanStatus,
+): number => {
+  if (status === MerkletreeScanStatus.Complete) return 1;
+  return Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+};
 
 const WalletStateSchema = z
   .object({
@@ -255,6 +261,10 @@ export class RailgunViewOnlyEngine {
         "RAILGUN provider load",
       );
       this.providerLoaded = true;
+      // PPOps owns the reconciliation scan schedule. Leaving the SDK polling
+      // provider active can overlap our explicit scan and launch untracked,
+      // delayed TXID syncs that outlive LevelDB during shutdown.
+      pauseAllPollingProviders();
     } catch (error) {
       await this.stop().catch(() => undefined);
       throw error;
@@ -291,7 +301,10 @@ export class RailgunViewOnlyEngine {
   ): void {
     if (event.chain.id !== this.network.chain.id) return;
     const updatedAt = Math.floor(Date.now() / 1_000);
-    const progressRatio = normalizeMerkletreeProgressRatio(event.progress);
+    const progressRatio = normalizeMerkletreeProgressRatio(
+      event.progress,
+      event.scanStatus,
+    );
     this.syncProgress = {
       ...this.syncProgress,
       [kind]: { status: event.scanStatus, progressRatio, updatedAt },

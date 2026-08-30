@@ -6,7 +6,10 @@ import {
   RpcQuorum,
   type RpcProviderLike,
 } from "../src/railgun/rpc-quorum.js";
-import { bucketToPOIStatus } from "../src/railgun/scanner.js";
+import {
+  bucketToPOIStatus,
+  chainStatusWhenReceiptMissing,
+} from "../src/railgun/scanner.js";
 
 const block = (number: number, hashByte = "ab"): Block =>
   ({
@@ -105,6 +108,19 @@ describe("RPC quorum", () => {
     );
     await quorum.close();
   });
+
+  it("retries a transient provider failure without weakening the quorum", async () => {
+    const first = provider({ latest: 100, finalized: 90 });
+    const second = provider({ latest: 101, finalized: 90 });
+    vi.mocked(second.getBlockNumber)
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValue(101);
+    const quorum = quorumFor([first, second]);
+
+    await expect(quorum.chainContext(false)).resolves.toEqual({ latestBlock: 100 });
+    expect(second.getBlockNumber).toHaveBeenCalledTimes(2);
+    await quorum.close();
+  });
 });
 
 describe("PPOI fail-closed mapping", () => {
@@ -123,5 +139,11 @@ describe("PPOI fail-closed mapping", () => {
     expect(bucketToPOIStatus(RailgunWalletBalanceBucket.ShieldBlocked, {})).toBe(
       "BLOCKED",
     );
+  });
+
+  it("does not label a newly observed note reverted before its receipt is visible", () => {
+    expect(chainStatusWhenReceiptMissing()).toBe("OBSERVED");
+    expect(chainStatusWhenReceiptMissing("CONFIRMED")).toBe("OBSERVED");
+    expect(chainStatusWhenReceiptMissing("FINALIZED")).toBe("REVERTED");
   });
 });

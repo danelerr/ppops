@@ -27,4 +27,6 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    stop_grace_period: 30s
+    # The RAILGUN scan is not cancellable. Give the daemon time to drain it
+    # before the orchestrator escalates from SIGTERM to SIGKILL.
+    stop_grace_period: 30m

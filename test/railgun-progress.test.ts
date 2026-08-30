@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MerkletreeScanStatus } from "@railgun-community/shared-models";
 
 import { normalizeMerkletreeProgressRatio } from "../src/railgun/engine.js";
 
@@ -10,5 +11,8 @@ describe("RAILGUN scan progress", () => {
     expect(normalizeMerkletreeProgressRatio(-1)).toBe(0);
     expect(normalizeMerkletreeProgressRatio(50)).toBe(1);
     expect(normalizeMerkletreeProgressRatio(Number.NaN)).toBe(0);
+    expect(
+      normalizeMerkletreeProgressRatio(0, MerkletreeScanStatus.Complete),
+    ).toBe(1);
   });
 });

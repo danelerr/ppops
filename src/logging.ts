@@ -4,6 +4,7 @@ export type SafeErrorCode =
   | "TIMEOUT"
   | "CONCURRENT_SCAN"
   | "RPC_RATE_LIMITED"
+  | "RPC_QUORUM"
   | "RPC_NETWORK"
   | "STORAGE_LOCKED"
   | "STORAGE_CORRUPT"
@@ -19,7 +20,12 @@ export const classifyError = (error: unknown): SafeErrorCode => {
     return "CONCURRENT_SCAN";
   }
   if (message.includes("429") || message.includes("rate limit")) return "RPC_RATE_LIMITED";
-  if (message.includes("lock") || systemCode === "eagain") return "STORAGE_LOCKED";
+  if (message.startsWith("rpc quorum") || message.startsWith("rpc omitted")) {
+    return "RPC_QUORUM";
+  }
+  if (/\block(?:ed|ing)?\b/.test(message) || systemCode === "eagain" || systemCode === "ebusy") {
+    return "STORAGE_LOCKED";
+  }
   if (message.includes("corrupt") || message.includes("checksum")) return "STORAGE_CORRUPT";
   if (message.includes("ppoi") || message.includes("proof of innocence")) return "PPOI_FAILED";
   if (

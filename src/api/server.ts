@@ -88,10 +88,11 @@ export class PPOpsDaemon {
     if (this.scanTimer) clearTimeout(this.scanTimer);
     if (this.server) await closeServer(this.server);
     if (this.activeScan) {
-      await Promise.race([
-        this.activeScan,
-        new Promise<void>((resolve) => setTimeout(resolve, 15_000)),
-      ]);
+      logInfo("daemon.draining_scan");
+      // The Wallet SDK scan cannot be cancelled. Closing the engine or LevelDB
+      // while it is still running would violate the single-scan/state-owner
+      // invariant, so shutdown must drain it before runtime teardown.
+      await this.activeScan;
     }
     this.unsubscribeSyncProgress();
     await this.runtime.stop();
