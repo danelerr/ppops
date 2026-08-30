@@ -10,6 +10,8 @@ Remediated implementation: `136c4bc`
 
 Operational follow-up: `e09245e`
 
+Ambiguity/retry remediation: `5d07fa0`
+
 Reviewer: repository-grounded automated differential review; not an independent
 third-party audit
 
@@ -19,9 +21,11 @@ The Gate B delta adds a bounded Waku Broadcaster submission path to the separate
 `ppops-payer` harness. PPOps merchant code and its view-only trust boundary do
 not gain payer spending authority.
 
-The adversarial review found one Medium and two Low implementation issues. All
-three were corrected in `136c4bc` and have regression coverage. No open Critical,
-High or Medium application finding was confirmed in the reviewed delta.
+The initial adversarial review found one Medium and two Low implementation
+issues. The funded trial and follow-up review found one additional Medium
+cross-intent nullifier risk and two Low ambiguity/retry risks. All six are fixed
+in `136c4bc` and `5d07fa0` with regression coverage. No open Critical, High or
+Medium application finding is confirmed in the reviewed delta.
 
 The most important correction separates three different facts:
 
@@ -38,14 +42,16 @@ A Broadcaster response can no longer drive `SUBMITTED`, receipt lookup or
 nullifiers durably reserved before Waku submission. Merchant fulfillment remains
 independently fail-closed behind `FINALIZED + SPENDABLE + MATCHED`.
 
-Disposition: **acceptable for a bounded beta Gate B trial after fresh financial
-authorization; not production-ready**. The value-bearing Gate B payment and an
-independently operated pilot remain unexecuted. This review moved no funds.
+Disposition: **the implementation fails closed, but another funded Gate B trial
+is not justified until the client/Broadcaster response failure is reproduced or
+diagnosed; not production-ready**. The funded trial was attempted without a
+reported/recovered transaction, and an independently operated pilot remains
+unexecuted. The review methods themselves moved no funds.
 
 ## Scope and change surface
 
-The reviewed range `716b54d..136c4bc` contains three commits, 34 changed files
-and approximately 5,112 additions / 101 deletions. Much of that volume is the
+The reviewed range `716b54d..5d07fa0` contains 12 commits, 41 changed files and
+approximately 7,305 additions / 137 deletions. Much of that volume is the
 pinned Waku dependency lockfile and new tests. The security-sensitive production
 surface is concentrated in:
 
@@ -70,6 +76,9 @@ not a removed control.
 | DR-001 | Medium | Fixed | Broadcaster-reported hash could be treated as canonical transaction identity |
 | DR-002 | Low | Fixed | Slow RPCs and one extreme gas-price response could deny bounded progress |
 | DR-003 | Low | Fixed | External quote/runtime version values lacked complete structural and safe-integer validation |
+| DR-004 | Medium | Fixed | A different intent could reserve nullifiers already held by an unresolved Broadcaster submission |
+| DR-005 | Low | Fixed | Broadcaster rejection and chain-ambiguous post-send failures were not separated into durable safe categories |
+| DR-006 | Low | Fixed | A bounded ambiguity retry could repeatedly select the same failing Broadcaster identity |
 
 ### DR-001 — Broadcaster-reported hash was not bound to reserved nullifiers
 
@@ -151,6 +160,45 @@ snapshot—are now durably journaled before submission. Regression coverage
 rejects changed fee rates and verifies compatible rotation and exact
 submission-quote persistence.
 
+### DR-004 — unresolved nullifiers were scoped only to one intent
+
+The original journal prevented a second submission for the same intent but did
+not compare input nullifiers across different intent records. After an
+ambiguous Waku result, the full wallet could still regard those notes as
+spendable and generate a different merchant payment from the same inputs. Two
+variants could not both succeed on-chain, but which merchant intent won would
+be nondeterministic and an operator could mistake the loser for a safe retry.
+
+`5d07fa0` normalizes and compares every reserved nullifier before any initial
+Broadcaster Waku send. It rejects overlap with every non-rejected,
+non-reverted Broadcaster record. A same-intent retry is the sole exception and
+must reproduce the exact complete nullifier set already stored.
+
+### DR-005 — response ambiguity needed durable semantics
+
+The Waku client can return explicit pre-submission rejections, errors that may
+still correspond to an on-chain send, malformed hashes, transport timeouts or
+unknown dependency errors. Treating all of them as one generic failure left
+the journal safely blocked but did not preserve enough non-secret state for a
+reviewable recovery decision.
+
+The fix maps the official stable server responses into rejection or ambiguity
+categories. Only authenticated definitive rejections may become `REJECTED`;
+timeouts, invalid hashes, unknown responses and every unclassified failure
+after `send()` starts remain `SUBMITTING`. Raw errors are never logged or
+persisted. The CLI exposes category/count/limit state without nullifiers,
+Broadcaster addresses or secret material.
+
+### DR-006 — retry selection needed identity diversity
+
+A same-nullifier variant is safe from double settlement, but repeatedly sending
+it to the same broken Broadcaster provides no useful liveness and consumes the
+local retry budget. The hardened retry excludes every identity recorded by the
+initial request and prior retry reservations. Discovery reports only aggregate
+candidate counts and fails before proof/submission if no different valid
+identity exists. Selection among eligible quotes is deterministic by fee,
+reliability and fingerprint. The retry count is capped at three.
+
 ## State and trust-boundary invariants after remediation
 
 - PPOps merchant runtime remains view-only and cannot import payer code.
@@ -167,6 +215,12 @@ submission-quote persistence.
 - `SUBMITTED`, `MINED` and `REVERTED` require canonical transaction identity;
   terminal states additionally require a block number.
 - An unresolved reservation always returns `paymentRetryPermitted: false`.
+- Different intents cannot reserve an unresolved nullifier.
+- A deliberate ambiguity retry preserves the signed request, payer and exact
+  nullifier set, excludes attempted identities and is locally capped.
+- Only a definitive classified pre-submission rejection or a quorum-confirmed
+  reverted transaction can release the notes for a fresh intent; every unknown
+  post-send result remains manual review.
 - PPOps independently requires receiver finality, PPOI spendability and memo
   matching before intent credit.
 
@@ -189,7 +243,7 @@ protection was found.
 `npm run verify:all` passed after remediation:
 
 - merchant: 19 test files, 58 tests;
-- reference payer: 14 test files, 59 tests;
+- reference payer: 15 test files, 76 tests;
 - TypeScript typechecks and production builds;
 - merchant coverage thresholds;
 - merchant and payer privacy checks;
@@ -216,7 +270,10 @@ The new payer regressions specifically exercise:
 
 ## Limitations and residual risks
 
-- No value-bearing Gate B transaction was submitted during this review.
+- The later value-bearing Gate B trial sent encrypted Waku requests but did not
+  obtain a reported or canonical transaction hash. Four same-nullifier variants
+  across two selected identities all remained unresolved; synchronized payer
+  balance stayed `0.1895 USDC` and no fee was observed as charged.
 - A live no-send preparation generated the proof and observed a `70373`-atomic
   Broadcaster fee for a `10000`-atomic request, but wrote no journal and left
   the merchant intent open with zero received.
@@ -236,17 +293,18 @@ The new payer regressions specifically exercise:
 
 ## Recommendation
 
-Keep `136c4bc`, follow-up `e09245e` and the updated runbooks. Before any Gate B
-claim:
+Keep `136c4bc`, follow-up `e09245e`, ambiguity remediation `5d07fa0` and the
+updated runbooks. Before any Gate B claim:
 
-1. create a fresh unexpired intent;
-2. rerun non-financial `prepare-broadcaster` and record the fresh bounded fee;
-3. obtain explicit approval for the exact USDC amount and maximum Broadcaster
-   fee;
-4. submit once, recover ambiguity only through the journal and nullifiers;
-5. finalize payer PPOI and require PPOps
-   `FINALIZED + SPENDABLE + MATCHED -> PAID`;
-6. repeat the documented flow with an independently controlled operator.
+1. retain the unresolved journal and do not delete, reset or bypass its
+   nullifier reservation;
+2. diagnose the client/Broadcaster failure with a non-financial reproducible
+   fixture or upstream maintainer support before another funded trial;
+3. if a future fresh trial is justified, obtain explicit amount/fee approval,
+   submit once and recover ambiguity through the journal first;
+4. require payer PPOI and PPOps
+   `FINALIZED + SPENDABLE + MATCHED -> PAID` before any Gate B claim;
+5. repeat a passing released flow with an independently controlled operator.
 
 Do not describe the project as production-ready, sender-anonymous or externally
 adopted until the corresponding gates pass.

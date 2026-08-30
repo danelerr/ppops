@@ -54,7 +54,7 @@ available.
 | RPC outage, wrong chain or gas-price outlier | At least two distinct configured origins; 15-second local deadlines; strict healthy majority; upper-median gas selection; explicit fee ceilings; strict identical-receipt quorum | RAILGUN SDK fallback behavior, a high outlier in a two-provider profile and correlated providers remain dependencies |
 | PPOI delay/block | Balance buckets are reported; `finalize-poi` binds proof generation to an exact `MINED` journal record and requires node acknowledgement; PPOps requires receiver `Spendable` | External list policy and node availability are outside the harness; chain mining does not imply PPOI completion |
 | Transaction response lost after submission | The raw transaction is signed locally; its hash and nonce are persisted before broadcast, reuse is blocked, and receipt state advances through `SUBMITTED`, `MINED` or `REVERTED` | RPC/receipt failure still requires resolving the recorded public hash before any new intent is paid |
-| Broadcaster lies about or loses the hash after Waku submission | Intent, payer, the exact quote used for encrypted submission, bounded fee and nullifiers are persisted before Waku; the returned hash remains only a report; submission/receipt state uses the canonical hash rederived from those nullifiers; a strict RPC majority must agree on receipts; the same intent remains blocked | A reservation can remain unresolved indefinitely; a compromised full-wallet SDK could misderive identity; operator must not delete it to force a retry |
+| Broadcaster lies about, rejects or loses the response after Waku submission | Intent, payer, exact quote, bounded fee and nullifiers are persisted before Waku; the returned hash remains only a report; recovery first derives canonical identity from those nullifiers; a strict RPC majority must agree on receipts. An explicit ambiguity retry must preserve the signed request, payer and complete nullifier set, exclude every attempted Broadcaster identity and stay within a three-retry cap. Any unresolved nullifier is barred from a different intent | The reservation can remain unresolved indefinitely after the cap; distinct 0zk identities need not be independent operators; a compromised full-wallet SDK could misderive identity; the operator must not delete or bypass the journal to force a fresh spend |
 | Public sender correlation | Explicit Gate A warning | Inherent to self-signing; Gate B Broadcaster is required for the final privacy claim |
 | Network metadata correlation | Broadcaster transaction content is encrypted, but RPC, PPOI, artifact, DNS/Waku and Broadcaster connections originate from the payer host | No Tor/mixnet guarantee; timing and IP-layer analysis remain possible |
 | Supply-chain compromise | Exact dependency lockfile, build/tests, audit gate | Official RAILGUN tree retains low/moderate legacy transitive findings and downloaded proving artifacts remain trusted inputs |
@@ -86,3 +86,13 @@ available.
 8. Treat `reportedTransactionHash` as diagnostic metadata only. Continue
    recovery until `canonicalTransactionHashResolved` is true; never inspect the
    reported hash and infer that payment succeeded.
+9. After an ambiguous Gate B response, run `recover-broadcaster` before any
+   retry. Use `retry-broadcaster` only when the command reports it available;
+   it regenerates a conflicting variant for the exact same nullifiers and
+   excludes identities already attempted.
+10. Never pay a different intent with nullifiers held by a nonterminal
+    Broadcaster journal record. The journal enforces this locally; do not delete
+    or edit it to bypass the check.
+11. After three retry reservations, stop. There is no timeout after which an
+    unknown external submission becomes safe to ignore; resolve it manually or
+    obtain definitive rejection/reversion evidence before releasing the notes.

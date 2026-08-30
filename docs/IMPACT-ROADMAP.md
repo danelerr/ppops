@@ -128,6 +128,14 @@ USDC` Broadcaster fee for a `0.01 USDC` test payment, illustrating why explicit
 fee visibility and ceilings are impact-relevant usability controls rather than
 implementation detail.
 
+The later funded trial also remains a failure, not evidence of sender
+unlinkability. Four same-nullifier variants reached two selected Broadcaster
+identities without a usable response or canonical transaction; a final recovery
+found the payer balance unchanged and the merchant intent still open. PPOps now
+preserves that ambiguity, prevents cross-intent nullifier reuse, excludes prior
+Broadcaster identities on bounded retries and stops for manual review after the
+retry cap. This protects funds but does not solve Broadcaster liveness.
+
 Failure to complete the private-transfer primitive remains a stop condition.
 
 ### Gate 1 — payer readiness and provider resilience

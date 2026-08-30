@@ -237,13 +237,15 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 14 test files and 59 tests,
+- Automated reference-payer suite on 2026-08-30: 15 test files and 76 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
   adversarial hash mismatch, proof-compatible quote rotation,
-  exact-submission-quote persistence, ambiguous-submission recovery, bounded
-  RPC reads, gas outlier handling, receipt agreement, no-broadcast preparation
-  and clean CLI-process termination.
+  exact-submission-quote persistence, classified rejection/ambiguity,
+  exact-nullifier bounded retries, alternate-Broadcaster exclusion,
+  cross-intent nullifier collision rejection, bounded RPC reads, gas outlier
+  handling, receipt agreement, no-broadcast preparation and clean CLI-process
+  termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
@@ -297,7 +299,21 @@ Verification evidence:
   had already rejected the quote safely before proof. The passing preparation
   submitted no payment, wrote no journal record and left the intent open at
   zero received. The fee is point-in-time evidence, not a later quote. The
-  value-bearing Gate B remains pending.
+  value-bearing Gate B remained unproven at this stage.
+- Controlled value-bearing Gate B trial: one initial Waku submission and three
+  bounded same-nullifier variants used fee quotes between `0.058867` and
+  `0.071154 USDC`, each below the operator's `0.08 USDC` ceiling. The first
+  three attempts addressed one Broadcaster identity. The final retry observed
+  18 valid quotes from 14 unique identities, excluded the prior identity and
+  selected a second. Both attempted identities returned post-send failures
+  without a reported transaction hash; one was the upstream-sanitized
+  `UNKNOWN_ERROR`, while another remained an unclassified client/transport
+  failure. Final wallet synchronization more than 15 minutes after the last
+  attempt found no canonical transaction for the reserved nullifiers; the
+  private balance remained `0.1895 USDC` and the merchant intent remained open
+  with zero received/pending value.
+  The retry cap is exhausted, the nullifiers remain reserved, no fee was
+  observed as charged and Gate B is **not passed**.
 - After moving to one explicit scan owner, the merchant reached readiness in
   approximately 6 seconds and, after the final observability correction,
   completed five subsequent scheduled scans at roughly 34-second cadence.

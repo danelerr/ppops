@@ -1,49 +1,51 @@
 # PPOps audit context dossier
 
-Context-building snapshot: 2026-08-29. This document describes the final source
-tree through commits `9c42664` and `68b8c77`. Review began from root commit
+Context-building snapshot: 2026-08-30. This document describes the source tree
+through Gate B ambiguity/retry remediation commit
+`5d07fa0a3ca115452a0a626c378afcaaebfc0d68`. Review began from root commit
 `89256e9e2fa2f4d388c9b2dd96adb5ef588fe8ef`; the payer subtree was originally
 imported from commit
 `300bcb7c5a52ad7955ce317f15a120b3138c48e6`. This is an orientation record, not
 a vulnerability report, severity assessment, or production-readiness claim.
-The post-snapshot hardening delta is reviewed in
-[`SECURITY-REVIEW-2026-08-30.md`](./SECURITY-REVIEW-2026-08-30.md); where code or
-line references differ, that later review and the current source take priority.
+The 2026-08-30 extension maps the current Gate B Broadcaster submission and
+recovery flow; the separate security-review documents are not part of this
+context-building analysis.
 
 Ignored runtime state and secret/configuration contents were not opened. In
 particular, no contents under `secrets/`, `data/`, `instance/`, `backups/`,
 `restore/`, `pilot/`, `pilot-evidence/`, or `tools/ppops-payer/{secrets,data,artifacts}`
-were inspected. The untracked `justito-hackathon-deck.html` was not read or
-modified.
+were inspected. The path `justito-hackathon-deck.html` was not read or modified.
 
 ## System shape
 
 The repository contains two independently executable Node/TypeScript packages:
 
 1. `ppops` is a merchant-side view-only reconciler. Its binary is
-   `dist/cli.js` (`package.json:L24-L26`). It accepts a RAILGUN shareable viewing
+   `dist/cli.js` (`package.json:L27-L29`). It accepts a RAILGUN shareable viewing
    key, an independent merchant EIP-712 key, an API token, an encrypted-wallet
    database key, and optionally a webhook HMAC key
    (`src/runtime.ts:L41-L72`). It creates payment intents, watches receiver
    notes, derives payment state, and emits an outbox/webhook.
-2. `tools/ppops-payer` is a payer-side Gate A harness. Its binary is also built
-   separately (`tools/ppops-payer/package.json:L17-L19`). It accepts a payer
-   mnemonic when first importing a full RAILGUN wallet and a separate EVM key
-   for self-signed transaction submission
-   (`tools/ppops-payer/src/cli.ts:L230-L255`). It does not run in the merchant
-   daemon. An executable boundary check rejects merchant imports of payer code,
-   payer imports that escape its package, merchant spending-material options,
-   payer inclusion in the merchant build, and Docker copies of payer tooling
-   (`scripts/trust-boundary-check.ts:L31-L80`).
+2. `tools/ppops-payer` is a payer-side Gate A/Gate B harness. Its binary is built
+   separately (`tools/ppops-payer/package.json:L20-L22`). It accepts a payer
+   mnemonic only when first importing a full RAILGUN wallet. Gate A additionally
+   loads an EVM self-signing key; Gate B sets `requireSelfSigner=false` and uses
+   an owner-pinned Broadcaster trust file plus the Waku Broadcaster client
+   (`tools/ppops-payer/src/cli.ts:L295-L320`, `L793-L857`). It does not run in the
+   merchant daemon. An executable boundary check rejects merchant imports of
+   payer code, payer imports that escape its package, merchant spending-material
+   options, payer inclusion in the merchant build/package, and Docker copies of
+   payer tooling (`scripts/trust-boundary-check.ts:L31-L89`).
 
 The verification boundary mirrors the runtime boundary: root Vitest discovery
 is limited to `test/**/*.test.ts` and root coverage to `src/**/*.ts`
 (`vitest.config.ts:L3-L16`); payer tests/build/audit execute from the payer
 package through its own `verify` script (`tools/ppops-payer/package.json:L23-L28`).
 Root `verify:all` composes the two runs without merging their test discovery or
-coverage accounting (`package.json:L38-L43`).
-The final separate test runs for this snapshot reported 17 merchant files / 52
-tests and 7 payer files / 19 tests.
+coverage accounting (`package.json:L41-L46`).
+The latest separate verification reported by the coordinating run contained 19
+merchant test files / 58 tests and 15 payer test files / 76 tests; those counts
+are execution observations rather than source invariants.
 
 The protocol path is:
 
@@ -54,7 +56,13 @@ merchant backend
   -> public metadata-minimal request.json
   -> independently pinned merchant signer verification on payer host
   -> full RAILGUN payer wallet + encrypted memo + private ERC-20 proof
-  -> Arbitrum RAILGUN proxy transaction
+  -> Gate A: local EVM self-signer -> Arbitrum RAILGUN proxy transaction
+     OR
+  -> Gate B: pinned fee-signers -> validated quote -> encrypted Waku request
+       -> initial reservation OR bounded same-request/payer/nullifier retry
+       -> selected RAILGUN Broadcaster -> Arbitrum RAILGUN proxy transaction
+       -> classified rejection/ambiguity OR reported hash
+       -> payer nullifier-based canonical-hash recovery + RPC receipt quorum
   -> merchant view-only RAILGUN scan
   -> RPC-quorum finality + SDK/PPOI balance bucket
   -> transactional settlement/projection/outbox
@@ -72,9 +80,11 @@ merchant backend
 | Scheduled scan | Daemon timer (`src/api/server.ts:L101-L121`) | Process-internal | Settlement/projection/outbox writes and webhook delivery |
 | `scan-once` | Root CLI (`src/cli.ts:L346-L354`) | OS user and local secrets | Same reconciliation effects as scheduled scan |
 | Outbound webhook | Internal maintenance (`src/runtime.ts:L129-L143`) | HMAC key establishes message origin for receiver | External HTTP side effect; local delivery/retry/dead-letter state |
-| Payer CLI `main` | Local process arguments (`tools/ppops-payer/src/cli.ts:L423-L460`) | OS user, owner-only config/secrets, explicit command bounds | Full-wallet import/cache, sync state, submission journal state, or one self-signed spend submission |
-| Payer `submission-status` | Local process arguments (`tools/ppops-payer/src/cli.ts:L314-L337`) | OS user and owner-only payer config/journal | None; reports absent, `SUBMITTING`, or `SUBMITTED` plus a recorded hash |
-| Payer request loader | HTTPS or loopback HTTP, or local file (`tools/ppops-payer/src/request.ts:L118-L148`) | Descriptor must later verify against signer supplied out of band | None until `pay-self-signed` proceeds |
+| Payer CLI `main` | Local process arguments (`tools/ppops-payer/src/cli.ts:L1037-L1125`) | OS user, owner-only config/secrets, explicit command bounds | Full-wallet import/cache, sync state, journal transitions, Gate A submission, or Gate B submission/retry/recovery |
+| Payer `pay-broadcaster` / `retry-broadcaster` | Local CLI command (`tools/ppops-payer/src/cli.ts:L793-L905`) | Independently supplied merchant signer, payer address, amount/fee ceilings and exact intent confirmation; retry additionally requires an eligible local lineage | Proof/cache activity, initial or retry journal reservation, Waku message and possibly Arbitrum transaction/receipt state |
+| Payer `recover-broadcaster` | Local CLI command (`tools/ppops-payer/src/cli.ts:L907-L1035`) | Expected payer address plus existing Broadcaster journal record and full payer wallet for nonterminal lookup | Reports `REJECTED`; may advance `SUBMITTING` to `SUBMITTED`, then `MINED` or `REVERTED`; reports same-nullifier retry availability without sending |
+| Payer `submission-status` | Local process arguments (`tools/ppops-payer/src/cli.ts:L564-L613`) | OS user and owner-only payer config/journal | None; reports base state including `REJECTED`, retry count, rejection/ambiguity categories, reported/canonical hashes and block when present |
+| Payer request loader | HTTPS or loopback HTTP, or local file (`tools/ppops-payer/src/request.ts:L134-L164`) | Descriptor must later verify against signer supplied out of band; value-bearing Gate A/B require a live URL | None until a submission path proceeds |
 
 All root routes registered after the authentication middleware at
 `src/api/app.ts:L272-L282` are authenticated. The three health routes and the
@@ -105,10 +115,11 @@ unauthenticated. Static payer assets are also unauthenticated
 ### Payer side
 
 - A separate LevelDOWN and owner-only wallet-state JSON hold the full RAILGUN
-  wallet cache and its creation block (`tools/ppops-payer/src/railgun/engine.ts:L267-L301`).
+  wallet cache and its creation block (`tools/ppops-payer/src/railgun/engine.ts:L386-L424`).
 - The mnemonic is read only when the wallet-state file does not exist; the EVM
-  private key is read only for self-signed submission
-  (`tools/ppops-payer/src/cli.ts:L230-L245`).
+  private key is read only when a Gate A command sets `requireSelfSigner=true`;
+  Gate B loads neither key after initial wallet import
+  (`tools/ppops-payer/src/cli.ts:L295-L320`, `L705-L790`, `L793-L857`).
 - The payer config, DB key, mnemonic, and EVM key are resolved relative to the
   payer config and required to occupy distinct paths
   (`tools/ppops-payer/src/config.ts:L87-L137`).
@@ -117,13 +128,20 @@ unauthenticated. Static payer assets are also unauthenticated
   descriptor format.
 - Payer CLI engine operations acquire a PID/token lock derived from the
   wallet-state path before engine construction and release it after shutdown
-  (`tools/ppops-payer/src/cli.ts:L339-L362`;
+  (`tools/ppops-payer/src/cli.ts:L655-L692`;
   `tools/ppops-payer/src/security/runtime-lock.ts:L38-L78`).
-- A JSON submission journal adjacent to wallet state records an intent as
-  `SUBMITTING` before EVM submission and, after ethers returns a hash, as
-  `SUBMITTED` with that hash
-  (`tools/ppops-payer/src/security/submission-journal.ts:L12-L45`,
-  `L63-L102`).
+- A JSON submission journal adjacent to wallet state distinguishes
+  `SELF_SIGNED` and `BROADCASTER` records. Gate B base state is
+  `SUBMITTING -> SUBMITTED -> MINED|REVERTED` or fresh
+  `SUBMITTING -> REJECTED`; up to three same-request/payer/nullifier retry
+  attempts carry their own `RESERVED|REJECTED|AMBIGUOUS|REPORTED` outcome. The
+  Waku-reported hash remains separate until wallet nullifier lookup supplies a
+  canonical hash
+  (`tools/ppops-payer/src/security/submission-journal.ts:L19-L246`,
+  `L305-L702`).
+- Broadcaster journal reads/writes remain owner-only, schema-validated
+  whole-document replacements with file and non-Windows directory sync
+  (`tools/ppops-payer/src/security/submission-journal.ts:L704-L747`).
 
 ## Trust boundaries and external dependencies
 
@@ -134,10 +152,15 @@ unauthenticated. Static payer assets are also unauthenticated
 | Trusted merchant identity -> payer | Expected EVM signer | Supplied separately as CLI input at `tools/ppops-payer/src/cli.ts:L286-L296`; signature comparison at `tools/ppops-payer/src/descriptor.ts:L54-L73` |
 | Merchant host -> local filesystem | Config, secrets, SQLite, LevelDB, artifacts | Owner/file/type/size/identity checks at `src/security/private-file.ts:L9-L58`; schema/path checks; OS filesystem remains part of the trusted base |
 | Payer host -> local filesystem | Mnemonic, full-wallet cache, EVM key | Owner/file/type/size/identity checks at `tools/ppops-payer/src/security/private-file.ts:L9-L58` |
-| Both processes -> RAILGUN Wallet SDK | Viewing key or mnemonic, wallet DB key, notes, proofs, balances, PPOI buckets | Pinned package versions at root `package.json:L55-L64` and payer `package.json:L30-L37`; SDK behavior is external to project source |
+| Both processes -> RAILGUN Wallet SDK | Viewing key or mnemonic, wallet DB key, notes, proofs, balances, PPOI buckets | Pinned package versions at root `package.json:L58-L67` and payer `tools/ppops-payer/package.json:L33-L41`; cryptographic/protocol behavior remains dependency behavior |
 | Scanner -> RPC providers | Chain ID, latest/finalized heights, receipts, blocks | Majority grouping/height clustering in `src/railgun/rpc-quorum.ts:L68-L175` |
 | Wallet SDK -> PPOI nodes | PPOI health/proof/bucket data | URL/profile constraints at `src/config.ts:L144-L221`; health preflight at `src/railgun/ppoi-preflight.ts:L18-L68`; proof semantics remain an SDK/PPOI dependency |
 | Payer -> one submission RPC | Network/fee reads and raw transaction submission | First healthy provider selection with chain-ID check at `tools/ppops-payer/src/railgun/self-signed-transfer.ts:L49-L75` |
+| Operator trust file -> Waku fee cache | One to sixteen trusted fee-signer 0zk addresses, Waku topic, time/reliability/version bounds | Owner-only strict trust config at `tools/ppops-payer/src/broadcaster/config.ts:L37-L104`; passed to the SDK at `tools/ppops-payer/src/broadcaster/session.ts:L262-L290`; local SDK verifies broadcaster fee-message signatures and applies trusted-signer fee authorization at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/fees/handle-fees-message.js:L32-L128` |
+| Payer -> Waku/Broadcaster | RAILGUN proxy target/calldata, fee ID, gas floor and pre-transaction PPOI payload encrypted to selected Broadcaster viewing key; retry excludes every previously attempted Broadcaster identity and preserves the exact original nullifier set | Retry selection at `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L138-L178` and `tools/ppops-payer/src/broadcaster/session.ts:L196-L260`; `prepareSubmission` at `tools/ppops-payer/src/broadcaster/session.ts:L445-L478`; retry binding at `tools/ppops-payer/src/security/submission-journal.ts:L412-L468`; pinned local client encryption at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L41-L68` |
+| Waku/Broadcaster -> payer | Encrypted transact response text or completion inferred from the reserved nullifiers | SDK response-key state/decryption at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transact-response.js:L5-L44`; exact response classifiers plus unclassified fallback at `tools/ppops-payer/src/broadcaster/failures.ts:L39-L165` and `tools/ppops-payer/src/broadcaster/session.ts:L480-L517`; reported/canonical split at `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L357-L448` |
+| Payer wallet state -> canonical public hash | One to 64 populated transfer nullifiers | Project wrapper at `tools/ppops-payer/src/railgun/engine.ts:L253-L274`; installed Wallet/Engine path requires every nullifier to map to the same transaction in one UTXO tree at `tools/ppops-payer/node_modules/@railgun-community/engine/dist/railgun-engine.js:L1255-L1275` |
+| Payer -> configured receipt RPCs | Canonical transaction hash | Strict identical-receipt majority at `tools/ppops-payer/src/railgun/rpc-quorum.ts:L121-L185` |
 | PPOps -> webhook receiver | Stored event JSON plus timestamp/key ID/event ID/HMAC | Signature construction and redirect/timeout policy at `src/events/webhook.ts:L93-L149` |
 | Operator -> backup input | Manifest and files, optionally secrets | Schema, exact inventory and SHA-256 checks at `src/backup.ts:L25-L53` and `L219-L235`; manifest is not independently authenticated by this code |
 
@@ -153,6 +176,9 @@ unauthenticated. Static payer assets are also unauthenticated
   URL username/password fields are forbidden (`src/config.ts:L23-L31`).
 - Payer mnemonic, payer RAILGUN wallet database key, full wallet cache, and
   EVM self-signing private key.
+- Gate B transaction nullifiers, payer/Broadcaster 0zk identities, Waku response
+  key held by the local SDK, retry attempt metadata, and the operator-pinned
+  Broadcaster trust file.
 - Backups made with `includeSecrets: true`.
 
 ### Integrity/availability-sensitive
@@ -165,6 +191,9 @@ unauthenticated. Static payer assets are also unauthenticated
 - Webhook delivery/dead-letter state.
 - Wallet creation block and persisted wallet identity on the payer.
 - Explicit payer address, self-signer address, amount cap, and gas-cost cap.
+- Gate B trusted fee-signer set, exact/compatible quote identity, fee ceiling,
+  active cross-record nullifier ownership, retry lineage, stable rejection/
+  ambiguity categories, reported hash, canonical hash, and receipt state.
 
 ### Financial authority
 
@@ -172,8 +201,12 @@ unauthenticated. Static payer assets are also unauthenticated
   (`src/config.ts:L82-L88`) and checks that the loaded wallet cannot be resolved
   or used as a full/signing wallet (`src/railgun/engine.ts:L227-L246`).
 - `tools/ppops-payer` intentionally has spending authority: it imports a mnemonic
-  (`tools/ppops-payer/src/railgun/engine.ts:L286-L289`) and sends through an EVM
-  signer (`tools/ppops-payer/src/railgun/self-signed-transfer.ts:L232-L250`).
+  (`tools/ppops-payer/src/railgun/engine.ts:L405-L408`). Gate A sends through an
+  EVM signer; Gate B creates a private transfer proof with a token fee payable to
+  the selected Broadcaster, then sends the encrypted request through Waku without
+  loading the optional EVM self-signing key
+  (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L156-L266`, `L324-L359`;
+  `tools/ppops-payer/src/cli.ts:L817-L857`).
 
 ## Cross-component invariants
 
@@ -224,10 +257,10 @@ unauthenticated. Static payer assets are also unauthenticated
     LevelDB/SQLite are opened (`src/runtime.ts:L53-L60`) and is released last on
     shutdown (`src/runtime.ts:L146-L171`). Backup/restore first require the
     runtime to be stopped (`src/backup.ts:L127-L135`, `L243-L251`).
-11. **Payer process exclusivity.** Normal `sync` and `pay-self-signed` engine
-    operations use `withEngine`, which acquires a PID/token lock before engine
-    construction and releases it after shutdown
-    (`tools/ppops-payer/src/cli.ts:L339-L362`).
+11. **Payer process exclusivity.** Normal `sync`, Gate A, Gate B, POI and
+    nullifier-recovery engine operations use `withEngine`, which acquires a
+    PID/token lock before engine construction and releases it after shutdown
+    (`tools/ppops-payer/src/cli.ts:L655-L692`, `L831-L857`, `L959-L966`).
 12. **Payer execution is explicitly bounded.** The CLI requires exact intent ID,
     amount cap, expected payer 0zk address, expected EVM signer, and gas-cost cap
     before calling the spend path (`tools/ppops-payer/src/cli.ts:L375-L409`). The
@@ -236,20 +269,82 @@ unauthenticated. Static payer assets are also unauthenticated
 13. **Bounded CLI failure output.** Root command failures are classified into a
     fixed code (`src/security/failures.ts:L1-L65`) at the final CLI boundary
     (`src/cli.ts:L592-L604`). Payer runtime errors are likewise reduced to a
-    fixed code (`tools/ppops-payer/src/events.ts:L18-L50`); payer progress events
+    fixed code (`tools/ppops-payer/src/events.ts:L21-L66`) at the final promise
+    rejection boundary (`tools/ppops-payer/src/cli.ts:L1116-L1125`); payer events
     contain selected SDK status/progress fields rather than caught error text.
-    This relies on command
-    failures reaching the respective final boundaries.
-14. **One local payer submission per intent.** The transfer path refuses an
-    existing intent record, reserves `SUBMITTING` immediately before the
-    network call, and records `SUBMITTED` after receiving a transaction hash
-    (`tools/ppops-payer/src/railgun/self-signed-transfer.ts:L104-L107`,
-    `L241-L250`; `tools/ppops-payer/src/security/submission-journal.ts:L54-L102`).
+    This relies on command failures reaching the respective final boundaries.
+14. **One local payer lineage per intent.** Gate A and a fresh Gate B operation
+    refuse an existing intent record. Gate A reserves a precomputed public hash
+    before its network call; Gate B reserves payer/quote/fee/nullifiers before
+    Waku. The dedicated retry path mutates that same record only when request,
+    payer and exact nullifier set match, no hash is known/reported, and fewer
+    than three retry attempts exist
+    (`tools/ppops-payer/src/railgun/self-signed-transfer.ts:L195-L196`,
+    `L372-L391`; `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L132-L154`,
+    `L337-L355`; `tools/ppops-payer/src/security/submission-journal.ts:L305-L468`).
 15. **Verification results preserve package ownership.** Merchant test discovery
     and coverage include only root `test/` and `src/`; payer verification runs
     separately from `tools/ppops-payer`. `verify:all` requires both package
-    pipelines (`vitest.config.ts:L3-L16`; `package.json:L38-L43`;
+    pipelines (`vitest.config.ts:L3-L16`; `package.json:L41-L46`;
     `tools/ppops-payer/package.json:L23-L28`).
+16. **Gate B financial bounds precede proof submission.** The CLI independently
+    bounds payment amount and confirms the exact intent; the transfer path
+    validates a positive uint256 fee ceiling, a quorum-derived Arbitrum gas
+    price, quote token/identity/lifetime/reliability, the exact calculated token
+    fee, and `payment + fee` spendable balance before Waku submission
+    (`tools/ppops-payer/src/cli.ts:L793-L853`;
+    `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L120-L244`).
+17. **Gate B preparation is separated from the irreversible call.** Proof and
+    population complete, the proxy/zero-value/nullifier set and live request are
+    checked, and `submit=false` returns without constructing a Waku transaction
+    or journal record. On `submit=true`, local encrypted-message construction
+    completes before the journal reservation; `submitPrepared` is called only
+    after that reservation returns
+    (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L246-L359`).
+18. **Canonical Gate B identity comes from nullifiers.** The hash returned by
+    the Waku client is journaled only as `reportedTransactionHash`. Wallet/engine
+    lookup requires all reserved nullifiers to map to one transaction; only that
+    result can populate `transactionHash`, drive receipt quorum, and advance the
+    journal (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L407-L470`;
+    `tools/ppops-payer/node_modules/@railgun-community/engine/dist/railgun-engine.js:L1255-L1275`).
+19. **Gate B state distinguishes rejection, ambiguity and chain progress.**
+    Base records accept `SUBMITTING -> SUBMITTED -> MINED|REVERTED` or a fresh
+    hashless `SUBMITTING -> REJECTED`. Retry attempts independently move from
+    `RESERVED` to `REJECTED`, `AMBIGUOUS`, or `REPORTED`, while ambiguity/retry
+    rejection preserves base `SUBMITTING`. Canonical hash/block presence is
+    coupled to base status
+    (`tools/ppops-payer/src/security/submission-journal.ts:L19-L246`,
+    `L470-L702`).
+20. **Active nullifier ownership is checked before a fresh Gate B reserve.** A
+    populated/journaled set contains one to 64 nonzero unique 32-byte values
+    (`tools/ppops-payer/src/railgun/populated-transfer.ts:L10-L27`;
+    `tools/ppops-payer/src/security/submission-journal.ts:L170-L182`). A new
+    reservation rejects overlap with any other Broadcaster record in
+    `SUBMITTING`, `SUBMITTED`, or `MINED`; `REJECTED` and `REVERTED` are excluded.
+    Retry requires exact equality with its own original set
+    (`tools/ppops-payer/src/security/submission-journal.ts:L362-L468`).
+21. **One SDK Broadcaster transaction is active in the normal CLI process.** A
+    payer runtime lock spans Gate B proof, `BroadcasterSession`, Waku send and
+    immediate canonical recovery (`tools/ppops-payer/src/cli.ts:L831-L857`). The
+    pinned Waku client stores one process-global response shared key and one
+    stored transaction response (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transact-response.js:L5-L15`).
+22. **Broadcaster response categories are exact and bounded.** Remote response
+    categories require the installed SDK's expected outer error plus an exact
+    nested message-map hit. The exact local SDK timeout and an invalid returned
+    hash have their own ambiguity categories. A fresh classified rejection
+    becomes `REJECTED`; every ambiguity remains `SUBMITTING`; every otherwise
+    unrecognized post-send error becomes the stable `UNCLASSIFIED_FAILURE`
+    ambiguity
+    (`tools/ppops-payer/src/broadcaster/failures.ts:L39-L165`;
+    `tools/ppops-payer/src/broadcaster/session.ts:L480-L517`;
+    `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L357-L406`).
+23. **Standard retries diversify Broadcaster identity.** The retry path derives
+    an exclusion list from the original Broadcaster plus every prior retry
+    attempt. Discovery validates all current quotes, removes those identities,
+    then sorts eligible quotes by lowest fee-per-gas, highest reliability and
+    fingerprint; a retry cannot proceed to proof until an alternate identity is
+    selected (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L138-L178`;
+    `tools/ppops-payer/src/broadcaster/session.ts:L196-L260`, `L341-L398`).
 
 ## Assumptions recorded as `nothing found`
 
@@ -272,6 +367,92 @@ impact.
   acquire `PayerRuntimeLock`, but `PayerRailgunEngine` is exported and does not
   acquire the lock internally. A guarantee that every non-CLI consumer uses the
   wrapper is established by: **nothing found** at the module boundary.
+- **Gate B operator trust provenance:** `pay-broadcaster` and
+  `retry-broadcaster` assume the merchant
+  signer, expected payer address, amount/fee ceilings, exact intent confirmation,
+  and Broadcaster trusted fee-signer set came from independently authenticated
+  operator decisions (`tools/ppops-payer/src/cli.ts:L793-L853`). Their provenance
+  is established by: **nothing found** in application code.
+- **One active Waku transaction per process:** `BroadcasterTransaction.create`
+  replaces one static response shared key and clears one static stored response
+  (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transact-response.js:L5-L15`).
+  The standard CLI places one Gate B operation under one runtime lock, but a
+  guarantee that exported `BroadcasterSession` callers never overlap prepared
+  submissions is established by: **nothing found** at the class boundary.
+- **Compatible fee-ID rotation:** a fresh quote may replace the proof-time quote
+  when Broadcaster address, token and fee-per-gas remain equal
+  (`tools/ppops-payer/src/broadcaster/session.ts:L150-L194`, `L414-L439`). The
+  assumption that the selected Broadcaster will accept the successor fee ID and
+  that this substitution preserves all protocol-bound economics is established
+  by: **nothing found in project source** beyond identical recipient/token/rate;
+  it is a Broadcaster protocol/SDK contract.
+- **Waku delivery/response contract:** the installed client retries the encrypted
+  request, queries historical responses, decrypts through the static shared key,
+  and can alternatively return a nullifier-derived txid
+  (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L69-L145`).
+  A guarantee that LightPush acceptance, Store/Filter retrieval and decrypted
+  response identity represent one selected Broadcaster is established by:
+  **nothing found** in PPOps source; these are SDK/Waku dependencies.
+- **Pre-transaction PPOI and encrypted payload binding:** Gate B passes proxy
+  calldata, fee ID, gas floor, nullifiers and pre-transaction PPOI data to the
+  pinned client's `BroadcasterTransaction.create`
+  (`tools/ppops-payer/src/broadcaster/session.ts:L445-L470`). The cryptographic
+  binding and Broadcaster-side interpretation are established by: **nothing
+  found in project source**; the local installed SDK delegates encryption to the
+  Wallet package at
+  `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L45-L67`.
+- **Nullifier-to-canonical-hash identity:** Wallet/Engine lookup accepts a hash
+  only when every supplied nullifier resolves to the same txid in one tree
+  (`tools/ppops-payer/node_modules/@railgun-community/engine/dist/railgun-engine.js:L1255-L1275`).
+  The protocol guarantee that this lookup result is the canonical Arbitrum
+  transaction intended by the populated proof is established by: **nothing
+  found in PPOps source**; it is a Wallet/Engine state dependency.
+- **Journal-wide identity from method provenance:** `reserveBroadcaster` rejects
+  active cross-record nullifier overlap and duplicate intent ID, while retry
+  requires its own exact original set
+  (`tools/ppops-payer/src/security/submission-journal.ts:L362-L468`). The
+  whole-file schema itself does not enforce unique intent IDs or cross-record
+  nullifier ownership; a guarantee that all preexisting state was constructed
+  through serialized public methods is established by: **nothing found** in the
+  schema.
+- **Nullifier reuse after terminal rejection/revert:** a fresh reservation ignores
+  overlaps owned by `REJECTED` or `REVERTED` records
+  (`tools/ppops-payer/src/security/submission-journal.ts:L381-L394`). The protocol
+  guarantee that these outcomes make the same notes available for a different
+  intent is established by: **nothing found** in project source.
+- **Same-nullifier retry contract:** retry regenerates proof/population and may
+  select refreshed Broadcaster/quote/fee metadata, but the journal requires the
+  exact original request, payer and nullifier set and caps attempts at three
+  (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L324-L355`;
+  `tools/ppops-payer/src/security/submission-journal.ts:L412-L468`). Remote
+  idempotence and proof-identity semantics are established by: **nothing found**
+  in project source.
+- **Broadcaster identity diversity:** standard retry excludes the original and
+  prior-attempt 0zk addresses before deterministic quote selection
+  (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L138-L178`;
+  `tools/ppops-payer/src/broadcaster/session.ts:L196-L260`). The guarantee that
+  distinct 0zk identities represent operationally independent Broadcasters is
+  established by: **nothing found** in project source.
+- **Broadcaster response-category contract:** remote rejection/ambiguity mapping
+  requires exact installed-SDK outer and nested error strings; the exact local
+  timeout and invalid returned hash have explicit ambiguity enums, and every
+  otherwise unmatched post-send error becomes `UNCLASSIFIED_FAILURE`
+  (`tools/ppops-payer/src/broadcaster/failures.ts:L39-L137`;
+  `tools/ppops-payer/src/broadcaster/session.ts:L480-L517`). The stability and
+  remote non-submission/uncertainty meaning of those strings across accepted
+  Broadcaster versions is established by: **nothing found** in project source.
+- **Recovery journal serialization:** `recoverBroadcaster` reads the record
+  before `withEngine`, and its `markSubmitted`/`markMined` calls occur after
+  `withEngine` returns and releases the runtime lock
+  (`tools/ppops-payer/src/cli.ts:L914-L966`, `L985-L1018`;
+  `tools/ppops-payer/src/cli.ts:L655-L692`). An independent lock inside
+  `SubmissionJournal` or a guarantee that no other writer overlaps those calls
+  is established by: **nothing found**.
+- **Safe failure code runtime membership:** `safeFailureResult` emits the `code`
+  property of any object that is an instance of exported `SafeFailure`; the union
+  is enforced by TypeScript callers but not revalidated at serialization time
+  (`tools/ppops-payer/src/events.ts:L21-L66`). A runtime membership check for
+  direct JavaScript consumers is established by: **nothing found**.
 - **Merchant intent state through submission:** `paySelfSigned` verifies `OPEN`
   and zero received/pending before engine start/sync/proof, while the transfer
   path separately rechecks local expiry immediately before reservation and send
@@ -336,7 +517,7 @@ impact.
   expected not to overlap it.
 - **Submission-journal filesystem contract on Windows:** journal replacement
   syncs the file and, on non-Windows systems, its directory after rename
-  (`tools/ppops-payer/src/security/submission-journal.ts:L120-L140`). An
+  (`tools/ppops-payer/src/security/submission-journal.ts:L720-L740`). An
   equivalent explicit directory-sync step on Windows is established by:
   **nothing found** in the journal writer.
 
@@ -373,6 +554,68 @@ impact.
     helpers (`src/security/private-file.ts:L20-L29` and the mirrored payer
     helper). The equivalent Windows
     access-control precondition is not described in source.
+11. Does the pinned Waku client support more than one prepared/in-flight
+    `BroadcasterTransaction` in a process? Its response decryptor holds one static
+    shared key and response slot
+    (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transact-response.js:L5-L15`).
+12. When `BroadcasterTransaction.send()` returns a hash, was it obtained from a
+    decrypted Broadcaster response or from the client's own nullifier lookup?
+    Both paths return the same untagged string
+    (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L82-L93`, `L127-L145`).
+13. What external protocol guarantee says a Broadcaster retains or accepts a
+    proof-compatible successor `feesID` when address, token and fee rate remain
+    fixed (`tools/ppops-payer/src/broadcaster/session.ts:L150-L194`)?
+14. What RAILGUN state guarantee makes nullifiers owned by `REJECTED` or
+    `REVERTED` records eligible for a fresh intent while active-state collisions
+    remain refused
+    (`tools/ppops-payer/src/security/submission-journal.ts:L362-L410`)?
+15. What operator evidence resolves a `SUBMITTING` Broadcaster record if repeated
+    wallet syncs continue to return no canonical hash? Recovery reports
+    `paymentRetryPermitted:false` and separately derives
+    `sameNullifierRetryAvailable`
+    (`tools/ppops-payer/src/cli.ts:L967-L983`).
+16. Is `MINED` intended to mean receipt-quorum observation or chain finality?
+    Gate B advances on an identical configured-provider receipt without a later
+    finalized-height check (`tools/ppops-payer/src/railgun/rpc-quorum.ts:L121-L185`;
+    `tools/ppops-payer/src/security/submission-journal.ts:L650-L674`).
+17. What concurrency policy covers `recoverBroadcaster` journal updates after
+    the engine wrapper has released `PayerRuntimeLock`
+    (`tools/ppops-payer/src/cli.ts:L959-L1018`)?
+18. On SDK timeout, does process shutdown or a later session clear the static
+    response shared key? The installed `broadcast` timeout path throws before
+    `clearSharedKey`, while success and explicit response-error paths clear it
+    (`tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L124-L144`).
+19. Where is the versioned remote contract that assigns non-submission or
+    chain-uncertainty meaning to each exact response string in the rejection and
+    ambiguity maps (`tools/ppops-payer/src/broadcaster/failures.ts:L39-L137`)?
+20. Does regenerating a proof with the same request, payer and exact nullifier
+    set but a refreshed Broadcaster/quote/fee represent the same idempotent spend
+    for every accepted Broadcaster version
+    (`tools/ppops-payer/src/security/submission-journal.ts:L412-L468`)?
+21. Is unique intent/active-nullifier ownership intended to be a schema property,
+    or does recovery assume every journal snapshot was constructed only through
+    serialized public methods?
+
+## Operator-reported Gate B observation
+
+One controlled run reported on 2026-08-30 exercised the current retry path. This
+is an operational observation, not a source-code guarantee and not a review of
+ignored runtime files:
+
+- discovery reported 18 valid quotes representing 14 unique Broadcaster 0zk
+  identities;
+- the previously attempted identity was excluded and an alternate identity was
+  selected before proof generation;
+- proof generation completed, then the post-send path produced
+  `UNCLASSIFIED_FAILURE` without a reported or canonical transaction hash;
+- the durable lineage reached three retry attempts, so the configured journal
+  retry limit was exhausted; and
+- a final full-wallet recovery more than 15 minutes later still found no
+  canonical hash; the reported private balance remained `189500` atomic units
+  and the merchant intent remained open at zero received/pending value.
+
+No secret, ignored config, wallet database or journal contents were opened to
+record this observation; the values above were supplied by the operator.
 
 ## Function record index
 
@@ -394,11 +637,20 @@ impact.
 | [`payer-verify-request.md`](functions/payer-verify-request.md) | Payer-side descriptor and duplicated-field validation |
 | [`payer-engine-start.md`](functions/payer-engine-start.md) | Full-wallet engine/import lifecycle |
 | [`payer-runtime-lock.md`](functions/payer-runtime-lock.md) | Exclusive payer state ownership for normal CLI operations |
-| [`payer-submission-journal.md`](functions/payer-submission-journal.md) | Pre-send reservation and transaction-hash state for each payer intent |
+| [`payer-submission-journal.md`](functions/payer-submission-journal.md) | Initial/retry reservation, nullifier ownership, classified outcomes and canonical/receipt state |
 | [`payer-sync-balances.md`](functions/payer-sync-balances.md) | Spendable/PPOI-bucket synchronization |
 | [`payer-cli-pay-self-signed.md`](functions/payer-cli-pay-self-signed.md) | Explicit CLI execution gates |
 | [`payer-send-self-signed-transfer.md`](functions/payer-send-self-signed-transfer.md) | Proof population and EVM submission |
 | [`payer-read-secret.md`](functions/payer-read-secret.md) | Owner-only, identity-stable payer file loading |
+| [`payer-broadcaster-discover.md`](functions/payer-broadcaster-discover.md) | Alternate-identity exclusion, quote ordering and Waku peer readiness before proof |
+| [`payer-broadcaster-prepare-submission.md`](functions/payer-broadcaster-prepare-submission.md) | Fresh quote selection and local encrypted Waku transaction construction |
+| [`payer-broadcaster-submit-prepared.md`](functions/payer-broadcaster-submit-prepared.md) | Irreversible SDK send boundary, returned-hash validation and response category dispatch |
+| [`payer-broadcaster-failure-classification.md`](functions/payer-broadcaster-failure-classification.md) | Exact installed-response mapping to stable rejection/ambiguity enums |
+| [`payer-send-broadcaster-transfer.md`](functions/payer-send-broadcaster-transfer.md) | Gate B proof, initial/retry reservation, classified Waku outcomes and canonical receipt lifecycle |
+| [`payer-recover-broadcaster.md`](functions/payer-recover-broadcaster.md) | Terminal-state reporting and nullifier-based recovery/retry-availability derivation |
+| [`payer-safe-failure-result.md`](functions/payer-safe-failure-result.md) | Top-level redacted payer CLI failure serialization |
+| [`sdk-broadcaster-transaction-create.md`](functions/sdk-broadcaster-transaction-create.md) | Installed Waku client encrypted request/shared-response-key construction |
+| [`sdk-broadcaster-transaction-send.md`](functions/sdk-broadcaster-transaction-send.md) | Installed Waku client retry, response and nullifier-completion loop |
 
 ## Coverage boundary of this context pass
 
@@ -406,6 +658,17 @@ Read in depth: root runtime/API/config/secret/lock, intent/descriptor/database,
 scanner/RPC/PPOI, reconciliation/projection/outbox/webhook, backup/restore, and
 the payer config/secrets/request/descriptor/engine/execution/submission/journal
 flow.
+
+Gate B extension read in depth: payer Broadcaster trust/session, proof and fee
+path, populated-transfer/nullifier checks, exact response classification,
+initial/same-nullifier retry journal state, recovery and final failure
+serialization. The locally installed, exactly locked
+`@railgun-community/waku-broadcaster-client-node@9.1.1` compiled distribution was
+followed through fee-message verification/cache selection,
+`BroadcasterTransaction.create`, response-key storage, LightPush send, Store
+retrieval, response decryption, retry/timeout and Wallet nullifier fallback
+(`tools/ppops-payer/package-lock.json:L3661-L3676`). Its `@waku/sdk`, libp2p,
+cryptographic Wallet calls and remote peers remain external dependencies.
 
 Oriented but not micro-analyzed: mainnet-gate evidence implementation, pilot
 webhook receiver, health bookkeeping, Railway diagnostic utility, kill-test

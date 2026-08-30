@@ -268,8 +268,20 @@ A Waku-returned hash is only an untrusted report: the payer must recover the
 canonical transaction hash from those nullifiers before receipt lookup or
 `SUBMITTED`. Gas reads use a bounded upper-median policy, while a strict
 configured-provider majority must agree on an identical receipt before
-`MINED`. `PENDING` or an error must be resolved with `recover-broadcaster`,
-never by deleting the journal or blindly retrying.
+`MINED`. `PENDING` or an error must first be resolved with
+`recover-broadcaster`. Only an explicitly eligible `retry-broadcaster` run may
+submit another variant: it preserves the signed request, payer and exact
+nullifier set, excludes previously attempted Broadcaster identities and stops
+after three retry reservations. A different intent cannot claim those
+unresolved nullifiers. Never delete or edit the journal to force a fresh spend.
+
+The controlled funded trial did not pass Gate B. One initial submission and
+three bounded same-nullifier variants used two selected Broadcaster identities;
+none returned a usable hash, and recovery more than 15 minutes after the final
+attempt found no canonical transaction. The payer balance remained unchanged
+and the merchant intent remained `OPEN` with zero received. The retry cap is
+exhausted, so that lineage remains in manual review and no more funded variants
+should be sent.
 
 A future passing Gate B will prove only that the payment was submitted by a
 Broadcaster instead of the payer's public EVM self-signer. It will not prove

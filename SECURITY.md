@@ -60,15 +60,19 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
   attacker-controlled bundle.
 - Gate A self-signing links the payer's public EVM address to the RAILGUN
   transaction. It is diagnostic evidence, not the final sender-privacy path;
-  Gate B still requires Broadcaster submission.
+  Gate B still requires a successful Broadcaster-submitted settlement.
 - The payer's write-ahead journal blocks automatic reuse of an intent. Gate A
   resolves ambiguity through its precomputed hash and nonce. Gate B stores a
   Waku-reported hash separately and accepts only the canonical hash recovered
-  from reserved nullifiers. Any unresolved record remains intentionally
-  fail-closed; deleting the journal to retry can double-pay.
+  from reserved nullifiers. The explicit retry path preserves the exact same
+  nullifier set, excludes attempted Broadcaster identities and is capped; any
+  unresolved record otherwise remains intentionally fail-closed. Deleting or
+  bypassing the journal can double-pay.
 - The controlled Gate A payment and signed Mainnet Gate artifact pass. A fresh
-  Gate B no-send proof preparation also passes. A fresh value-bearing Gate B
-  payment and independently operated pilot evidence are still required before
-  any sender-unlinkability or production-readiness claim.
+  Gate B no-send proof preparation also passes. The bounded funded Gate B trial
+  returned no reported/recoverable hash across two selected identities and did
+  not pass. A completed Broadcaster payment and independently operated pilot
+  evidence are still required before any sender-unlinkability or
+  production-readiness claim.
 
 See `docs/OPERATIONAL-PROFILE.md` and `docs/ppops-threat-model.md` for detail.

@@ -1,7 +1,8 @@
 # Gate B: Waku Broadcaster payment
 
-Status: **PREFLIGHT + NO-SEND PREPARATION PASS; VALUE-BEARING GATE PENDING** on
-Arbitrum mainnet, 2026-08-30.
+Status: **PREFLIGHT + NO-SEND PREPARATION PASS; VALUE-BEARING GATE ATTEMPTED
+BUT NOT PASSED** on Arbitrum mainnet, 2026-08-30. The live attempts failed
+closed without a reported/canonical transaction hash or a payer balance change.
 
 Gate B replaces Gate A's public payer EVM signer with a RAILGUN Broadcaster. It
 does not change PPOps, the signed payment request, private ERC-20 proof, memo,
@@ -158,7 +159,7 @@ The upstream Waku client can retransmit the same encrypted transaction while it
 waits and can identify a mined transaction from those same nullifiers. PPOps
 does not treat a timeout as permission to create a second payment.
 
-## 5. Resolve ambiguity without retrying
+## 5. Recover first; retry only the same nullifiers
 
 If submission returns an error, `PENDING`, `SUBMITTING` or `SUBMITTED`, do not
 delete the journal and do not rerun `pay-broadcaster`:
@@ -175,7 +176,41 @@ wallet and rederives the public transaction from the reserved nullifiers. It
 rejects a conflict with any previously derived canonical hash and never treats
 the Waku-reported hash as receipt authority. Once canonical identity exists, it
 requires the same strict receipt quorum. A result that remains unresolved is
-explicitly `paymentRetryPermitted: false`.
+explicitly `paymentRetryPermitted: false`; creating a fresh intent does not
+make reuse of the reserved input notes safe.
+
+After the upstream-recommended waiting period and another empty recovery, the
+operator may deliberately invoke `retry-broadcaster` with the exact same live
+request, payer, limits and intent confirmation. This is not a normal payment
+retry:
+
+```bash
+node dist/cli.js retry-broadcaster \
+  --config ./payer.config.json \
+  --broadcaster-config ./broadcaster.config.json \
+  --request http://127.0.0.1:8787/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS \
+  --max-amount-atomic 10000 \
+  --max-broadcaster-fee-atomic YOUR_SEPARATELY_APPROVED_MAXIMUM \
+  --confirm-intent INTENT_ID
+```
+
+The payer regenerates the proof, then aborts before Waku unless its input
+nullifier set is byte-for-byte identical to the original durable reservation.
+All variants therefore conflict on-chain: at most one can consume the inputs.
+It also rejects nullifier reuse by any different local intent, excludes every
+previously attempted Broadcaster identity, and permits at most three such
+retry reservations. If no different valid identity is available, discovery
+fails before proof/submission and consumes no retry slot. Every recognized
+post-send rejection is journaled by a stable category; every timeout, malformed
+hash, unknown response or unclassified post-send failure remains ambiguous.
+Raw dependency errors and Broadcaster identities are not printed.
+
+When the retry cap is reached without a canonical hash, the record remains
+`SUBMITTING`, reports `manualReviewRequired: true`, and continues reserving its
+nullifiers. PPOps does not invent a timeout after which an unknown transaction
+becomes cryptographically impossible.
 
 After `MINED`, run the existing `finalize-poi` command for that exact intent.
 PPOps may fulfill only after receiver state reaches:
@@ -183,6 +218,28 @@ PPOps may fulfill only after receiver state reaches:
 ```text
 FINALIZED + SPENDABLE + MATCHED -> PAID
 ```
+
+## 6. Controlled value-bearing result
+
+The controlled `0.01 USDC` attempt used a `0.08 USDC` maximum Broadcaster fee.
+The initial request and three bounded same-nullifier retries produced fee quotes
+between `0.058867` and `0.071154 USDC`. The first three Waku submissions reached
+one Broadcaster identity; the final hardened retry discovered 18 valid quotes
+from 14 unique identities, excluded the prior identity and selected another.
+
+Both attempted identities returned post-send failures without a transaction
+hash. One response was the upstream-sanitized `UNKNOWN_ERROR`; another remained
+an unclassified client/transport failure. A final recovery more than 15 minutes
+after the last attempt found no canonical public transaction for the reserved
+nullifiers; the private balance remained `0.1895 USDC` and the merchant intent
+remained `OPEN` with zero received/pending value. The retry cap is exhausted and
+PPOps will not send another variant. No Broadcaster fee was observed as charged.
+
+This is useful negative evidence: direct Waku discovery, fee calculation,
+proof generation, exact-nullifier regeneration and alternate-identity selection
+worked, but the current public Broadcaster path did not complete a payment. Gate
+B is therefore **not passed**, and sender-unlinkability from a completed
+Broadcaster payment must not be claimed.
 
 ## Claim boundary
 

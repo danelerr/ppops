@@ -135,7 +135,11 @@ and abuse monitoring before exposure.
   before Waku submission. After proof generation, a quote may rotate only when
   Broadcaster, token and fee rate remain identical. A Waku-returned hash remains
   untrusted metadata until the full payer wallet derives the canonical
-  transaction hash from those nullifiers. Evidence:
+  transaction hash from those nullifiers. Recovery precedes every explicit
+  ambiguity retry; a retry must preserve the signed request, payer and complete
+  nullifier set, exclude all previously attempted Broadcaster identities and
+  remain within a three-retry cap. A different intent cannot reserve any
+  unresolved nullifier. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
   `tools/ppops-payer/src/security/runtime-lock.ts` and
   `tools/ppops-payer/src/security/submission-journal.ts`.
@@ -145,7 +149,10 @@ and abuse monitoring before exposure.
   `scripts/encrypted-memo-leaf-gate.ts`, `artifacts/privacy-report.json` and
   `tools/ppops-payer/src/railgun/broadcaster-transfer.ts`. Broadcaster mode also
   crosses operator-pinned fee-signer, DNS/Waku and selected-Broadcaster trust
-  boundaries; it does not claim network-layer anonymity.
+  boundaries; it does not claim network-layer anonymity or relay availability.
+  The controlled value-bearing trial reached two selected Broadcaster identities
+  without obtaining a usable response or canonical transaction and therefore
+  did not pass Gate B.
 - **RAILGUN runtime ↔ RPC/PPOI:** encrypted chain history, receipts, block tags,
   PPOI statuses and timing cross outbound HTTPS/JSON-RPC and SDK-specific
   protocols. PPOps validates configured chain/deployment identity and fails
@@ -313,6 +320,13 @@ flowchart LR
    settlement-identity collision or projection regression not covered by the
    pinned gate → cross the paid threshold incorrectly or emit a misleading
    reversal/confirmation (TM-009).
+10. **Exploit ambiguous relay state:** lose or forge a Broadcaster response after
+    Waku submission → tempt the operator to create a fresh payment with inputs
+    that may already be in flight → double-pay or permanently strand the local
+    workflow. The payer instead reserves nullifiers before Waku, recovers first,
+    permits only bounded conflicting same-nullifier variants through previously
+    unattempted identities and then requires manual review (TM-003, TM-004,
+    TM-009).
 
 ## Threat model table
 
@@ -373,8 +387,8 @@ flowchart LR
 | `package-lock.json` | Captures the large vulnerable upstream dependency surface | TM-005 |
 | `Dockerfile` | Defines runtime privilege, copied dependencies and base-image trust | TM-005, TM-008 |
 | `scripts/trust-boundary-check.ts` | Prevents payer spending code from entering the merchant build/image boundary | TM-001, TM-003, TM-005 |
-| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents an automatic second spend and separates an untrusted Broadcaster report from canonical transaction identity | TM-003, TM-009 |
-| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates the populated call, reserves recovery identity before Waku and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
+| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents cross-intent nullifier reuse, bounds same-nullifier retries and separates rejection, ambiguity, reported hash and canonical transaction identity | TM-003, TM-009 |
+| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates the populated call, reserves recovery identity before Waku, rotates retry identity and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
 
 ## Quality check
 

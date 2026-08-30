@@ -25,8 +25,10 @@ Current status: Gate A passed on Arbitrum mainnet on 2026-08-30. A bounded
 and PPOps recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. This remains a
 controlled self-pilot, not external adoption or a production-readiness claim.
 Gate B's non-financial Waku preflight and complete no-send proof preparation
-also passed on 2026-08-30. Its value-bearing payment remains pending and must
-not be inferred from preparation.
+also passed on 2026-08-30. A bounded value-bearing trial later used two selected
+Broadcaster identities but neither returned a usable hash; nullifier recovery
+found no transaction and the payer balance remained unchanged. Gate B is not
+passed and must not be inferred from preparation or attempted submission.
 
 ## Scope
 
@@ -67,8 +69,11 @@ RAILGUN Broadcaster and never loads the optional EVM self-signing key.
   advances to `SUBMITTED` only after the full payer wallet derives the canonical
   public transaction hash from the reserved nullifiers. Receipt lookup never
   uses the reported hash by itself.
-- An ambiguous Broadcaster result is recoverable from the private journal but
-  never authorizes an automatic payment retry.
+- An ambiguous Broadcaster result must be recovered from the private journal
+  first and never authorizes an automatic payment retry. The explicit bounded
+  retry command preserves the same signed request, payer and exact nullifier
+  set, excludes attempted Broadcaster identities, rejects cross-intent
+  nullifier reuse and stops after three local retry reservations.
 - Verify the merchant signer through a trusted channel independent of the
   checkout URL.
 

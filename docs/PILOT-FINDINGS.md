@@ -4,7 +4,8 @@ First recorded: 2026-08-23. Updated: 2026-08-30.
 
 Status: living pilot record. The controlled mainnet payment gate passed on
 2026-08-30; Gate B connectivity and no-send proof preparation passed, while
-its value-bearing payment and external adoption remain open. This document
+its bounded value-bearing trial failed closed and external adoption remains
+open. This document
 distinguishes observations from upstream guarantees and future proposals. It
 must not be cited as evidence of an independent merchant deployment.
 
@@ -79,6 +80,16 @@ a cryptographically private payment inaccessible or operationally unsafe.
   quote produced a `70373`-atomic (`0.070373 USDC`) fee for the `10000`-atomic
   (`0.01 USDC`) request. The command reported `paymentSubmitted: false`, wrote
   no journal record and left the merchant intent `OPEN` with zero received.
+- A separately authorized value-bearing Gate B trial sent one initial encrypted
+  Waku request and three bounded variants that preserved the exact same input
+  nullifiers. Fee quotes ranged from `0.058867` to `0.071154 USDC`, below the
+  `0.08 USDC` ceiling. The first three attempts reached one Broadcaster
+  identity. The final hardened retry observed 18 valid quotes across 14 unique
+  identities, excluded the prior identity and selected another. Neither
+  attempted identity returned a transaction hash. Final full-wallet recovery
+  more than 15 minutes after the last attempt found no canonical transaction
+  for the reserved nullifiers; the private balance remained `0.1895 USDC`, the
+  merchant intent remained open at zero and no fee was observed as charged.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -103,9 +114,10 @@ reference or invoice identifier belongs in the public version of this record.
 
 - No independent merchant or payer has completed the full flow. The project
   therefore does not yet have verifiable external traction.
-- Gate B has not submitted through a Waku Broadcaster. Its connectivity and
-  no-send proof tests therefore do not demonstrate removal of the payer public
-  gas signer from a real payment.
+- Gate B submitted encrypted requests through two selected Waku Broadcaster
+  identities but did not obtain or recover a mined transaction. It therefore
+  does not demonstrate removal of the payer public gas signer from a completed
+  payment.
 - One successful controlled payment does not establish an availability SLO,
   general wallet usability or production readiness.
 
@@ -339,9 +351,13 @@ The reference payer therefore pins the reviewed fee-signer list locally instead
 of downloading mutable configuration during payment. It fingerprints that
 trust input, imposes quote reliability/lifetime and atomic-USDC fee limits,
 requires enough private balance for payment plus fee, and persists nullifiers
-before Waku submission. An ambiguous response is a recovery state, not a retry
-signal. The value-bearing path remains unproven until one fresh payment reaches
-PPOps `PAID` and its payer-owned PPOI is finalized.
+before Waku submission. An ambiguous response first enters recovery and never
+permits a fresh payment. A deliberate retry may only regenerate a conflicting
+variant for the same signed request, payer and exact nullifier set, must select
+a previously unattempted Broadcaster identity, and is capped at three local
+retry reservations. Cross-intent reuse of any unresolved nullifier is rejected.
+The value-bearing path remains unproven until one payment reaches PPOps `PAID`
+and its payer-owned PPOI is finalized.
 
 The no-send run made fee visibility concrete. A `0.05 USDC` maximum failed
 safely before proof, while the passing diagnostic preparation observed an exact
@@ -368,6 +384,21 @@ but cannot drive state. Gas and receipt RPC calls also have local deadlines.
 Gas selection uses the upper median from a healthy strict majority so one high
 outlier cannot set the value when at least three healthy readings exist, while
 the explicit token-fee ceiling remains the financial stop.
+
+The value-bearing trial then exposed the remaining dependency limit. Four
+same-nullifier variants across two selected identities returned no usable hash;
+one response was the upstream-sanitized `UNKNOWN_ERROR` and another was an
+unclassified post-send failure. The hardened final discovery saw 14 unique
+valid identities, so this was not a lack-of-peer or lack-of-quote failure. It
+also did not prove that all Broadcasters would fail. The safe conclusion is
+narrower: this client/payload path did not complete through the two identities
+actually attempted, and additional blind sends were not justified.
+
+The journal now distinguishes definitive authenticated rejection from every
+ambiguous post-send outcome, records only stable non-secret categories and
+keeps the reserved notes locked after the retry cap. That behavior protects
+funds, but it creates a manual-review state with no automatic liveness escape.
+This is an honest operational limitation, not a passed Gate B.
 
 ## Claim discipline
 
@@ -396,9 +427,9 @@ PPOps must not yet claim:
    `tools/ppops-payer` package as the reproducible payer.
 2. Preserve the Gate A operator records and signed public report with the beta
    release.
-3. Complete the now-prepared Gate B with one separately approved, bounded
-   Broadcaster payment and retain Railway only as an optional compatibility
-   client.
+3. Preserve the failed Gate B journal and stop value-bearing retries. Diagnose
+   the official client/Broadcaster response path with upstream maintainers or a
+   non-financial reproducible fixture before authorizing another funded trial.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside
    the existing settlement evidence.

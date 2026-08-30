@@ -113,7 +113,7 @@ v0.1.
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
-| Broadcaster path without payer EVM self-signer | Waku preflight and complete no-send proof preparation | PARTIAL; value-bearing Gate B pending |
+| Broadcaster path without payer EVM self-signer | Waku preflight, no-send proof and bounded value-bearing trial | FAIL-CLOSED; two selected identities returned no hash, so no completed-payment claim |
 | Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
 | Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — public main is not yet a tagged release** |
 
@@ -188,6 +188,11 @@ standard in the v0.1 funding scope.
 - The controlled Gate B preparation observed a `0.070373 USDC` Broadcaster fee
   for a `0.01 USDC` payment. This was point-in-time and shows that small payments
   may be economically poor.
+- The subsequent funded Gate B trial used two selected Broadcaster identities
+  and exact-same-nullifier variants but returned no reported or recoverable
+  transaction hash. The balance remained unchanged and no fee was observed as
+  charged. PPOps cannot claim a completed Broadcaster payment or sender
+  unlinkability from this result.
 - Public RPC/PPOI/Waku services remain availability and metadata dependencies.
 - The pinned RAILGUN/Waku dependency graphs retain Moderate/Low advisories but
   no known High/Critical advisory under the current audit gate.
@@ -199,8 +204,8 @@ standard in the v0.1 funding scope.
 - [x] Push the reviewed implementation and obtain green public verify + Docker
       CI at `767960e`.
 - [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
-- [ ] Complete one separately authorized value-bearing Gate B payment, or remove
-      every sender-unlinkability implication from the application.
+- [x] Record the failed value-bearing Gate B honestly and remove every
+      sender-unlinkability implication from the application.
 - [ ] Complete at least one independent operator pilot.
 - [ ] Obtain permission for any operator quote or public identity reference.
 - [ ] Insert real team/contact/legal/funding fields from the applicant.

@@ -50,8 +50,11 @@ deployment.
 6. For Broadcaster mode, approve the payment amount and maximum atomic-USDC fee
    separately. A fee quote can change; exceeding either ceiling must fail
    without submission.
-7. Never retry an ambiguous submission. Use the journal and documented recovery
-   command.
+7. Recover every ambiguous submission first. Retry only when the journal-backed
+   `retry-broadcaster` command reports it available; it preserves the exact
+   nullifier set, excludes attempted Broadcaster identities and stops after
+   three retry reservations. Never delete or edit the journal to create a fresh
+   spend.
 8. Publish only redacted evidence. Keep direct payment identifiers private
    unless the operator consciously accepts correlation loss.
 
