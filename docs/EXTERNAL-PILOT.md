@@ -55,8 +55,9 @@ deployment.
 ## Reproduce the release
 
 The maintainer must first push a public commit, wait for CI to pass and publish
-a version-matching release tag. An unpushed local commit is not reproducible
-external evidence.
+a version-matching release tag. The release attaches its immutable container
+digest, merchant/payer SBOMs and public gate reports. An unpushed local commit
+is not reproducible external evidence.
 
 Use the exact release tag or commit supplied for the pilot:
 

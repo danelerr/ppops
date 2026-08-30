@@ -444,9 +444,11 @@ with `mainnet-gate-report-verify` against the independently distributed signer.
 - `tools/ppops-payer` deliberately accepts payer spending authority, but it is
   excluded from the merchant build/container and must run on a payer-controlled
   host. Gate A's public self-signer is linkable by design.
-- The base image and GitHub Actions are digest/SHA pinned. CI builds the Docker
-  image, emits an SBOM and publishes immutable GHCR tags when a `v*` Git tag is
-  deliberately pushed.
+- The base image and GitHub Actions are digest/SHA pinned. Release CI rejects a
+  Git tag that differs from `v<package version>`, builds the Docker image,
+  emits merchant/payer SBOMs, publishes version and commit-addressed GHCR tags,
+  and attaches the immutable image digest plus all three public gate reports to
+  the GitHub release.
 
 See `SECURITY.md` and `docs/ppops-threat-model.md` before exposing PPOps beyond
 the documented single-merchant, local/private deployment.

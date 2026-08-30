@@ -22,11 +22,25 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             tools/ppops-payer/package-lock.json
+      - name: Verify release tag matches package version
+        env:
+          PPOPS_VERSION: ${{ github.ref_name }}
+        run: |
+          PPOPS_EXPECTED_TAG="v$(node -p 'require("./package.json").version')"
+          if [ "$PPOPS_VERSION" != "$PPOPS_EXPECTED_TAG" ]; then
+            printf 'Release tag %s does not match package version %s\n' "$PPOPS_VERSION" "$PPOPS_EXPECTED_TAG" >&2
+            exit 1
+          fi
       - name: Verify release source and generate SBOM
         run: |
           npm ci
           npm run payer:install
           npm run verify:all
+          node -e "const primitive=require('./artifacts/primitive-gate-report.json'); const privacy=require('./artifacts/privacy-report.json'); if (primitive.decision !== 'GO' || primitive.productionReady !== false || privacy.result !== 'PASS') process.exit(1)"
+          PPOPS_REPORT_SIGNER="$(node -p 'require("./artifacts/mainnet-gate-report.json").merchantSigner')"
+          node dist/cli.js mainnet-gate-report-verify \
+            --file ./artifacts/mainnet-gate-report.json \
+            --expected-signer "$PPOPS_REPORT_SIGNER"
           npm run --silent sbom > "$RUNNER_TEMP/ppops-sbom.cdx.json"
           (cd tools/ppops-payer && ../../node_modules/.bin/cyclonedx-npm --ignore-npm-errors --package-lock-only --omit dev --output-reproducible --output-format JSON --output-file "$RUNNER_TEMP/ppops-payer-sbom.cdx.json")
       - name: Log in to GitHub Container Registry
@@ -45,6 +59,15 @@ jobs:
             .
           docker push "$PPOPS_IMAGE:$PPOPS_VERSION"
           docker push "$PPOPS_IMAGE:sha-$PPOPS_REVISION"
+          PPOPS_REPO_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$PPOPS_IMAGE:$PPOPS_VERSION")"
+          case "$PPOPS_REPO_DIGEST" in
+            "$PPOPS_IMAGE@sha256:"*) ;;
+            *)
+              printf 'Unexpected container digest: %s\n' "$PPOPS_REPO_DIGEST" >&2
+              exit 1
+              ;;
+          esac
+          printf '%s\n' "$PPOPS_REPO_DIGEST" > "$RUNNER_TEMP/ppops-container-digest.txt"
       - name: Publish GitHub release evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,4 +75,8 @@ jobs:
         run: |
           gh release create "$PPOPS_VERSION" --verify-tag --generate-notes \
             "$RUNNER_TEMP/ppops-sbom.cdx.json#Merchant CycloneDX SBOM" \
-            "$RUNNER_TEMP/ppops-payer-sbom.cdx.json#Payer CycloneDX SBOM"
+            "$RUNNER_TEMP/ppops-payer-sbom.cdx.json#Payer CycloneDX SBOM" \
+            "$RUNNER_TEMP/ppops-container-digest.txt#Immutable container digest" \
+            "artifacts/primitive-gate-report.json#Primitive Gate report" \
+            "artifacts/privacy-report.json#Privacy report" \
+            "artifacts/mainnet-gate-report.json#Mainnet Gate report"

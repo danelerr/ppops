@@ -352,6 +352,9 @@ persistent disagreement still fails closed and the next owned scan retries
 without loosening finality or accepting a single-provider answer.
 
 Docker packaging is built in CI. The Node base image is digest-pinned, GitHub
-Actions are SHA-pinned, and a tag-triggered workflow publishes version and
-commit-addressed GHCR images. Compose bounds memory, CPU and PID usage; the
-production runbook defines readiness, metrics, alert and egress policy.
+Actions are SHA-pinned, and a tag-triggered workflow first requires
+`v<package version>`, then publishes version and commit-addressed GHCR images.
+The release records the immutable image digest and attaches both SBOMs and the
+primitive, privacy and Mainnet Gate reports. Compose bounds memory, CPU and PID
+usage; the production runbook defines readiness, metrics, alert and egress
+policy.
