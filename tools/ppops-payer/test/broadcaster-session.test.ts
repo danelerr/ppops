@@ -2,7 +2,7 @@ import type { SelectedBroadcaster } from "@railgun-community/shared-models";
 import { describe, expect, it } from "vitest";
 
 import {
-  selectCurrentBroadcaster,
+  selectSubmissionBroadcaster,
   validateBroadcaster,
 } from "../src/broadcaster/session.js";
 
@@ -66,10 +66,10 @@ describe("Broadcaster quote validation", () => {
     }
   });
 
-  it("matches the complete quote fingerprint and ignores malformed candidates", () => {
+  it("prefers the complete quote fingerprint and ignores malformed candidates", () => {
     const expected = validateBroadcaster(quote(), 0.75, 60_000, 1_000_000);
     expect(
-      selectCurrentBroadcaster(
+      selectSubmissionBroadcaster(
         [{ tokenFee: {} }, quote()],
         expected,
         0.75,
@@ -77,11 +77,61 @@ describe("Broadcaster quote validation", () => {
         1_000_000,
       )?.fingerprint,
     ).toBe(expected.fingerprint);
+  });
+
+  it("accepts a rotated fee ID only when proof-bound economics are unchanged", () => {
+    const expected = validateBroadcaster(quote(), 0.75, 60_000, 1_000_000);
+    const rotated = quote({
+      tokenFee: {
+        ...quote().tokenFee,
+        expiration: 1_200_000,
+        feesID: "fee-quote-2",
+      },
+    });
+    const selected = selectSubmissionBroadcaster(
+      [rotated],
+      expected,
+      0.75,
+      60_000,
+      1_000_000,
+    );
+    expect(selected?.selected.tokenFee.feesID).toBe("fee-quote-2");
+    expect(selected?.fingerprint).not.toBe(expected.fingerprint);
+    expect(selected?.feePerUnitGas).toBe(expected.feePerUnitGas);
+  });
+
+  it("uses a fresh compatible quote after the original quote lifetime elapses", () => {
+    const expected = validateBroadcaster(quote(), 0.75, 60_000, 1_000_000);
+    const selected = selectSubmissionBroadcaster(
+      [
+        quote({
+          tokenFee: {
+            ...quote().tokenFee,
+            expiration: 1_300_000,
+            feesID: "fee-quote-3",
+          },
+        }),
+      ],
+      expected,
+      0.75,
+      60_000,
+      1_100_000,
+    );
+    expect(selected?.selected.tokenFee.feesID).toBe("fee-quote-3");
+  });
+
+  it("rejects a rotated quote that changes the proof-bound fee rate", () => {
+    const expected = validateBroadcaster(quote(), 0.75, 60_000, 1_000_000);
     expect(
-      selectCurrentBroadcaster(
+      selectSubmissionBroadcaster(
         [
           quote({
-            tokenFee: { ...quote().tokenFee, expiration: 1_200_000 },
+            tokenFee: {
+              ...quote().tokenFee,
+              expiration: 1_200_000,
+              feesID: "fee-quote-2",
+              feePerUnitGas: "0x2000000000000",
+            },
           }),
         ],
         expected,

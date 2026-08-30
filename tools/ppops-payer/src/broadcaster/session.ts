@@ -33,6 +33,7 @@ export type ValidatedBroadcaster = {
 };
 
 export type PreparedBroadcasterSubmission = {
+  quote: ValidatedBroadcaster;
   send: () => Promise<string>;
 };
 
@@ -132,13 +133,29 @@ export const validateBroadcaster = (
   return { selected, feePerUnitGas, fingerprint };
 };
 
-export const selectCurrentBroadcaster = (
+const proofCompatibleQuote = (
+  candidate: ValidatedBroadcaster,
+  expected: ValidatedBroadcaster,
+): boolean =>
+  // Fee broadcasts rotate their feesID/expiration in the client cache while
+  // the Broadcaster retains earlier fee IDs through their TTL. The generated
+  // transfer proof binds the fee recipient/token/amount; with fixed gas details,
+  // identical fee-per-gas preserves that amount. Never reuse a proof across an
+  // address, token or fee-rate change.
+  candidate.selected.railgunAddress.toLowerCase() ===
+    expected.selected.railgunAddress.toLowerCase() &&
+  candidate.selected.tokenAddress.toLowerCase() ===
+    expected.selected.tokenAddress.toLowerCase() &&
+  candidate.feePerUnitGas === expected.feePerUnitGas;
+
+export const selectSubmissionBroadcaster = (
   candidates: unknown,
   expected: ValidatedBroadcaster,
   minimumReliability: number,
   minimumQuoteValidityMs: number,
   now = Date.now(),
 ): ValidatedBroadcaster | undefined => {
+  const validatedCandidates: ValidatedBroadcaster[] = [];
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
     try {
       const validated = validateBroadcaster(
@@ -147,12 +164,19 @@ export const selectCurrentBroadcaster = (
         minimumQuoteValidityMs,
         now,
       );
-      if (validated.fingerprint === expected.fingerprint) return validated;
+      validatedCandidates.push(validated);
     } catch (error) {
       if (!(error instanceof SafeFailure)) throw error;
     }
   }
-  return undefined;
+  return (
+    validatedCandidates.find(
+      (candidate) => candidate.fingerprint === expected.fingerprint,
+    ) ??
+    validatedCandidates.find((candidate) =>
+      proofCompatibleQuote(candidate, expected),
+    )
+  );
 };
 
 export class BroadcasterSession {
@@ -292,7 +316,7 @@ export class BroadcasterSession {
       PAYER_TOKEN_ADDRESS,
       false,
     );
-    const current = selectCurrentBroadcaster(
+    const current = selectSubmissionBroadcaster(
       candidates,
       expected,
       this.config.minimumReliability,
@@ -301,8 +325,13 @@ export class BroadcasterSession {
     if (!current) {
       throw new SafeFailure(
         "BROADCASTER_INVALID_QUOTE",
-        "The selected Broadcaster quote changed during proof generation",
+        "No live Broadcaster quote remains compatible with the generated proof",
       );
+    }
+    if (current.fingerprint !== expected.fingerprint) {
+      writeEvent("broadcaster.quote-rotated-compatible", {
+        quoteValidityMs: current.selected.tokenFee.expiration - Date.now(),
+      });
     }
     return current;
   }
@@ -336,7 +365,7 @@ export class BroadcasterSession {
         false,
         input.preTransactionPOIsPerTxidLeafPerList,
       );
-      return { send: () => transaction.send() };
+      return { quote: current, send: () => transaction.send() };
     } catch (error) {
       throw new SafeFailure(
         "BROADCASTER_SUBMISSION_FAILED",

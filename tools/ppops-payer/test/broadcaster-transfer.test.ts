@@ -160,12 +160,13 @@ const testContext = async (): Promise<{
 
 const fakeSession = (
   send: () => Promise<string> = vi.fn(async () => TX_HASH),
+  preparedQuote = selected(),
 ): BroadcasterSession => {
   const quote = selected();
   return {
     discover: vi.fn(async () => quote),
     assertQuoteStillCurrent: vi.fn(() => quote),
-    prepareSubmission: vi.fn(async () => ({ send })),
+    prepareSubmission: vi.fn(async () => ({ quote: preparedQuote, send })),
     submitPrepared: vi.fn(async (prepared: PreparedBroadcasterSubmission) =>
       prepared.send(),
     ),
@@ -237,10 +238,15 @@ describe("Broadcaster transfer lifecycle", () => {
     const journal = new SubmissionJournal(
       submissionJournalPath(config.storage.walletStatePath),
     );
+    const preparedQuote = selected();
+    preparedQuote.fingerprint = "bb".repeat(32);
+    preparedQuote.selected.tokenFee.feesID = "rotated-fee-id";
+    preparedQuote.selected.tokenFee.reliability = 0.95;
     const submit = vi.fn(async () => {
       await expect(journal.get(request.id)).resolves.toMatchObject({
         status: "SUBMITTING",
         submissionMode: "BROADCASTER",
+        broadcasterQuoteFingerprint: "bb".repeat(32),
         nullifiers: [NULLIFIER],
       });
       return TX_HASH;
@@ -248,7 +254,7 @@ describe("Broadcaster transfer lifecycle", () => {
     const result = await sendBroadcasterTransfer({
       config,
       engine,
-      session: fakeSession(submit),
+      session: fakeSession(submit, preparedQuote),
       request,
       dbEncryptionKey: "11".repeat(32),
       maxBroadcasterFeeAtomic: "1000",
@@ -258,6 +264,7 @@ describe("Broadcaster transfer lifecycle", () => {
     });
 
     expect(result.receiptStatus).toBe("PENDING");
+    expect(result.quoteReliability).toBe(0.95);
     expect(submit).toHaveBeenCalledOnce();
     await expect(journal.get(request.id)).resolves.toMatchObject({
       status: "SUBMITTED",

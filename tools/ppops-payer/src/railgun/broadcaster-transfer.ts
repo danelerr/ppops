@@ -301,15 +301,18 @@ export const sendBroadcasterTransfer = async (input: {
     preTransactionPOIsPerTxidLeafPerList:
       populated.preTransactionPOIsPerTxidLeafPerList,
   });
+  const submissionQuote = preparedSubmission.quote;
+  const submissionQuoteValidityMs =
+    submissionQuote.selected.tokenFee.expiration - Date.now();
 
   try {
     await submissionJournal.reserveBroadcaster(
       request,
       {
         payerRailgunAddress: engine.railgunAddress,
-        broadcasterRailgunAddress: current.selected.railgunAddress,
-        broadcasterQuoteFingerprint: current.fingerprint,
-        broadcasterFeesID: current.selected.tokenFee.feesID,
+        broadcasterRailgunAddress: submissionQuote.selected.railgunAddress,
+        broadcasterQuoteFingerprint: submissionQuote.fingerprint,
+        broadcasterFeesID: submissionQuote.selected.tokenFee.feesID,
         broadcasterFeeAmountAtomic: broadcasterFee.amount,
         nullifiers,
       },
@@ -347,8 +350,8 @@ export const sendBroadcasterTransfer = async (input: {
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
-      quoteReliability: current.selected.tokenFee.reliability,
-      quoteValidityMs,
+      quoteReliability: submissionQuote.selected.tokenFee.reliability,
+      quoteValidityMs: submissionQuoteValidityMs,
       receiptStatus: "PENDING",
     };
   }
@@ -374,8 +377,8 @@ export const sendBroadcasterTransfer = async (input: {
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
-      quoteReliability: current.selected.tokenFee.reliability,
-      quoteValidityMs,
+      quoteReliability: submissionQuote.selected.tokenFee.reliability,
+      quoteValidityMs: submissionQuoteValidityMs,
       receiptStatus: "PENDING",
     };
   }
@@ -405,8 +408,8 @@ export const sendBroadcasterTransfer = async (input: {
     broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
     gasEstimate: gasEstimate.toString(),
     providerAgreement,
-    quoteReliability: current.selected.tokenFee.reliability,
-    quoteValidityMs,
+    quoteReliability: submissionQuote.selected.tokenFee.reliability,
+    quoteValidityMs: submissionQuoteValidityMs,
     receiptStatus: "MINED",
     blockNumber: receipt.blockNumber,
   };
