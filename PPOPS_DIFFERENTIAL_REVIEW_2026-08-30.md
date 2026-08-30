@@ -301,8 +301,9 @@ protection was found.
 `npm run verify:all` passed after remediation:
 
 - public CI run
-  [`33335378295`](https://github.com/danelerr/ppops/actions/runs/33335378295)
-  passed its `verify` and `docker` jobs at `835e792`;
+  [`33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
+  passed its `verify` and `docker` jobs at `9374f5d`, including remediation
+  commit `d70057e`;
 - merchant: 19 test files, 58 tests;
 - reference payer: 15 test files, 79 tests;
 - TypeScript typechecks and production builds;

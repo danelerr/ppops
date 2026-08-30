@@ -109,7 +109,7 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed at [`835e792`](https://github.com/danelerr/ppops/commit/835e7921f7918a89f3f3dda7a7687e5401e4470a) |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346) at `9374f5d` |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
@@ -210,7 +210,7 @@ standard in the v0.1 funding scope.
 ## Submission checklist
 
 - [x] Push the reviewed implementation and obtain green public verify + Docker
-      CI at `5d5752b`.
+      CI at `9374f5d` (including implementation remediation `d70057e`).
 - [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
 - [x] Record the failed value-bearing Gate B honestly and remove every
       sender-unlinkability implication from the application.

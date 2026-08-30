@@ -231,9 +231,10 @@ Primitive gate:
 Verification evidence:
 
 - Public CI run
-  [`33335378295`](https://github.com/danelerr/ppops/actions/runs/33335378295)
-  passed both `verify` and `docker` for commit `835e792`, including the final
-  populated-calldata simulation remediation and documentation.
+  [`33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
+  passed both `verify` and `docker` for commit `9374f5d`, including the final
+  populated-calldata simulation and prepare-time nullifier-admission
+  remediations.
 - Automated merchant suite on 2026-08-30: 19 test files and 58 tests, including
   1,000 property-based runs across reconciliation conservation/order invariance
   and opaque memo round trips. Enforced V8 coverage is 67.54% statements,
@@ -394,7 +395,8 @@ transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
 production runbook defines readiness, metrics, alert and egress policy.
 
 Public GitHub Actions
-[run `33333725083`](https://github.com/danelerr/ppops/actions/runs/33333725083)
-passed both the full verify job and the Docker build job for implementation
-commit `5d5752b` on 2026-08-30. This proves that commit's CI build, not the
-still-pending tag-triggered GHCR publication.
+[run `33336163346`](https://github.com/danelerr/ppops/actions/runs/33336163346)
+passed both the full verify job and the Docker build job for documentation
+commit `9374f5d`, which contains implementation remediation `d70057e`, on
+2026-08-30. This proves that commit's CI build, not the still-pending
+tag-triggered GHCR publication.

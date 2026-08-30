@@ -110,10 +110,12 @@ funded attempt; increasing the fee ceiling is not.
 
 ## Reproduction references
 
-- PPOps final-call guard: commit
+- PPOps final-call and prepare-admission guards: commits
   [`b6d5e3d`](https://github.com/danelerr/ppops/commit/b6d5e3dee1d39968a2ae96c5827e65e84d87124e)
+  and
+  [`d70057e`](https://github.com/danelerr/ppops/commit/d70057e)
 - Passing public verification:
-  [GitHub Actions run 33335378295](https://github.com/danelerr/ppops/actions/runs/33335378295)
+  [GitHub Actions run 33336163346](https://github.com/danelerr/ppops/actions/runs/33336163346)
 - Full bounded workflow and outcome: [Gate B runbook](GATE-B.md)
 - Security disposition:
   [Broadcaster differential review](../../../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md)
