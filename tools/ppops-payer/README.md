@@ -24,8 +24,9 @@ Current status: Gate A passed on Arbitrum mainnet on 2026-08-30. A bounded
 `0.01 USDC` transfer was mined, its output PPOI was submitted by this payer,
 and PPOps recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. This remains a
 controlled self-pilot, not external adoption or a production-readiness claim.
-Gate B's non-financial Waku preflight also passed on 2026-08-30. Its
-value-bearing payment remains pending and must not be inferred from preflight.
+Gate B's non-financial Waku preflight and complete no-send proof preparation
+also passed on 2026-08-30. Its value-bearing payment remains pending and must
+not be inferred from preparation.
 
 ## Scope
 
@@ -57,6 +58,11 @@ RAILGUN Broadcaster and never loads the optional EVM self-signing key.
   configuration and an independent maximum atomic USDC fee. It requires
   `payment + fee` to be spendable, rechecks the quote/request after proof
   generation and journals nullifiers before Waku submission.
+- A fee broadcast may rotate while the proof is being generated. The payer
+  prefers the original quote and accepts a live successor only when the
+  Broadcaster address, token and fee-per-gas remain identical. Any change to
+  those proof-bound economics fails closed and requires a new proof. The exact
+  quote used to create the encrypted submission is the quote journaled.
 - A hash returned by Waku is recorded only as an untrusted report. The journal
   advances to `SUBMITTED` only after the full payer wallet derives the canonical
   public transaction hash from the reserved nullifiers. Receipt lookup never
@@ -238,7 +244,11 @@ requires a strict majority of identical hash/block/status observations. Use
 
 The controlled 2026-08-30 preflight found at least five LightPush and at least
 five Filter peers and a ready quote with observed reliability between `0.84`
-and `1`. No proof or payment was created.
+and `1`. A later full no-send preparation generated the proof with a
+`1226761` gas estimate and observed a `70373`-atomic (`0.070373 USDC`)
+Broadcaster fee. It submitted no payment, wrote no journal record and left the
+merchant intent open with zero received. These are point-in-time observations,
+not a fee quote or recommendation for a later run.
 
 ## Evidence interpretation
 
@@ -253,9 +263,10 @@ metadata-minimal mainnet report passed restart, restore and webhook-deduplicatio
 checks. Direct identifiers remain in private operator evidence only.
 
 Gate B is now implemented behind separate amount/fee/intent confirmation and a
-write-ahead recovery journal. Only its connectivity preflight has run; a real
-Broadcaster payment and reconciliation are still required. Railway Wallet
-remains an optional manual compatibility client, not an operational dependency.
+write-ahead recovery journal. Its connectivity and complete no-send proof path
+have run; a real Broadcaster payment and reconciliation are still required.
+Railway Wallet remains an optional manual compatibility client, not an
+operational dependency.
 
 ## Development
 

@@ -1,7 +1,7 @@
 # Gate B: Waku Broadcaster payment
 
-Status: **CONNECTIVITY PREFLIGHT PASS; VALUE-BEARING GATE PENDING** on Arbitrum
-mainnet, 2026-08-30.
+Status: **PREFLIGHT + NO-SEND PREPARATION PASS; VALUE-BEARING GATE PENDING** on
+Arbitrum mainnet, 2026-08-30.
 
 Gate B replaces Gate A's public payer EVM signer with a RAILGUN Broadcaster. It
 does not change PPOps, the signed payment request, private ERC-20 proof, memo,
@@ -78,11 +78,12 @@ node dist/cli.js prepare-broadcaster \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --max-amount-atomic 10000 \
-  --max-broadcaster-fee-atomic 50000
+  --max-broadcaster-fee-atomic YOUR_ACCEPTED_MAXIMUM
 ```
 
-For native USDC, `10000` is `0.01 USDC` and `50000` is a maximum of
-`0.05 USDC`. They are independent ceilings, not recommendations or quoted
+For native USDC, `10000` is `0.01 USDC`; a value such as `50000` would cap the
+fee at `0.05 USDC`. Replace `YOUR_ACCEPTED_MAXIMUM` with an integer you approve.
+The amount and fee are independent ceilings, not recommendations or quoted
 costs. Choose both values independently.
 
 Preparation requires a strict majority of configured RPCs to return Arbitrum
@@ -97,6 +98,34 @@ populated RAILGUN proxy call. It then reloads and re-verifies the live merchant
 request and quote. It returns `paymentSubmitted: false`, does not create a
 journal entry and does not load the EVM self-signing key.
 
+Broadcaster fee messages can rotate while proof generation is in progress. The
+payer prefers the exact original quote. It may use a live successor only when
+the Broadcaster address, native-USDC token and fee-per-gas are identical, so the
+proof-bound fee recipient and amount do not change. A different address, token
+or rate fails closed and requires proof regeneration. `pay-broadcaster`
+persists the exact successor quote actually used to construct the encrypted
+Waku request, not an earlier discovery result.
+
+Controlled no-send result on 2026-08-30:
+
+- request amount: `10000` atomic (`0.01 USDC`);
+- first `50000`-atomic fee ceiling: rejected safely before proof because the
+  live fee exceeded the ceiling;
+- diagnostic preparation ceiling: `179000` atomic;
+- exact observed fee: `70373` atomic (`0.070373 USDC`);
+- gas estimate: `1226761`, with three configured providers agreeing;
+- quote reliability: `0.84`, with approximately 299 seconds remaining;
+- proof generated: yes; payment submitted: no;
+- submission journal record: none; merchant intent: `OPEN`, zero received.
+
+The observed Broadcaster fee was larger than the test payment and can change on
+the next run. It is evidence for operator-visible fee bounds, not an approved
+spend or a prediction. The first live preparation also exposed fee-ID rotation
+in the client cache; the proof-compatible rotation rule above was added and
+covered by regression tests before the passing repeat. RAILGUN's
+[private-transaction UX guidance](https://docs.railgun.org/developer-guide/wallet/transactions/ux-private-transactions)
+likewise treats proof generation and fee expiry as separate lifecycle steps.
+
 ## 4. Submit only after a separate value-bearing approval
 
 The value-bearing command deliberately repeats all preparation against fresh
@@ -110,15 +139,15 @@ node dist/cli.js pay-broadcaster \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --max-amount-atomic 10000 \
-  --max-broadcaster-fee-atomic 50000 \
+  --max-broadcaster-fee-atomic YOUR_SEPARATELY_APPROVED_MAXIMUM \
   --confirm-intent INTENT_ID
 ```
 
 Immediately before Waku submission, the payer durably reserves the intent,
-full quote fingerprint, bounded fee, payer identity and transaction nullifiers
-in its owner-only journal. The nullifiers are not printed. A hash returned by
-Waku is stored separately as `reportedTransactionHash`; it is not trusted as
-the submitted transaction. The journal remains `SUBMITTING` until the full
+exact submission-quote fingerprint, bounded fee, payer identity and transaction
+nullifiers in its owner-only journal. The nullifiers are not printed. A hash
+returned by Waku is stored separately as `reportedTransactionHash`; it is not
+trusted as the submitted transaction. The journal remains `SUBMITTING` until the full
 payer wallet synchronizes and derives the canonical public transaction hash
 from the reserved nullifiers. Only that canonical hash can move the journal to
 `SUBMITTED`. A strict configured-provider majority must then agree on hash,

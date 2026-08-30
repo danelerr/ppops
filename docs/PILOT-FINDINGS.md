@@ -3,8 +3,8 @@
 First recorded: 2026-08-23. Updated: 2026-08-30.
 
 Status: living pilot record. The controlled mainnet payment gate passed on
-2026-08-30; Gate B connectivity passed, while its value-bearing payment and
-external adoption remain open. This document
+2026-08-30; Gate B connectivity and no-send proof preparation passed, while
+its value-bearing payment and external adoption remain open. This document
 distinguishes observations from upstream guarantees and future proposals. It
 must not be cited as evidence of an independent merchant deployment.
 
@@ -73,6 +73,12 @@ a cryptographically private payment inaccessible or operationally unsafe.
   observed reliability between `0.84` and `1` and roughly five to nine minutes of
   validity. This preflight opened no wallet,
   generated no proof and moved no funds.
+- A subsequent Gate B preparation opened the existing full payer wallet,
+  generated a private-transfer proof and populated the RAILGUN call without
+  submitting it. Three providers agreed on a `1226761` gas estimate; the live
+  quote produced a `70373`-atomic (`0.070373 USDC`) fee for the `10000`-atomic
+  (`0.01 USDC`) request. The command reported `paymentSubmitted: false`, wrote
+  no journal record and left the merchant intent `OPEN` with zero received.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -97,9 +103,9 @@ reference or invoice identifier belongs in the public version of this record.
 
 - No independent merchant or payer has completed the full flow. The project
   therefore does not yet have verifiable external traction.
-- Gate B has not submitted through a Waku Broadcaster. Its connectivity test
-  therefore does not demonstrate removal of the payer public gas signer from a
-  real payment.
+- Gate B has not submitted through a Waku Broadcaster. Its connectivity and
+  no-send proof tests therefore do not demonstrate removal of the payer public
+  gas signer from a real payment.
 - One successful controlled payment does not establish an availability SLO,
   general wallet usability or production readiness.
 
@@ -321,12 +327,13 @@ closed while any assurance step is missing.
 
 ### F-12: Broadcaster connectivity is feasible, but trust and recovery are product surfaces
 
-The direct Waku preflight passed concrete peer and quote readiness checks and discovered a usable
-native-USDC quote in about twelve seconds, so Railway Wallet is not required for
-Broadcaster discovery either. The result does not make the path trustless. Fee
-authorization depends on a signer list, discovery depends on DNS/Waku peers,
-submission depends on a selected Broadcaster, and receipt resolution still
-depends on RPC providers.
+The direct Waku preflight passed concrete peer and quote readiness checks and
+discovered a usable native-USDC quote in about twelve seconds, so Railway Wallet
+is not required for Broadcaster discovery either. A later no-send run also
+completed wallet sync, fee calculation, proof generation and population. The
+result does not make the path trustless. Fee authorization depends on a signer
+list, discovery depends on DNS/Waku peers, submission depends on a selected
+Broadcaster, and receipt resolution still depends on RPC providers.
 
 The reference payer therefore pins the reviewed fee-signer list locally instead
 of downloading mutable configuration during payment. It fingerprints that
@@ -335,6 +342,21 @@ requires enough private balance for payment plus fee, and persists nullifiers
 before Waku submission. An ambiguous response is a recovery state, not a retry
 signal. The value-bearing path remains unproven until one fresh payment reaches
 PPOps `PAID` and its payer-owned PPOI is finalized.
+
+The no-send run made fee visibility concrete. A `0.05 USDC` maximum failed
+safely before proof, while the passing diagnostic preparation observed an exact
+`0.070373 USDC` Broadcaster fee for a `0.01 USDC` payment. The fee can change
+and the diagnostic ceiling was not spending authorization. Small payments can
+therefore be economically poor even when the protocol path is technically
+available; checkout software must display and independently cap the fee.
+
+It also exposed quote rotation during proof generation. The pinned client keeps
+the latest broadcast per Broadcaster, so an exact fee-ID fingerprint can
+disappear while the proof is still valid. The payer now prefers the original
+quote and accepts a live successor only when Broadcaster address, token and
+fee-per-gas are identical. Any proof-bound economic change fails closed. For a
+real submission, the exact quote used to build the encrypted Waku request is
+the one persisted in the recovery journal.
 
 An adversarial review exposed another necessary distinction before that value
 gate: a transaction hash returned by the Broadcaster is not proof that the
@@ -374,7 +396,7 @@ PPOps must not yet claim:
    `tools/ppops-payer` package as the reproducible payer.
 2. Preserve the Gate A operator records and signed public report with the beta
    release.
-3. Complete the now-connected Gate B with one separately approved, bounded
+3. Complete the now-prepared Gate B with one separately approved, bounded
    Broadcaster payment and retain Railway only as an optional compatibility
    client.
 4. Repeat with an independently operated merchant or payer.

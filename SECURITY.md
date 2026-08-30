@@ -67,7 +67,8 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
   from reserved nullifiers. Any unresolved record remains intentionally
   fail-closed; deleting the journal to retry can double-pay.
 - The controlled Gate A payment and signed Mainnet Gate artifact pass. A fresh
-  value-bearing Gate B payment and independently operated pilot evidence are
-  still required before any sender-unlinkability or production-readiness claim.
+  Gate B no-send proof preparation also passes. A fresh value-bearing Gate B
+  payment and independently operated pilot evidence are still required before
+  any sender-unlinkability or production-readiness claim.
 
 See `docs/OPERATIONAL-PROFILE.md` and `docs/ppops-threat-model.md` for detail.

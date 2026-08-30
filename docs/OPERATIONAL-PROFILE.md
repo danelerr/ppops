@@ -237,12 +237,13 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 14 test files and 56 tests,
+- Automated reference-payer suite on 2026-08-30: 14 test files and 59 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
-  adversarial hash mismatch, ambiguous-submission recovery, bounded RPC reads,
-  gas outlier handling, receipt agreement, no-broadcast preparation and clean
-  CLI-process termination.
+  adversarial hash mismatch, proof-compatible quote rotation,
+  exact-submission-quote persistence, ambiguous-submission recovery, bounded
+  RPC reads, gas outlier handling, receipt agreement, no-broadcast preparation
+  and clean CLI-process termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
@@ -288,7 +289,15 @@ Verification evidence:
   native-USDC quote with observed reliability between `0.84` and `1` and roughly
   five to nine minutes remaining. The
   command loaded no wallet or EVM key, generated no proof and submitted no
-  payment. The value-bearing Gate B remains pending.
+  payment.
+- Non-financial Gate B full preparation: the payer generated a proof for a
+  `10000`-atomic (`0.01 USDC`) request, obtained a `1226761` gas estimate with
+  three-provider agreement and observed an exact `70373`-atomic (`0.070373
+  USDC`) Broadcaster fee at `0.84` reliability. A lower `50000`-atomic ceiling
+  had already rejected the quote safely before proof. The passing preparation
+  submitted no payment, wrote no journal record and left the intent open at
+  zero received. The fee is point-in-time evidence, not a later quote. The
+  value-bearing Gate B remains pending.
 - After moving to one explicit scan owner, the merchant reached readiness in
   approximately 6 seconds and, after the final observability correction,
   completed five subsequent scheduled scans at roughly 34-second cadence.

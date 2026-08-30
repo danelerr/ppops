@@ -131,8 +131,9 @@ and abuse monitoring before exposure.
   serializes wallet access with a local runtime lock and reserves an intent in
   an owner-only write-ahead submission journal before broadcasting. Gate A
   records a precomputed signed transaction hash; Gate B records the bounded fee
-  identity, payer, complete quote fingerprint and nullifiers before encrypted
-  Waku submission. A Waku-returned hash remains untrusted metadata until the
+  identity, payer, exact encrypted-submission quote fingerprint and nullifiers
+  before Waku submission. After proof generation, a quote may rotate only when
+  Broadcaster, token and fee rate remain identical. A Waku-returned hash remains untrusted metadata until the
   full payer wallet derives the canonical transaction hash from those
   nullifiers. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,

@@ -14,10 +14,11 @@ processor. Its lifecycle is intentionally familiar to developers who use
 payment-intent APIs, while custody and infrastructure remain with the merchant.
 
 This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and a controlled
-Arbitrum mainnet self-pilot pass. Direct Waku/Broadcaster connectivity also
-passes, but the value-bearing Broadcaster gate and external adoption remain
-open. This is not a production-readiness claim. Review the known risks before
-using real financial data.
+Arbitrum mainnet self-pilot pass. Direct Waku/Broadcaster connectivity and a
+complete no-send proof preparation also pass, but the value-bearing
+Broadcaster gate and external adoption remain open. This is not a
+production-readiness claim. Review the known risks before using real financial
+data.
 
 ## Product model
 
@@ -383,8 +384,9 @@ external adoption.
 
 The payer's separate
 [`Gate B runbook`](tools/ppops-payer/docs/GATE-B.md) distinguishes the passing
-non-financial Waku preflight from the still-pending value-bearing Broadcaster
-payment. Preflight is not sender-unlinkability evidence.
+non-financial Waku preflight and no-send proof preparation from the
+still-pending value-bearing Broadcaster payment. Preparation is not
+sender-unlinkability evidence.
 
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect

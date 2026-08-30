@@ -3,8 +3,8 @@
 Controlled self-pilot status: **PASS** on 2026-08-30. The signed public report
 is `artifacts/mainnet-gate-report.json`; external adoption remains a separate
 gate. This report used diagnostic Gate A self-signing. Gate B's Waku
-connectivity passes, but its separate value-bearing sender-submission evidence
-is still pending.
+connectivity and no-send proof preparation pass, but its separate value-bearing
+sender-submission evidence is still pending.
 
 PPOps is publishable as beta only after every item below has evidence attached
 to a release. This gate deliberately requires a fresh private transfer; the

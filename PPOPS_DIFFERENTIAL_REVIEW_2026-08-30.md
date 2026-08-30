@@ -8,6 +8,8 @@ Initial Broadcaster implementation: `25f3afb`
 
 Remediated implementation: `136c4bc`
 
+Operational follow-up: `e09245e`
+
 Reviewer: repository-grounded automated differential review; not an independent
 third-party audit
 
@@ -86,8 +88,8 @@ denial of service.
 
 The fix:
 
-1. reserves payer identity, complete quote fingerprint, bounded fee and unique
-   nonzero nullifiers before encrypted submission;
+1. reserves payer identity, the exact encrypted-submission quote fingerprint,
+   bounded fee and unique nonzero nullifiers before submission;
 2. stores the Waku result only as `reportedTransactionHash` while status remains
    `SUBMITTING`;
 3. synchronizes the original full payer wallet and calls the RAILGUN nullifier
@@ -132,10 +134,22 @@ runtime boundary from malformed Waku objects. Version syntax permitted numeric
 components larger than JavaScript's safe integer range. Both conditions could
 cause inconsistent comparisons or an unbounded operational failure.
 
-The fix validates the runtime quote object before field access, enforces safe
-integer version components, and revalidates the complete quote fingerprint
-(Broadcaster, token, fee ID, fee-per-gas and expiration) after proof generation.
-Malformed candidates are ignored; a changed quote fails closed.
+The fix validates the runtime quote object before field access and enforces safe
+integer version components. It prefers the complete original quote fingerprint
+after proof generation. A live successor quote is accepted only when its
+Broadcaster address, token and fee-per-gas are identical, preserving the
+proof-bound recipient and amount while allowing the fee ID and expiration to
+rotate. A change to any proof-bound economic field fails closed. Malformed
+candidates are ignored.
+
+The first live no-send proof preparation exposed why that distinction matters:
+the pinned client cache replaced an otherwise compatible fee ID while proof
+generation was in progress. Follow-up `e09245e` added the compatibility rule
+and also makes `prepareSubmission` return the exact quote used to construct the
+encrypted Waku request. That exact fingerprint and fee ID—not a prior discovery
+snapshot—are now durably journaled before submission. Regression coverage
+rejects changed fee rates and verifies compatible rotation and exact
+submission-quote persistence.
 
 ## State and trust-boundary invariants after remediation
 
@@ -145,6 +159,8 @@ Malformed candidates are ignored; a changed quote fails closed.
   intent confirmation.
 - The payer's optional EVM self-signing key is not loaded in Gate B.
 - A durable reservation exists before the first Waku send attempt.
+- The reservation fingerprints the exact quote used for the encrypted Waku
+  request; proof-compatible rotation cannot change Broadcaster, token or rate.
 - `reportedTransactionHash` never authorizes receipt lookup.
 - A Broadcaster `SUBMITTING` record cannot contain a canonical
   `transactionHash`.
@@ -173,7 +189,7 @@ protection was found.
 `npm run verify:all` passed after remediation:
 
 - merchant: 19 test files, 58 tests;
-- reference payer: 14 test files, 56 tests;
+- reference payer: 14 test files, 59 tests;
 - TypeScript typechecks and production builds;
 - merchant coverage thresholds;
 - merchant and payer privacy checks;
@@ -191,7 +207,9 @@ The new payer regressions specifically exercise:
 - a conflicting Waku-reported hash losing to the nullifier-derived hash;
 - receipt lookup using only the canonical hash;
 - wrong expected payer rejection before terminal journal state is trusted;
-- exact quote-fingerprint revalidation and malformed quote rejection;
+- exact-quote preference, proof-compatible quote rotation, changed-rate
+  rejection and malformed quote rejection;
+- persistence of the exact quote used for encrypted submission;
 - safe-integer version bounds;
 - unique/nonzero nullifiers and cross-state journal validation;
 - RPC deadline behavior, majority retention and high-outlier gas selection.
@@ -199,6 +217,9 @@ The new payer regressions specifically exercise:
 ## Limitations and residual risks
 
 - No value-bearing Gate B transaction was submitted during this review.
+- A live no-send preparation generated the proof and observed a `70373`-atomic
+  Broadcaster fee for a `10000`-atomic request, but wrote no journal and left
+  the merchant intent open with zero received.
 - The RAILGUN Wallet SDK, engine, Waku client, proving artifacts, PPOI services,
   Broadcasters and protocol cryptography were treated as dependencies, not
   independently audited.
@@ -215,10 +236,11 @@ The new payer regressions specifically exercise:
 
 ## Recommendation
 
-Keep `136c4bc` and the updated runbooks. Before any Gate B claim:
+Keep `136c4bc`, follow-up `e09245e` and the updated runbooks. Before any Gate B
+claim:
 
 1. create a fresh unexpired intent;
-2. run non-financial `prepare-broadcaster` and record the bounded fee;
+2. rerun non-financial `prepare-broadcaster` and record the fresh bounded fee;
 3. obtain explicit approval for the exact USDC amount and maximum Broadcaster
    fee;
 4. submit once, recover ambiguity only through the journal and nullifiers;

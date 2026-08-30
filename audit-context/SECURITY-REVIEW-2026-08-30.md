@@ -24,9 +24,9 @@ open.
 Later on 2026-08-30, Gate A passed: one bounded `0.01 USDC` Arbitrum payment
 reached PPOps `FINALIZED + SPENDABLE + MATCHED -> PAID`, and restart, restore
 and webhook replay evidence passed. The subsequent Waku/Broadcaster
-implementation and non-financial connectivity preflight also passed; no
-value-bearing Gate B payment has been made. The post-review payer suite now has
-14 test files and 56 tests; its Waku-enabled dependency graph has 10 Moderate
+implementation, non-financial connectivity preflight and no-send proof
+preparation also passed; no value-bearing Gate B payment has been made. The
+post-review payer suite now has 14 test files and 59 tests; its Waku-enabled dependency graph has 10 Moderate
 and 30 Low findings, with zero Critical/High findings. This paragraph records
 later state and does not retroactively expand the review scope below. The
 subsequent Broadcaster-specific differential review is recorded separately in

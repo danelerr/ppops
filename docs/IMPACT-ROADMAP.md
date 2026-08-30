@@ -119,9 +119,13 @@ exact-once webhook, isolated restore and signed report requirements pass.
 Independent operator evidence is the remaining Gate 0 item; the self-pilot must
 not be counted as adoption.
 
-The non-financial Waku/Broadcaster preflight also passes. Its value-bearing
-payment is a separate privacy subgate: until that payment reaches PPOps `PAID`,
-the project must not claim that a real payer avoided the public self-signer.
+The non-financial Waku/Broadcaster preflight and a complete no-send proof
+preparation also pass. Its value-bearing payment is a separate privacy subgate:
+until that payment reaches PPOps `PAID`, the project must not claim that a real
+payer avoided the public self-signer. The preparation observed a `0.070373
+USDC` Broadcaster fee for a `0.01 USDC` test payment, illustrating why explicit
+fee visibility and ceilings are impact-relevant usability controls rather than
+implementation detail.
 
 Failure to complete the private-transfer primitive remains a stop condition.
 
