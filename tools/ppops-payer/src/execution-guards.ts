@@ -74,9 +74,8 @@ export const deriveShieldPrivateKey = async (signer: {
   signMessage(message: string): Promise<string>;
 }): Promise<string> => {
   try {
-    const signature = Signature.from(
-      await signer.signMessage(getShieldPrivateKeySignatureMessage()),
-    ).serialized;
+    const signature = await signer.signMessage(getShieldPrivateKeySignatureMessage());
+    Signature.from(signature);
     return keccak256(signature);
   } catch (error) {
     throw new SafeFailure("SECRET_INVALID", "Unable to derive the RAILGUN shield key", {

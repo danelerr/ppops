@@ -1,4 +1,4 @@
-import { Wallet, keccak256 } from "ethers";
+import { Signature, Wallet, keccak256 } from "ethers";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -64,6 +64,19 @@ describe("mainnet execution guards", () => {
     await expect(
       deriveShieldPrivateKey({ signMessage: async () => "not-a-signature" }),
     ).rejects.toThrow(/Unable to derive the RAILGUN shield key/);
+  });
+
+  it("hashes the signer's original compact signature bytes", async () => {
+    const wallet = new Wallet(
+      "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+    );
+    const compactSignature = Signature.from(
+      await wallet.signMessage("RAILGUN_SHIELD"),
+    ).compactSerialized;
+
+    await expect(
+      deriveShieldPrivateKey({ signMessage: async () => compactSignature }),
+    ).resolves.toBe(keccak256(compactSignature));
   });
 
   it("rejects malformed and uint256-overflowing gas bounds", () => {
