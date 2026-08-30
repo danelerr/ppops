@@ -248,6 +248,11 @@ Verification evidence:
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
   latest block `499967929`, finalized block `499964670`; both providers agreed
   on the conservative finalized block and its hash.
+- A later three-origin profile passed chain/finality preflight with 2-of-3
+  majority semantics. The payer subsequently synchronized and completed the
+  same bounded no-broadcast preparation in 6.3 seconds; no submission record was
+  created. This is fault-tolerance evidence for that run, not an availability
+  SLA or proof of provider organizational independence.
 - PPOI preflight against the community aggregator documented by the Wallet SDK:
   `1/1` node returned the exact `ppoi_health` JSON-RPC success response on
   2026-08-30. This proves reachability at that time, not future availability or

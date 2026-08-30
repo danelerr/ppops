@@ -30,6 +30,11 @@ a cryptographically private payment inaccessible or operationally unsafe.
 - Configuration validation and preflight passed for Arbitrum One (`42161`),
   native USDC, two independent RPC origins, the `finalized` tag and one healthy
   PPOI endpoint.
+- After observing intermittent unanimity failures in the two-provider profile,
+  the merchant and reference payer were moved to three distinct public RPC
+  origins. The resulting 2-of-3 merchant quorum passed chain/finality preflight,
+  and a payer synchronization plus complete no-broadcast preparation finished
+  in 6.3 seconds.
 - PPOps created an idempotent local intent and returned a signed descriptor,
   receiver `0zk` address and opaque `ppops:v1` memo.
 - A distinct payer wallet required public Arbitrum ETH for shielding gas and
@@ -245,6 +250,28 @@ hide outages: each quorum read gets one bounded retry, then persistent
 disagreement still fails closed, degrades readiness, and is retried by the next
 single-owner scan.
 
+### F-10: two providers provide verification, not failure tolerance
+
+With two RPC origins, PPOps correctly requires both responses: one timeout or
+temporary disagreement prevents a false confirmation, but also makes that scan
+fail. The controlled daemon observed isolated `RPC_QUORUM` failures followed by
+successful scans at the next interval. This was fail-closed behavior, not a
+LevelDB or RAILGUN synchronization failure.
+
+The controlled profiles now use three distinct public origins. PPOps' majority
+quorum can tolerate one unavailable or outlying origin while still requiring
+two agreeing responses; it never falls back to a single provider. The updated
+merchant preflight reported three providers and a healthy finalized-block
+quorum. The reference payer then synchronized and prepared the same `0.01 USDC`
+request in 6.3 seconds, generated its proof and populated the bounded
+transaction, while `paymentSubmitted` remained false and the submission journal
+remained empty.
+
+This improves fault tolerance but adds another external metadata and
+availability dependency. Three public endpoints do not prove organizational
+independence, and production operators should use providers under separately
+verified administrative control.
+
 ## Claim discipline
 
 Until the mainnet and adoption gates pass, PPOps may claim:
@@ -254,7 +281,7 @@ Until the mainnet and adoption gates pass, PPOps may claim:
 - reproducible primitive/privacy tests;
 - a successfully initialized Arbitrum mainnet profile;
 - one observed mainnet shield and documented payer-onboarding findings;
-- one bounded mainnet prepare-only proof run with no signature or broadcast.
+- bounded mainnet prepare-only proof runs with no signature or broadcast.
 
 PPOps must not yet claim:
 

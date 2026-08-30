@@ -105,7 +105,9 @@ directory. The root TypeScript build and Docker image exclude it, and
 - Node.js 22 or newer (the tested runtime is Node 24).
 - A RAILGUN shareable viewing key for the merchant receiver.
 - At least two independently operated Arbitrum RPC origins and a production PPOI
-  endpoint for a mainnet instance.
+  endpoint for a mainnet instance. Three RPC origins are recommended so the
+  majority quorum can tolerate one unavailable or outlying provider; PPOps does
+  not reduce the quorum to regain availability.
 - Native Arbitrum USDC. The v0.1 production profile rejects other tokens,
   confirmation-count finality and the documented test PPOI host.
 
