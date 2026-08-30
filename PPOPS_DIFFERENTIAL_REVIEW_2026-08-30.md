@@ -14,6 +14,8 @@ Ambiguity/retry remediation: `5d07fa0`
 
 Final-calldata simulation remediation: `b6d5e3d`
 
+Prepare-time nullifier admission remediation: `d70057e`
+
 Reviewer: repository-grounded automated differential review; not an independent
 third-party audit
 
@@ -26,9 +28,10 @@ not gain payer spending authority.
 The initial adversarial review found one Medium and two Low implementation
 issues. The funded trial and follow-up review found one additional Medium
 cross-intent nullifier risk and two Low ambiguity/retry risks. A post-trial
-review found one further Low pre-submission simulation gap. All seven are fixed
-in `136c4bc`, `5d07fa0` and `b6d5e3d` with regression coverage. No open Critical,
-High or Medium application finding is confirmed in the reviewed delta.
+review found two further Low pre-submission evidence gaps. All eight are fixed
+in `136c4bc`, `5d07fa0`, `b6d5e3d` and `d70057e` with regression coverage. No
+open Critical, High or Medium application finding is confirmed in the reviewed
+delta.
 
 The most important correction separates three different facts:
 
@@ -53,8 +56,8 @@ unexecuted. The review methods themselves moved no funds.
 
 ## Scope and change surface
 
-The reviewed range `716b54d..b6d5e3d` contains 17 commits, 52 changed files and
-approximately 9,776 additions / 297 deletions. Much of that volume is the
+The reviewed range `716b54d..d70057e` contains 19 commits, 53 changed files and
+approximately 10,135 additions / 296 deletions. Much of that volume is the
 pinned Waku dependency lockfile and new tests. The security-sensitive production
 surface is concentrated in:
 
@@ -83,6 +86,7 @@ not a removed control.
 | DR-005 | Low | Fixed | Broadcaster rejection and chain-ambiguous post-send failures were not separated into durable safe categories |
 | DR-006 | Low | Fixed | A bounded ambiguity retry could repeatedly select the same failing Broadcaster identity |
 | DR-007 | Low | Fixed | The exact post-proof populated calldata was not independently simulated before Waku |
+| DR-008 | Low | Fixed | Prepare mode did not reject inputs already reserved by another unresolved intent |
 
 ### DR-001 — Broadcaster-reported hash was not bound to reserved nullifiers
 
@@ -227,10 +231,34 @@ point-in-time Broadcaster fee was `64892` atomic (`0.064892 USDC`). No payment
 or journal record was created. This makes invalid final calldata unlikely under
 those RPC views and narrows, but does not solve, the remote Broadcaster failure.
 
+### DR-008 — prepare mode needed the same nullifier admission check
+
+The atomic `reserveBroadcaster` mutation rejected input nullifiers held by any
+other non-rejected, non-reverted Broadcaster record. Prepare-only mode stopped
+before that mutation, so it could report a complete proof and simulation even
+though the later value-bearing command was guaranteed to fail before Waku. No
+second spend could be sent, but the no-send result overstated operational
+readiness and encouraged unnecessary proof generation and fee approval.
+
+The fix adds a read-only journal admission check immediately after population.
+It applies the same active-record policy without printing the nullifiers or
+conflicting intent, permits the current intent for exact-set retry validation,
+and retains the mutation-time recheck to close the race. A conflict aborts
+before final RPC simulation, encrypted-request construction, journal mutation
+or Waku.
+
+The live follow-up selected at least one input held by the unresolved funded
+lineage and failed safely with `SUBMISSION_ALREADY_RECORDED`. It created no new
+journal record and submitted no payment. The existing private balance therefore
+cannot be assumed available for a fresh Gate B intent merely because the Wallet
+SDK still reports it as spendable.
+
 ## State and trust-boundary invariants after remediation
 
 - PPOps merchant runtime remains view-only and cannot import payer code.
 - `prepare-broadcaster` performs no journal write or Waku submission.
+- Prepare mode reads the local journal and rejects any populated input reserved
+  by another active intent before calling the final simulation quorum.
 - A strict configured-RPC majority simulates the exact populated proof/calldata
   before Waku construction or journal mutation.
 - `pay-broadcaster` still requires exact intent, payer, amount, fee and explicit
@@ -276,7 +304,7 @@ protection was found.
   [`33335378295`](https://github.com/danelerr/ppops/actions/runs/33335378295)
   passed its `verify` and `docker` jobs at `835e792`;
 - merchant: 19 test files, 58 tests;
-- reference payer: 15 test files, 78 tests;
+- reference payer: 15 test files, 79 tests;
 - TypeScript typechecks and production builds;
 - merchant coverage thresholds;
 - merchant and payer privacy checks;
@@ -301,6 +329,7 @@ The new payer regressions specifically exercise:
 - unique/nonzero nullifiers and cross-state journal validation;
 - RPC deadline behavior, majority retention and high-outlier gas selection.
 - exact populated-calldata simulation majority and pre-reservation failure.
+- prepare-time cross-intent nullifier conflict and terminal-record release.
 
 ## Limitations and residual risks
 
@@ -315,6 +344,10 @@ The new payer regressions specifically exercise:
   calldata and observed a `64892`-atomic fee, but this cannot reproduce the
   Broadcaster's private off-chain fee/PPOI/runtime validation or sanitized
   response path.
+- After adding the read-only admission check, the current diagnostic proof
+  selected at least one nullifier owned by the unresolved lineage and stopped
+  before simulation/Waku. Another funded trial needs independently fresh inputs
+  or a cryptographically resolved prior lineage, not a higher fee ceiling.
 - The RAILGUN Wallet SDK, engine, Waku client, proving artifacts, PPOI services,
   Broadcasters and protocol cryptography were treated as dependencies, not
   independently audited.
@@ -332,8 +365,8 @@ The new payer regressions specifically exercise:
 ## Recommendation
 
 Keep `136c4bc`, follow-up `e09245e`, ambiguity remediation `5d07fa0`, final-call
-simulation remediation `b6d5e3d` and the updated runbooks. Before any Gate B
-claim:
+simulation remediation `b6d5e3d`, prepare admission remediation `d70057e` and
+the updated runbooks. Before any Gate B claim:
 
 1. retain the unresolved journal and do not delete, reset or bypass its
    nullifier reservation;

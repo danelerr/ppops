@@ -1,8 +1,8 @@
 # PPOps audit context dossier
 
 Context-building snapshot: 2026-08-30. This document describes the source tree
-through Gate B final-calldata simulation remediation commit
-`b6d5e3dee1d39968a2ae96c5827e65e84d87124e`. Review began from root commit
+through Gate B prepare-time nullifier admission remediation commit
+`d70057e`. Review began from root commit
 `89256e9e2fa2f4d388c9b2dd96adb5ef588fe8ef`; the payer subtree was originally
 imported from commit
 `300bcb7c5a52ad7955ce317f15a120b3138c48e6`. This is an orientation record, not
@@ -44,7 +44,7 @@ package through its own `verify` script (`tools/ppops-payer/package.json:L23-L28
 Root `verify:all` composes the two runs without merging their test discovery or
 coverage accounting (`package.json:L41-L46`).
 The latest separate verification reported by the coordinating run contained 19
-merchant test files / 58 tests and 15 payer test files / 78 tests; those counts
+merchant test files / 58 tests and 15 payer test files / 79 tests; those counts
 are execution observations rather than source invariants.
 
 The protocol path is:
@@ -296,12 +296,13 @@ unauthenticated. Static payer assets are also unauthenticated
     (`tools/ppops-payer/src/cli.ts:L793-L853`;
     `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L120-L244`).
 17. **Gate B preparation is separated from the irreversible call.** Proof and
-    population complete, the proxy/zero-value/nullifier set is checked and a
-    configured RPC majority simulates the exact final calldata. The live request
-    and quote are then revalidated, and `submit=false` returns without
-    constructing a Waku transaction or journal record. On `submit=true`, local
-    encrypted-message construction completes before the journal reservation;
-    `submitPrepared` is called only after that reservation returns
+    population complete, the proxy/zero-value/nullifier set is checked, active
+    cross-intent reservations are rejected without mutation, and a configured
+    RPC majority simulates the exact final calldata. The live request and quote
+    are then revalidated, and `submit=false` returns without constructing a Waku
+    transaction or journal record. On `submit=true`, local encrypted-message
+    construction completes before the journal reservation; `submitPrepared` is
+    called only after that reservation returns
     (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts`).
 18. **Canonical Gate B identity comes from nullifiers.** The hash returned by
     the Waku client is journaled only as `reportedTransactionHash`. Wallet/engine
@@ -622,6 +623,12 @@ estimate, `1123239` final estimate). It observed a `64892`-atomic fee, submitted
 no payment and wrote no journal. This narrows the unresolved outcome to the
 Broadcaster's off-chain path or sanitized response boundary; it does not pass
 Gate B.
+
+After the read-only admission guard was added, a fresh-intent proof selected at
+least one nullifier held by the unresolved lineage. It returned
+`SUBMISSION_ALREADY_RECORDED` before final simulation or Waku and wrote no new
+journal record. The wallet's current `Spendable` projection therefore cannot be
+used as evidence that those inputs are safe for a competing intent.
 
 No secret, ignored config, wallet database or journal contents were opened to
 record these observations; the values above were emitted by bounded tooling

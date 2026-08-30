@@ -66,6 +66,10 @@ reliability/lifetime floors and enough available wallets.
 6. Recovery more than 15 minutes after the final attempt found no canonical
    transaction for the reserved nullifiers. The private balance and receiver
    intent remained unchanged. No fee was observed as charged.
+7. A later fresh-intent preparation generated a proof, but its read-only journal
+   admission check found that at least one selected input belonged to the
+   unresolved lineage. It returned `SUBMISSION_ALREADY_RECORDED` before final
+   simulation or Waku. No new journal record or payment was created.
 
 ## Interpretation
 
@@ -80,6 +84,11 @@ The reference server converts any non-allowlisted internal error to
 `Unknown Broadcaster error.` when `devLog` is false. That response therefore
 does not identify which private stage failed, and it cannot prove that the
 Broadcaster did not reach its chain-send boundary.
+
+The follow-up admission result also means the Wallet SDK's current `Spendable`
+balance cannot safely be used as fresh diagnostic capital. Resolving the old
+lineage or providing independently fresh inputs is a prerequisite for another
+funded attempt; increasing the fee ceiling is not.
 
 ## Maintainer questions
 

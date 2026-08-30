@@ -415,6 +415,13 @@ keeps the reserved notes locked after the retry cap. That behavior protects
 funds, but it creates a manual-review state with no automatic liveness escape.
 This is an honest operational limitation, not a passed Gate B.
 
+A final no-send admission check made that limitation executable. A fresh
+diagnostic proof selected at least one nullifier from the unresolved lineage;
+the payer returned `SUBMISSION_ALREADY_RECORDED` before final simulation, Waku
+or any new journal write. RAILGUN may still label the underlying balance
+`Spendable`, but PPOps cannot safely authorize it for a different intent while
+the prior encrypted submission remains cryptographically unresolved.
+
 ## Claim discipline
 
 After the controlled mainnet gate but before external adoption, PPOps may claim:

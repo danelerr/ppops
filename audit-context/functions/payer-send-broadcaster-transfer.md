@@ -1,4 +1,4 @@
-## `sendBroadcasterTransfer` in `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` (L120-L496)
+## `sendBroadcasterTransfer` in `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` (L123-L519)
 
 **Purpose:** Implements Gate B from a verified request and synchronized full
 payer wallet through bounded proof construction, initial or same-nullifier retry
@@ -118,14 +118,16 @@ await generateTransferProof(...payment, memo, broadcaster fee, gas...);
 const populated = await populateProvedTransfer(...same inputs...);
 const transaction = assertPopulatedPrivateTransfer(...configured proxy...);
 const nullifiers = assertPopulatedNullifiers(populated.nullifiers);
+await submissionJournal.assertBroadcasterNullifiersAvailable(request.id, nullifiers);
 const finalSimulation = await simulatePopulatedTransferQuorum(config, transaction);
 await revalidateLiveRequest(request, requestSource, expectedMerchantSigner);
 const current = session.assertQuoteStillCurrent(selected);
 ```
 
 - **What:** Generates/populates the private transfer, validates its visible
-  proxy/nullifier output, quorum-simulates the exact final calldata, refetches
-  the exact signed request and refreshes quote compatibility.
+  proxy/nullifier output, rejects inputs held by another active local intent,
+  quorum-simulates the exact final calldata, refetches the exact signed request
+  and refreshes quote compatibility.
 - **Why here:** Only a still-live request and admitted, RPC-executable populated
   result can reach Waku preparation or durable state. Simulation occurs before
   the final request/quote freshness checks so those checks remain closest to
@@ -135,8 +137,9 @@ const current = session.assertQuoteStillCurrent(selected);
   common population output; the cryptographic guarantee is established by:
   **nothing found in project source**.
 - **Establishes:** Configured proxy/zero-value calldata, one to 64 unique nonzero
-  nullifiers, a positive exact-call gas estimate from a strict configured-RPC
-  majority, unchanged request and a live compatible quote.
+  nullifiers not reserved by another active local intent, a positive exact-call
+  gas estimate from a strict configured-RPC majority, unchanged request and a
+  live compatible quote. The mutation-time reserve repeats the conflict check.
 - **Depended on by:** Prepare-only return or encrypted submission construction.
 
 ```ts

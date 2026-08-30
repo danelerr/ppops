@@ -134,13 +134,15 @@ and abuse monitoring before exposure.
   identity, payer, exact encrypted-submission quote fingerprint and nullifiers
   before Waku submission. After proof generation, a configured RPC majority
   must simulate the exact populated calldata before any encrypted-request or
-  journal effect. A quote may rotate only when Broadcaster, token and fee rate
-  remain identical. A Waku-returned hash remains untrusted metadata until the
-  full payer wallet derives the canonical transaction hash from those
-  nullifiers. Recovery precedes every explicit ambiguity retry; a retry must
-  preserve the signed request, payer and complete nullifier set, exclude all
-  previously attempted Broadcaster identities and remain within a three-retry
-  cap. A different intent cannot reserve any unresolved nullifier. Evidence:
+  journal effect. Before simulation, a read-only admission check rejects inputs
+  held by another active journal record; the later reservation rechecks the same
+  policy. A quote may rotate only when Broadcaster, token and fee rate remain
+  identical. A Waku-returned hash remains untrusted metadata until the full
+  payer wallet derives the canonical transaction hash from those nullifiers.
+  Recovery precedes every explicit ambiguity retry; a retry must preserve the
+  signed request, payer and complete nullifier set, exclude all previously
+  attempted Broadcaster identities and remain within a three-retry cap. A
+  different intent cannot reserve any unresolved nullifier. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
   `tools/ppops-payer/src/security/runtime-lock.ts` and
   `tools/ppops-payer/src/security/submission-journal.ts`.
@@ -327,8 +329,9 @@ flowchart LR
     workflow. The payer instead reserves nullifiers before Waku, recovers first,
     permits only bounded conflicting same-nullifier variants through previously
     unattempted identities and then requires manual review. Before any
-    reservation or Waku effect, a strict RPC majority must also simulate the
-    exact final populated calldata (TM-003, TM-004, TM-009).
+    reservation or Waku effect, the payer rejects cross-intent input overlap and
+    a strict RPC majority must simulate the exact final populated calldata
+    (TM-003, TM-004, TM-009).
 
 ## Threat model table
 
@@ -389,7 +392,7 @@ flowchart LR
 | `package-lock.json` | Captures the large vulnerable upstream dependency surface | TM-005 |
 | `Dockerfile` | Defines runtime privilege, copied dependencies and base-image trust | TM-005, TM-008 |
 | `scripts/trust-boundary-check.ts` | Prevents payer spending code from entering the merchant build/image boundary | TM-001, TM-003, TM-005 |
-| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents cross-intent nullifier reuse, bounds same-nullifier retries and separates rejection, ambiguity, reported hash and canonical transaction identity | TM-003, TM-009 |
+| `tools/ppops-payer/src/security/submission-journal.ts` | Rejects cross-intent nullifier reuse during both preparation and reservation, bounds same-nullifier retries and separates rejection, ambiguity, reported hash and canonical transaction identity | TM-003, TM-009 |
 | `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates and quorum-simulates the exact populated call before Waku, reserves recovery identity, rotates retry identity and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
 
 ## Quality check

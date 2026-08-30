@@ -142,6 +142,11 @@ preserves that ambiguity, prevents cross-intent nullifier reuse, excludes prior
 Broadcaster identities on bounded retries and stops for manual review after the
 retry cap. This protects funds but does not solve Broadcaster liveness.
 
+The same reservation policy now runs in prepare-only mode. A live follow-up
+proof selected an input from the unresolved lineage and failed before final
+simulation or Waku, demonstrating that a wallet-level `Spendable` label cannot
+override payment-level ambiguity safety.
+
 Failure to complete the private-transfer primitive remains a stop condition.
 
 ### Gate 1 — payer readiness and provider resilience

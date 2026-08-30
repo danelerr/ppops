@@ -96,8 +96,11 @@ remains the final financial bound. The payer obtains an authorized quote,
 calculates the exact token fee, checks
 `payment + fee` against spendable balance, generates the proof and validates the
 populated RAILGUN proxy call. A strict configured-RPC majority must then simulate
-that exact calldata with a positive gas estimate. After simulation, the payer
-reloads and re-verifies the live merchant request and quote. It returns
+that exact calldata with a positive gas estimate. Before simulation, prepare
+mode reads the existing submission journal and rejects any populated nullifier
+held by another non-rejected, non-reverted intent. It does not print either the
+nullifier or conflicting intent. After simulation, the payer reloads and
+re-verifies the live merchant request and quote. It returns
 `paymentSubmitted: false`, does not create a journal entry and does not load the
 EVM self-signing key.
 
@@ -141,6 +144,15 @@ new exact-call simulation guard:
 This makes invalid final calldata/proof an unlikely explanation under those RPC
 views. It does not validate the Broadcaster's off-chain fee extraction, PPOI
 checks, wallet/runtime/provider state or send path, and it is not a Gate B pass.
+
+The next live prepare-only run exercised the journal admission rule. The Wallet
+SDK generated a proof that selected at least one nullifier already reserved by
+the unresolved funded lineage. The command returned only
+`SUBMISSION_ALREADY_RECORDED` and stopped before final simulation, encrypted
+request construction, Waku or a new journal record. No payment or fee moved.
+The currently reported private balance must therefore not fund a new intent;
+the old lineage must be resolved or independently fresh inputs must first pass
+this same prepare-time admission check.
 
 ## 4. Submit only after a separate value-bearing approval
 

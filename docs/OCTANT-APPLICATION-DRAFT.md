@@ -197,6 +197,10 @@ standard in the v0.1 funding scope.
   configured RPCs (`1123239` gas estimate). This narrows the failure to remote
   Broadcaster processing or its sanitized response boundary, but does not turn
   preparation into a successful payment.
+- A subsequent fresh-intent preparation selected an input reserved by the
+  unresolved trial and failed before Waku. PPOps therefore prevents the wallet's
+  apparently spendable balance from becoming an accidental competing payment;
+  another funded Gate B attempt requires independently fresh inputs.
 - Public RPC/PPOI/Waku services remain availability and metadata dependencies.
 - The pinned RAILGUN/Waku dependency graphs retain Moderate/Low advisories but
   no known High/Critical advisory under the current audit gate.

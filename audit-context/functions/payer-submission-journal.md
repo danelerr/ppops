@@ -1,4 +1,4 @@
-## `SubmissionJournal` in `tools/ppops-payer/src/security/submission-journal.ts` (L19-L747)
+## `SubmissionJournal` in `tools/ppops-payer/src/security/submission-journal.ts` (L19-L784)
 
 **Purpose:** Maintains owner-only durable payer submission lineages. For Gate B
 it stores the original request/payer/quote/fee/nullifier reservation, bounded
@@ -33,6 +33,8 @@ Waku-reported hash, the independently recovered canonical hash and receipt state
 
 - `get` returns the first strict record for an intent; `assertUnused` rejects any
   existing lineage.
+- Read-only prepare admission rejects a populated nullifier held by another
+  active Broadcaster lineage without revealing that nullifier or mutating state.
 - Initial Gate B reserve normalizes/sorts nullifiers and refuses overlap with
   another Broadcaster record unless that record is `REJECTED` or `REVERTED`.
 - Retry admission/reservation requires the same request fingerprint, payer and
@@ -104,6 +106,7 @@ SubmissionJournalSchema = { schemaVersion: 1, records: max 10_000 };
 requestFingerprint = sha256(domain + intentId + descriptor.signature);
 feesIDFingerprint = sha256(domain + raw feesID);
 normalizedNullifiers = lowercase + sort;
+hasActiveBroadcasterNullifierConflict = other intent + active mode/status + overlap;
 sameNullifierSet = normalized exact array equality;
 ```
 
@@ -114,8 +117,8 @@ sameNullifierSet = normalized exact array equality;
   collision handling is established by: **nothing found**.
 - **Establishes:** Deterministic request/fee fingerprints and order-insensitive
   exact nullifier-set comparison.
-- **Depended on by:** Initial reservation, retry admission/reservation and schema
-  persistence.
+- **Depended on by:** Prepare admission, initial reservation, retry
+  admission/reservation and schema persistence.
 
 ```ts
 // L292-L332
@@ -123,9 +126,12 @@ get(intentId) -> first record;
 assertUnused -> reject any record;
 assertBroadcasterRetryable -> require BROADCASTER/SUBMITTING,
   no canonical/reported hash, same request fingerprint/payer, retries < 3;
+assertBroadcasterNullifiersAvailable -> reject overlap held by another intent
+  unless the prior record is REJECTED/REVERTED;
 ```
 
-- **What:** Provides initial and retry preflight snapshots.
+- **What:** Provides initial/retry preflight snapshots and read-only populated-
+  input admission.
 - **Why here:** Expensive proof work starts only for an eligible lineage.
 - **Assumes:** At most one record has an intent ID. Reservation methods recheck
   under serialized use; whole-file schema-level intent uniqueness is established
@@ -135,7 +141,8 @@ assertBroadcasterRetryable -> require BROADCASTER/SUBMITTING,
   method. Established by the explicit predicate at L310-L330.
 - **Establishes:** Successful initial preflight saw no record; successful retry
   preflight saw the exact unresolved lineage and available retry slot.
-- **Depended on by:** `sendBroadcasterTransfer` before proof generation.
+- **Depended on by:** `sendBroadcasterTransfer` before proof generation and,
+  after population, before final simulation.
 
 ```ts
 // L334-L410

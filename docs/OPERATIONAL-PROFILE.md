@@ -241,7 +241,7 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 15 test files and 78 tests,
+- Automated reference-payer suite on 2026-08-30: 15 test files and 79 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
   adversarial hash mismatch, proof-compatible quote rotation,
@@ -249,7 +249,8 @@ Verification evidence:
   exact-nullifier bounded retries, alternate-Broadcaster exclusion,
   cross-intent nullifier collision rejection, bounded RPC reads, gas outlier
   handling, exact populated-calldata simulation quorum, receipt agreement,
-  no-broadcast preparation and clean CLI-process termination.
+  prepare-time nullifier admission, no-broadcast preparation and clean
+  CLI-process termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
@@ -310,6 +311,11 @@ Verification evidence:
   (`0.064892 USDC`). The run submitted no payment and wrote no journal. This
   narrows the failed value-bearing path to off-chain Broadcaster processing or
   its sanitized response boundary; it does not pass Gate B.
+- Prepare-time reservation diagnosis: a later fresh-intent proof selected at
+  least one nullifier from the unresolved lineage. The read-only journal check
+  returned `SUBMISSION_ALREADY_RECORDED` before final simulation, Waku or a new
+  journal record. Existing Wallet SDK `Spendable` balance is therefore not
+  treated as safe fresh-input capacity.
 - Controlled value-bearing Gate B trial: one initial Waku submission and three
   bounded same-nullifier variants used fee quotes between `0.058867` and
   `0.071154 USDC`, each below the operator's `0.08 USDC` ceiling. The first

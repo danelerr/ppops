@@ -242,11 +242,13 @@ signers locally, bounds the token fee, journals nullifiers before Waku, derives
 the canonical transaction hash from those nullifiers instead of trusting the
 Broadcaster response, and requires a configured RPC majority to simulate the
 final populated calldata before any Waku submission or journal reservation. It
-prevents unresolved nullifiers from being assigned to another intent and does
-not load an EVM self-signing key. Ambiguous recovery can regenerate only a
-conflicting variant with the exact same nullifiers, a different Broadcaster
-identity and a bounded retry count. Railway Wallet remains an optional manual
-compatibility client, not a critical PPOps dependency. See
+also rejects a prepare-only proof when its inputs are already reserved by
+another unresolved intent, preventing wallet-level `Spendable` state from
+authorizing a competing local payment. It does not load an EVM self-signing key.
+Ambiguous recovery can regenerate only a conflicting variant with the exact same
+nullifiers, a different Broadcaster identity and a bounded retry count. Railway
+Wallet remains an optional manual compatibility client, not a critical PPOps
+dependency. See
 [`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the evidence procedure.
 
 ## Settlement semantics

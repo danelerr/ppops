@@ -268,12 +268,13 @@ For a new, independently approved intent, run `prepare-broadcaster` with exact
 amount and atomic-USDC fee ceilings. Only after reviewing that no-send result may
 the operator run `pay-broadcaster` with `--confirm-intent`. After proof
 generation, a strict configured-RPC majority must first simulate the exact
-populated proxy calldata with a positive gas estimate. Failure aborts before
-journal reservation or Waku. The payer then reloads the live signed request and
-journals the exact encrypted-submission quote fingerprint, bounded fee, payer
-identity and nullifiers before Waku. It tolerates fee-ID/expiry rotation only
-when the Broadcaster address, token and fee rate remain identical; otherwise it
-requires a new proof.
+populated proxy calldata with a positive gas estimate. Before that simulation,
+the payer also rejects any populated input reserved by another active journal
+record. Either failure aborts before journal mutation or Waku. The payer then
+reloads the live signed request and journals the exact encrypted-submission
+quote fingerprint, bounded fee, payer identity and nullifiers before Waku. It
+tolerates fee-ID/expiry rotation only when the Broadcaster address, token and
+fee rate remain identical; otherwise it requires a new proof.
 
 A Waku-returned hash is only an untrusted report: the payer must recover the
 canonical transaction hash from those nullifiers before receipt lookup or
@@ -293,6 +294,12 @@ attempt found no canonical transaction. The payer balance remained unchanged
 and the merchant intent remained `OPEN` with zero received. The retry cap is
 exhausted, so that lineage remains in manual review and no more funded variants
 should be sent.
+
+A follow-up prepare-only proof selected at least one input from that unresolved
+lineage and was rejected with `SUBMISSION_ALREADY_RECORDED` before final
+simulation or Waku. The Wallet SDK's `Spendable` balance is therefore not, by
+itself, authority to create a fresh local intent while a prior nullifier remains
+reserved.
 
 A future passing Gate B will prove only that the payment was submitted by a
 Broadcaster instead of the payer's public EVM self-signer. It will not prove

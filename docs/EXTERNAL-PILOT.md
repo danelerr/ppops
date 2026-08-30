@@ -50,7 +50,8 @@ deployment.
 6. For Broadcaster mode, approve the payment amount and maximum atomic-USDC fee
    separately. A fee quote can change; exceeding either ceiling must fail
    without submission. The no-send result must also report a strict majority of
-   configured RPCs for the exact final populated-calldata simulation.
+   configured RPCs for the exact final populated-calldata simulation and must
+   not report `SUBMISSION_ALREADY_RECORDED` for an input held by another intent.
 7. Recover every ambiguous submission first. Retry only when the journal-backed
    `retry-broadcaster` command reports it available; it preserves the exact
    nullifier set, excludes attempted Broadcaster identities and stops after
