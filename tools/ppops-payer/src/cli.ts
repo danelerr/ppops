@@ -65,6 +65,8 @@ Commands:
   ppops-payer request-verify --request URL_OR_PATH --expected-signer ADDRESS
   ppops-payer sync --config PATH
   ppops-payer submission-status --config PATH --intent-id pi_ID
+  ppops-payer finalize-poi --config PATH --intent-id pi_ID \\
+    --expected-payer 0zk_ADDRESS [--expected-railgun-txid TXID]
   ppops-payer prepare-self-signed --config PATH --request URL \\
     --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
     --expected-payer 0zk_ADDRESS --expected-self-signer EVM_ADDRESS \\
@@ -430,6 +432,46 @@ const submissionStatus = async (options: ParsedOptions): Promise<void> => {
   });
 };
 
+const finalizePOI = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, [
+    "config",
+    "intent-id",
+    "expected-payer",
+    "expected-railgun-txid",
+  ]);
+  const config = await loadConfig(one(options, "config", { required: true }));
+  const intentId = one(options, "intent-id", { required: true });
+  if (!/^pi_[0-9a-f]{32}$/.test(intentId)) {
+    throw new SafeFailure("REQUEST_INVALID", "Intent ID is invalid");
+  }
+  const record = await new SubmissionJournal(
+    submissionJournalPath(config.storage.walletStatePath),
+  ).get(intentId);
+  if (record?.status !== "MINED" || !record.transactionHash) {
+    throw new SafeFailure(
+      "POI_NOT_READY",
+      "PPOI finalization requires a mined local submission record",
+    );
+  }
+  const expectedRailgunTxid = one(options, "expected-railgun-txid");
+  if (expectedRailgunTxid && !/^(?:0x)?[0-9a-fA-F]{64}$/.test(expectedRailgunTxid)) {
+    throw new SafeFailure("REQUEST_INVALID", "Expected RAILGUN transaction ID is invalid");
+  }
+  const secrets = await loadRuntimeSecrets(config, false);
+  const result = await withEngine(config, secrets, async (engine) => {
+    assertExpectedPayerAddress(
+      engine.railgunAddress,
+      one(options, "expected-payer", { required: true }),
+    );
+    await engine.syncBalances();
+    return engine.finalizePOIForTransaction(
+      record.transactionHash as string,
+      expectedRailgunTxid || undefined,
+    );
+  });
+  output({ ok: true, intentId, ...result });
+};
+
 const withEngine = async <T>(
   config: PayerConfig,
   secrets: { dbEncryptionKey: string; mnemonic?: string },
@@ -561,6 +603,10 @@ const runSelfSigned = async (
     receiptStatus: result.receiptStatus,
     ...(result.blockNumber !== undefined ? { blockNumber: result.blockNumber } : {}),
     privacyWarning: "public-self-signer-linked",
+    poiFinalizationRequired: true,
+    next: `ppops-payer finalize-poi --config ${resolve(
+      one(options, "config", { required: true }),
+    )} --intent-id ${request.id} --expected-payer PINNED_PAYER_0ZK_ADDRESS`,
   });
 };
 
@@ -592,6 +638,9 @@ const main = async (): Promise<void> => {
       return;
     case "submission-status":
       await submissionStatus(options);
+      return;
+    case "finalize-poi":
+      await finalizePOI(options);
       return;
     case "prepare-self-signed":
       await runSelfSigned(options, false);

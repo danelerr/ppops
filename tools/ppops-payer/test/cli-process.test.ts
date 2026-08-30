@@ -15,6 +15,7 @@ describe("CLI process lifecycle", () => {
 
     expect(stdout).toContain("ppops-payer");
     expect(stdout).toContain("prepare-self-signed");
+    expect(stdout).toContain("finalize-poi");
     expect(stderr).toBe("");
   });
 

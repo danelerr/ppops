@@ -15,11 +15,14 @@ import {
   assertValidRailgunAddress,
   createRailgunWallet,
   fullWalletForID,
+  generatePOIsForWalletAndRailgunTxid,
   getProver,
+  getTXOsSpentPOIStatusInfoForWallet,
   loadProvider,
   loadWalletByID,
   pauseAllPollingProviders,
   refreshBalances,
+  refreshSpentPOIsForWallet,
   setOnTXIDMerkletreeScanCallback,
   setOnUTXOMerkletreeScanCallback,
   setOnWalletPOIProofProgressCallback,
@@ -42,6 +45,12 @@ import {
 import { SafeFailure, writeEvent } from "../events.js";
 import { readOwnerOnlyFile } from "../security/private-file.js";
 import { createArtifactStore } from "./artifacts.js";
+import {
+  POIFinalizationNotReadyError,
+  selectPOIFinalizationTarget,
+  type POIFinalizationTarget,
+  type SpentPOIStatusInfo,
+} from "./poi-finalization.js";
 
 const WalletStateSchema = z
   .object({
@@ -55,6 +64,11 @@ const WalletStateSchema = z
 type WalletState = z.infer<typeof WalletStateSchema>;
 
 export type BalanceSummary = Record<WalletBalanceBucket, string>;
+
+export type POIFinalizationResult = POIFinalizationTarget & {
+  transactionHash: string;
+  proofGenerationRequested: boolean;
+};
 
 const exists = async (path: string): Promise<boolean> => {
   try {
@@ -233,6 +247,79 @@ export class PayerRailgunEngine {
         [WalletBalanceBucket.Spendable],
       )) ?? 0n
     );
+  }
+
+  async finalizePOIForTransaction(
+    transactionHash: string,
+    expectedRailgunTxid?: string,
+  ): Promise<POIFinalizationResult> {
+    const readTarget = async (): Promise<POIFinalizationTarget> =>
+      selectPOIFinalizationTarget(
+        (await getTXOsSpentPOIStatusInfoForWallet(
+          PAYER_TXID_VERSION,
+          PAYER_NETWORK,
+          this.walletID,
+        )) as SpentPOIStatusInfo[],
+        transactionHash,
+      );
+
+    try {
+      await refreshSpentPOIsForWallet(
+        PAYER_TXID_VERSION,
+        PAYER_NETWORK,
+        this.walletID,
+      );
+      let target = await readTarget();
+      const expected = expectedRailgunTxid?.toLowerCase().replace(/^0x/, "");
+      if (expected && target.railgunTxid !== expected) {
+        throw new Error("Derived RAILGUN transaction does not match the expected identifier");
+      }
+
+      let proofGenerationRequested = false;
+      if (!target.acknowledged) {
+        if (target.listKeysCanGenerate.length === 0) {
+          throw new SafeFailure(
+            "POI_NOT_READY",
+            "PPOI inputs or TXID tree data are not ready for proof generation",
+          );
+        }
+        writeEvent("poi.generation-started", { railgunTxid: target.railgunTxid });
+        await generatePOIsForWalletAndRailgunTxid(
+          PAYER_TXID_VERSION,
+          PAYER_NETWORK,
+          this.walletID,
+          target.railgunTxid,
+        );
+        proofGenerationRequested = true;
+        await refreshSpentPOIsForWallet(
+          PAYER_TXID_VERSION,
+          PAYER_NETWORK,
+          this.walletID,
+          target.railgunTxid,
+        );
+        target = await readTarget();
+      }
+      if (!target.acknowledged) {
+        throw new SafeFailure(
+          "POI_NOT_READY",
+          "The PPOI node has not acknowledged the generated proof yet",
+        );
+      }
+
+      return {
+        transactionHash: transactionHash.toLowerCase(),
+        ...target,
+        proofGenerationRequested,
+      };
+    } catch (error) {
+      if (error instanceof SafeFailure) throw error;
+      if (error instanceof POIFinalizationNotReadyError) {
+        throw new SafeFailure("POI_NOT_READY", "The mined transaction is not PPOI-ready yet", {
+          cause: error,
+        });
+      }
+      throw new SafeFailure("POI_FAILED", "PPOI finalization failed", { cause: error });
+    }
   }
 
   private async balanceSummary(): Promise<BalanceSummary> {
