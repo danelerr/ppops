@@ -869,6 +869,10 @@ const runBroadcaster = async (
         required: true,
       }),
       gasEstimate: result.gasEstimate,
+      gasPriceProviderAgreement: result.providerAgreement,
+      finalSimulationGasEstimate: result.finalSimulationGasEstimate,
+      finalSimulationProviderAgreement:
+        result.finalSimulationProviderAgreement,
       quoteReliability: result.quoteReliability,
       quoteValidityMs: result.quoteValidityMs,
       proofGenerated: true,
@@ -889,6 +893,11 @@ const runBroadcaster = async (
     intentId: request.id,
     amountAtomic: request.amountAtomic,
     broadcasterFeeAmountAtomic: result.broadcasterFeeAmountAtomic,
+    gasEstimate: result.gasEstimate,
+    gasPriceProviderAgreement: result.providerAgreement,
+    finalSimulationGasEstimate: result.finalSimulationGasEstimate,
+    finalSimulationProviderAgreement:
+      result.finalSimulationProviderAgreement,
     ...(result.transactionHash ? { transactionHash: result.transactionHash } : {}),
     ...(result.reportedTransactionHash
       ? { broadcasterReportedTransactionHash: result.reportedTransactionHash }

@@ -2,6 +2,7 @@ import {
   JsonRpcProvider,
   type FeeData,
   type Network,
+  type TransactionRequest,
   type TransactionReceipt,
 } from "ethers";
 
@@ -17,6 +18,7 @@ const RPC_REQUEST_TIMEOUT_MS = 15_000;
 export type PayerRpcProviderLike = {
   getNetwork: () => Promise<Network>;
   getFeeData: () => Promise<FeeData>;
+  estimateGas: (transaction: TransactionRequest) => Promise<bigint>;
   getTransactionReceipt: (hash: string) => Promise<TransactionReceipt | null>;
   destroy: () => void;
 };
@@ -100,6 +102,64 @@ export const selectConservativeLegacyGasPrice = (
     gasPrice,
     providerAgreement: healthy.length,
   };
+};
+
+const PAYER_SIMULATION_FROM = "0x000000000000000000000000000000000000dEaD";
+
+export const selectConservativeGasEstimate = (
+  readings: Array<bigint | undefined>,
+  minimumAgreement = requiredAgreement(readings.length),
+): { gasEstimate: bigint; providerAgreement: number } => {
+  const healthy = readings
+    .filter((value): value is bigint => value !== undefined && value > 0n)
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  if (healthy.length < minimumAgreement) {
+    throw new SafeFailure(
+      "RPC_UNAVAILABLE",
+      "A configured RPC majority must simulate the populated transfer",
+    );
+  }
+  const gasEstimate = healthy[Math.floor(healthy.length / 2)];
+  if (gasEstimate === undefined) {
+    throw new SafeFailure("RPC_UNAVAILABLE", "RPC gas-estimate selection failed");
+  }
+  return { gasEstimate, providerAgreement: healthy.length };
+};
+
+export const simulatePopulatedTransferQuorum = async (
+  config: PayerConfig,
+  transaction: { to: string; data: string },
+  options: RpcReadOptions = {},
+): Promise<{ gasEstimate: bigint; providerAgreement: number }> => {
+  const providers = options.providers ?? openProviders(config);
+  const timeoutMs = options.timeoutMs ?? RPC_REQUEST_TIMEOUT_MS;
+  try {
+    const readings = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          return await withTimeout(
+            (async () => {
+              const network = await provider.getNetwork();
+              if (network.chainId !== BigInt(PAYER_CHAIN_ID)) return undefined;
+              const gasEstimate = await provider.estimateGas({
+                from: PAYER_SIMULATION_FROM,
+                to: transaction.to,
+                data: transaction.data,
+                value: 0n,
+              });
+              return gasEstimate > 0n ? gasEstimate : undefined;
+            })(),
+            timeoutMs,
+          );
+        } catch {
+          return undefined;
+        }
+      }),
+    );
+    return selectConservativeGasEstimate(readings);
+  } finally {
+    destroyProviders(providers);
+  }
 };
 
 export type QuorumReceipt = {

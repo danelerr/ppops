@@ -45,6 +45,7 @@ import {
 import {
   readConservativeLegacyGasPrice,
   readReceiptQuorum,
+  simulatePopulatedTransferQuorum,
 } from "./rpc-quorum.js";
 
 export type BroadcasterTransferResult = {
@@ -54,6 +55,8 @@ export type BroadcasterTransferResult = {
   broadcasterFeeAmountAtomic: string;
   gasEstimate: string;
   providerAgreement: number;
+  finalSimulationGasEstimate: string;
+  finalSimulationProviderAgreement: number;
   quoteReliability: number;
   quoteValidityMs: number;
   receiptStatus: "NOT_SUBMITTED" | "MINED" | "PENDING";
@@ -296,6 +299,14 @@ export const sendBroadcasterTransfer = async (input: {
     engine.network.proxyContract,
   );
   const nullifiers = assertPopulatedNullifiers(populated.nullifiers);
+  const finalSimulation = await simulatePopulatedTransferQuorum(
+    config,
+    transaction,
+  );
+  writeEvent("broadcaster.final-transaction-simulated", {
+    gasEstimate: finalSimulation.gasEstimate.toString(),
+    providerAgreement: finalSimulation.providerAgreement,
+  });
   await revalidateLiveRequest(
     request,
     input.requestSource,
@@ -314,6 +325,8 @@ export const sendBroadcasterTransfer = async (input: {
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
+      finalSimulationGasEstimate: finalSimulation.gasEstimate.toString(),
+      finalSimulationProviderAgreement: finalSimulation.providerAgreement,
       quoteReliability: current.selected.tokenFee.reliability,
       quoteValidityMs,
       canonicalTransactionHashResolved: false,
@@ -430,6 +443,8 @@ export const sendBroadcasterTransfer = async (input: {
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
+      finalSimulationGasEstimate: finalSimulation.gasEstimate.toString(),
+      finalSimulationProviderAgreement: finalSimulation.providerAgreement,
       quoteReliability: submissionQuote.selected.tokenFee.reliability,
       quoteValidityMs: submissionQuoteValidityMs,
       receiptStatus: "PENDING",
@@ -457,6 +472,8 @@ export const sendBroadcasterTransfer = async (input: {
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
+      finalSimulationGasEstimate: finalSimulation.gasEstimate.toString(),
+      finalSimulationProviderAgreement: finalSimulation.providerAgreement,
       quoteReliability: submissionQuote.selected.tokenFee.reliability,
       quoteValidityMs: submissionQuoteValidityMs,
       receiptStatus: "PENDING",
@@ -488,6 +505,8 @@ export const sendBroadcasterTransfer = async (input: {
     broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
     gasEstimate: gasEstimate.toString(),
     providerAgreement,
+    finalSimulationGasEstimate: finalSimulation.gasEstimate.toString(),
+    finalSimulationProviderAgreement: finalSimulation.providerAgreement,
     quoteReliability: submissionQuote.selected.tokenFee.reliability,
     quoteValidityMs: submissionQuoteValidityMs,
     receiptStatus: "MINED",

@@ -35,6 +35,7 @@ const walletMocks = vi.hoisted(() => ({
 }));
 const rpcMocks = vi.hoisted(() => ({
   readGas: vi.fn(),
+  simulateFinal: vi.fn(),
   readReceipt: vi.fn(),
 }));
 const requestMocks = vi.hoisted(() => ({
@@ -52,6 +53,7 @@ vi.mock("@railgun-community/wallet", async (importOriginal) => ({
 vi.mock("../src/railgun/rpc-quorum.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/railgun/rpc-quorum.js")>()),
   readConservativeLegacyGasPrice: rpcMocks.readGas,
+  simulatePopulatedTransferQuorum: rpcMocks.simulateFinal,
   readReceiptQuorum: rpcMocks.readReceipt,
 }));
 
@@ -190,6 +192,10 @@ beforeEach(() => {
     preTransactionPOIsPerTxidLeafPerList: {},
   });
   rpcMocks.readGas.mockResolvedValue({ gasPrice: 2n, providerAgreement: 2 });
+  rpcMocks.simulateFinal.mockResolvedValue({
+    gasEstimate: 110_000n,
+    providerAgreement: 2,
+  });
   rpcMocks.readReceipt.mockResolvedValue(undefined);
 });
 
@@ -227,7 +233,42 @@ describe("Broadcaster transfer lifecycle", () => {
     expect(result).toMatchObject({
       receiptStatus: "NOT_SUBMITTED",
       broadcasterFeeAmountAtomic: "500",
+      finalSimulationGasEstimate: "110000",
+      finalSimulationProviderAgreement: 2,
     });
+    expect(rpcMocks.simulateFinal).toHaveBeenCalledWith(config, {
+      to: PROXY,
+      data: "0x1234",
+    });
+    expect(session.prepareSubmission).not.toHaveBeenCalled();
+    expect(session.submitPrepared).not.toHaveBeenCalled();
+    await expect(
+      new SubmissionJournal(submissionJournalPath(config.storage.walletStatePath)).get(
+        request.id,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not reserve or send when the populated proof fails RPC simulation quorum", async () => {
+    const { config, engine, request } = await testContext();
+    const session = fakeSession();
+    rpcMocks.simulateFinal.mockRejectedValue(
+      new SafeFailure("RPC_UNAVAILABLE", "simulation failed"),
+    );
+
+    await expect(
+      sendBroadcasterTransfer({
+        config,
+        engine,
+        session,
+        request,
+        dbEncryptionKey: "11".repeat(32),
+        maxBroadcasterFeeAtomic: "1000",
+        requestSource: "http://127.0.0.1/request.json",
+        expectedMerchantSigner: request.expectedMerchantSigner,
+        submit: true,
+      }),
+    ).rejects.toMatchObject({ code: "RPC_UNAVAILABLE" });
     expect(session.prepareSubmission).not.toHaveBeenCalled();
     expect(session.submitPrepared).not.toHaveBeenCalled();
     await expect(

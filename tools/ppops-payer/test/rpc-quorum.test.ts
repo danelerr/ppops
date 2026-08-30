@@ -6,7 +6,9 @@ import {
   readConservativeLegacyGasPrice,
   readReceiptQuorum,
   selectConservativeLegacyGasPrice,
+  selectConservativeGasEstimate,
   selectReceiptQuorum,
+  simulatePopulatedTransferQuorum,
   type PayerRpcProviderLike,
 } from "../src/railgun/rpc-quorum.js";
 
@@ -32,6 +34,19 @@ describe("payer RPC agreement", () => {
       gasPrice: 4n,
       providerAgreement: 4,
     });
+  });
+
+  it("uses an upper median final-transaction simulation from a majority", () => {
+    expect(selectConservativeGasEstimate([100n, undefined, 120n])).toEqual({
+      gasEstimate: 120n,
+      providerAgreement: 2,
+    });
+    expect(() => selectConservativeGasEstimate([100n, undefined])).toThrow(
+      /majority/,
+    );
+    expect(
+      selectConservativeGasEstimate([100n, 110n, 120n, 9_999_999n]),
+    ).toEqual({ gasEstimate: 120n, providerAgreement: 4 });
   });
 
   it("requires a majority of identical receipts", () => {
@@ -60,6 +75,7 @@ describe("payer RPC agreement", () => {
       getFeeData: vi.fn(async () =>
         hangs ? never : ({ gasPrice } as FeeData),
       ),
+      estimateGas: vi.fn(async () => (hangs ? never : gasPrice * 10_000n)),
       getTransactionReceipt: vi.fn(async () =>
         hangs ? never : transactionReceipt,
       ),
@@ -86,6 +102,13 @@ describe("payer RPC agreement", () => {
     await expect(
       readReceiptQuorum(config, TX_HASH, { providers, timeoutMs: 5 }),
     ).resolves.toMatchObject({ transactionHash: TX_HASH, providerAgreement: 2 });
-    for (const current of providers) expect(current.destroy).toHaveBeenCalledTimes(2);
+    await expect(
+      simulatePopulatedTransferQuorum(
+        config,
+        { to: "0x0000000000000000000000000000000000001234", data: "0x1234" },
+        { providers, timeoutMs: 5 },
+      ),
+    ).resolves.toEqual({ gasEstimate: 50_000n, providerAgreement: 2 });
+    for (const current of providers) expect(current.destroy).toHaveBeenCalledTimes(3);
   });
 });
