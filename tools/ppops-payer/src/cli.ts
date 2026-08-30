@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { constants } from "node:fs";
+import { constants, writeSync } from "node:fs";
 import {
   access,
   chmod,
@@ -21,10 +21,15 @@ import {
   PAYER_TOKEN_SYMBOL,
 } from "./constants.js";
 import { SafeFailure, safeFailureResult } from "./events.js";
-import { assertExpectedPayerAddress } from "./execution-guards.js";
+import {
+  assertExpectedPayerAddress,
+  assertExpectedSelfSigner,
+  deriveExpectedSelfSigningKey,
+} from "./execution-guards.js";
 import { PayerRailgunEngine } from "./railgun/engine.js";
 import { sendSelfSignedTransfer } from "./railgun/self-signed-transfer.js";
 import {
+  assertLivePaymentRequestSource,
   loadPaymentRequest,
   verifyPaymentRequest,
   type PaymentRequest,
@@ -54,11 +59,17 @@ Commands:
     [--mnemonic-file PATH] [--self-signing-key-file PATH]
 
   ppops-payer config-validate --config PATH
+  ppops-payer derive-self-signing-key --config PATH \\
+    --expected-address EVM_ADDRESS [--derivation-index INDEX]
   ppops-payer secrets-check --config PATH
   ppops-payer request-verify --request URL_OR_PATH --expected-signer ADDRESS
   ppops-payer sync --config PATH
   ppops-payer submission-status --config PATH --intent-id pi_ID
-  ppops-payer pay-self-signed --config PATH --request URL_OR_PATH \\
+  ppops-payer prepare-self-signed --config PATH --request URL \\
+    --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
+    --expected-payer 0zk_ADDRESS --expected-self-signer EVM_ADDRESS \\
+    --max-gas-cost-wei WEI
+  ppops-payer pay-self-signed --config PATH --request URL \\
     --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
     --expected-payer 0zk_ADDRESS --expected-self-signer EVM_ADDRESS \\
     --max-gas-cost-wei WEI --confirm-intent pi_ID
@@ -120,8 +131,17 @@ const parsePositiveInteger = (value: string, name: string): number => {
   return parsed;
 };
 
+const parseNonNegativeInteger = (value: string, name: string): number => {
+  if (!/^(?:0|[1-9][0-9]*)$/.test(value)) {
+    throw new Error(`--${name} must be a non-negative integer`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`--${name} is too large`);
+  return parsed;
+};
+
 const output = (value: unknown): void => {
-  process.stdout.write(`${JSON.stringify(value)}\n`);
+  writeSync(process.stdout.fd, `${JSON.stringify(value)}\n`);
 };
 
 const PPOpsConfigSourceSchema = z.object({
@@ -223,7 +243,7 @@ const init = async (options: ParsedOptions): Promise<void> => {
     mnemonicFile: resolveFromRoot(mnemonicFile),
     selfSigningKeyFile: resolveFromRoot(selfSigningKeyFile),
     spendingMaterialCopied: false,
-    next: `ppops-payer secrets-check --config ${configPath}`,
+    next: `ppops-payer derive-self-signing-key --config ${configPath} --expected-address PINNED_EVM_ADDRESS`,
   });
 };
 
@@ -268,26 +288,93 @@ const configValidate = async (options: ParsedOptions): Promise<void> => {
   });
 };
 
+const deriveSelfSigningKey = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, ["config", "expected-address", "derivation-index"]);
+  const config = await loadConfig(one(options, "config", { required: true }));
+  const expectedAddress = one(options, "expected-address", { required: true });
+  const derivationIndex = parseNonNegativeInteger(
+    one(options, "derivation-index", { defaultValue: "0" }),
+    "derivation-index",
+  );
+  let mnemonic: string;
+  try {
+    mnemonic = await readSecret(config.secrets.mnemonicFile, "mnemonic");
+  } catch (error) {
+    throw new SafeFailure("SECRET_INVALID", "The payer mnemonic is unavailable", {
+      cause: error,
+    });
+  }
+  const derived = deriveExpectedSelfSigningKey(
+    mnemonic,
+    derivationIndex,
+    expectedAddress,
+  );
+  const alreadyExists = await exists(config.secrets.selfSigningKeyFile);
+  try {
+    if (alreadyExists) {
+      const existing = await readSecret(
+        config.secrets.selfSigningKeyFile,
+        "evm-private-key",
+      );
+      assertExpectedSelfSigner(existing, derived.address);
+    } else {
+      await writeNewSecret(config.secrets.selfSigningKeyFile, derived.privateKey);
+    }
+  } catch (error) {
+    if (error instanceof SafeFailure) throw error;
+    throw new SafeFailure("SECRET_INVALID", "Unable to store the self-signing key", {
+      cause: error,
+    });
+  }
+  output({
+    ok: true,
+    address: derived.address,
+    derivationIndex,
+    derivationPath: derived.derivationPath,
+    created: !alreadyExists,
+    privateKeyPrinted: false,
+    next: `ppops-payer secrets-check --config ${resolve(one(options, "config", { required: true }))}`,
+  });
+};
+
 const secretsCheck = async (options: ParsedOptions): Promise<void> => {
   assertAllowed(options, ["config"]);
   const config = await loadConfig(one(options, "config", { required: true }));
+  const walletImported = await exists(config.storage.walletStatePath);
   try {
+    if (walletImported) {
+      await readOwnerOnlyFile(config.storage.walletStatePath, {
+        label: "Payer wallet state",
+        maxBytes: 64 * 1_024,
+      });
+    }
     await readSecret(config.secrets.dbEncryptionKeyFile, "db-encryption-key");
-    await readSecret(config.secrets.mnemonicFile, "mnemonic");
+    if (!walletImported) {
+      await readSecret(config.secrets.mnemonicFile, "mnemonic");
+    }
     await readSecret(config.secrets.selfSigningKeyFile, "evm-private-key");
   } catch (error) {
     throw new SafeFailure("SECRET_INVALID", "A required local secret is unavailable", {
       cause: error,
     });
   }
-  output({ ok: true, valuesReturned: false, privateFilePolicy: "owner-only" });
+  output({
+    ok: true,
+    walletImported,
+    mnemonicRequired: !walletImported,
+    valuesReturned: false,
+    privateFilePolicy: "owner-only",
+  });
 };
 
-const verifiedRequest = async (options: ParsedOptions): Promise<PaymentRequest> => {
+const verifiedRequestFrom = async (
+  source: string,
+  expectedSigner: string,
+): Promise<PaymentRequest> => {
   try {
     return verifyPaymentRequest(
-      await loadPaymentRequest(one(options, "request", { required: true })),
-      one(options, "expected-signer", { required: true }),
+      await loadPaymentRequest(source),
+      expectedSigner,
     );
   } catch (error) {
     throw new SafeFailure("REQUEST_INVALID", "Payment request verification failed", {
@@ -298,7 +385,10 @@ const verifiedRequest = async (options: ParsedOptions): Promise<PaymentRequest> 
 
 const requestVerify = async (options: ParsedOptions): Promise<void> => {
   assertAllowed(options, ["request", "expected-signer"]);
-  const request = await verifiedRequest(options);
+  const request = await verifiedRequestFrom(
+    one(options, "request", { required: true }),
+    one(options, "expected-signer", { required: true }),
+  );
   output({
     ok: true,
     intentId: request.id,
@@ -328,8 +418,12 @@ const submissionStatus = async (options: ParsedOptions): Promise<void> => {
     ...(record
       ? {
           status: record.status,
+          ...(record.nonce !== undefined ? { nonce: record.nonce } : {}),
           ...(record.transactionHash
             ? { transactionHash: record.transactionHash }
+            : {}),
+          ...(record.blockNumber !== undefined
+            ? { blockNumber: record.blockNumber }
             : {}),
         }
       : {}),
@@ -353,10 +447,24 @@ const withEngine = async <T>(
     await engine.start();
     return await operation(engine);
   } finally {
+    let cleanupError: unknown;
     try {
-      await engine.stop().catch(() => undefined);
+      await engine.stop();
+    } catch (error) {
+      cleanupError = error;
     } finally {
-      await lock.release();
+      try {
+        await lock.release();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+    }
+    if (cleanupError) {
+      throw new SafeFailure(
+        "ENGINE_STOP_FAILED",
+        "RAILGUN payer runtime did not shut down cleanly",
+        { cause: cleanupError },
+      );
     }
   }
 };
@@ -372,7 +480,10 @@ const sync = async (options: ParsedOptions): Promise<void> => {
   output({ ok: true, ...result });
 };
 
-const paySelfSigned = async (options: ParsedOptions): Promise<void> => {
+const runSelfSigned = async (
+  options: ParsedOptions,
+  submit: boolean,
+): Promise<void> => {
   assertAllowed(options, [
     "config",
     "request",
@@ -381,10 +492,22 @@ const paySelfSigned = async (options: ParsedOptions): Promise<void> => {
     "expected-self-signer",
     "max-amount-atomic",
     "max-gas-cost-wei",
-    "confirm-intent",
+    ...(submit ? ["confirm-intent"] : []),
   ]);
-  const request = await verifiedRequest(options);
-  if (one(options, "confirm-intent", { required: true }) !== request.id) {
+  const requestSource = one(options, "request", { required: true });
+  const expectedSigner = one(options, "expected-signer", { required: true });
+  try {
+    assertLivePaymentRequestSource(requestSource);
+  } catch (error) {
+    throw new SafeFailure("REQUEST_INVALID", "A live payment request is required", {
+      cause: error,
+    });
+  }
+  const request = await verifiedRequestFrom(requestSource, expectedSigner);
+  if (
+    submit &&
+    one(options, "confirm-intent", { required: true }) !== request.id
+  ) {
     throw new SafeFailure("REQUEST_INVALID", "Explicit intent confirmation does not match");
   }
   const maxAmount = one(options, "max-amount-atomic", { required: true });
@@ -406,8 +529,27 @@ const paySelfSigned = async (options: ParsedOptions): Promise<void> => {
       evmPrivateKey: secrets.evmPrivateKey ?? "",
       expectedSelfSigner: one(options, "expected-self-signer", { required: true }),
       maxGasCostWei: one(options, "max-gas-cost-wei", { required: true }),
+      requestSource,
+      expectedMerchantSigner: expectedSigner,
+      submit,
     });
   });
+  if (!submit) {
+    output({
+      ok: true,
+      mode: "prepare-only",
+      intentId: request.id,
+      amountAtomic: request.amountAtomic,
+      selfSigner: result.selfSigner,
+      maxGasCostWei: result.maxGasCostWei,
+      proofGenerated: true,
+      paymentSubmitted: false,
+    });
+    return;
+  }
+  if (!result.transactionHash || result.receiptStatus === "NOT_SUBMITTED") {
+    throw new SafeFailure("INTERNAL_ERROR", "Submission result is incomplete");
+  }
   output({
     ok: true,
     mode: "self-signed",
@@ -416,6 +558,8 @@ const paySelfSigned = async (options: ParsedOptions): Promise<void> => {
     transactionHash: result.transactionHash,
     selfSigner: result.selfSigner,
     maxGasCostWei: result.maxGasCostWei,
+    receiptStatus: result.receiptStatus,
+    ...(result.blockNumber !== undefined ? { blockNumber: result.blockNumber } : {}),
     privacyWarning: "public-self-signer-linked",
   });
 };
@@ -423,7 +567,7 @@ const paySelfSigned = async (options: ParsedOptions): Promise<void> => {
 const main = async (): Promise<void> => {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help") {
-    process.stdout.write(USAGE);
+    writeSync(process.stdout.fd, USAGE);
     return;
   }
   const options = parseOptions(args);
@@ -433,6 +577,9 @@ const main = async (): Promise<void> => {
       return;
     case "config-validate":
       await configValidate(options);
+      return;
+    case "derive-self-signing-key":
+      await deriveSelfSigningKey(options);
       return;
     case "secrets-check":
       await secretsCheck(options);
@@ -446,15 +593,43 @@ const main = async (): Promise<void> => {
     case "submission-status":
       await submissionStatus(options);
       return;
+    case "prepare-self-signed":
+      await runSelfSigned(options, false);
+      return;
     case "pay-self-signed":
-      await paySelfSigned(options);
+      await runSelfSigned(options, true);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);
   }
 };
 
-main().catch((error: unknown) => {
-  output(safeFailureResult(error));
-  process.exitCode = 1;
-});
+const exitAfterOutputFlush = (code: number): void => {
+  let pendingStreams = 2;
+  const flushed = (): void => {
+    pendingStreams -= 1;
+    if (pendingStreams === 0) process.exit(code);
+  };
+  // The RAILGUN prover leaves worker threads referenced even after the engine,
+  // provider and LevelDB have been cleanly stopped. Flush both output streams,
+  // then terminate the already-closed CLI runtime deterministically.
+  process.stdout.end(flushed);
+  process.stderr.end(flushed);
+};
+
+// A pending Promise does not keep Node alive. Once the SDK polling provider is
+// paused, wallet decryption/POI completion can still be pending with no ref'ed
+// handle of its own. Keep the short-lived CLI alive until main settles.
+const runtimeKeepalive = setInterval(() => undefined, 1_000);
+
+main().then(
+  () => {
+    clearInterval(runtimeKeepalive);
+    exitAfterOutputFlush(0);
+  },
+  (error: unknown) => {
+    clearInterval(runtimeKeepalive);
+    output(safeFailureResult(error));
+    exitAfterOutputFlush(1);
+  },
+);

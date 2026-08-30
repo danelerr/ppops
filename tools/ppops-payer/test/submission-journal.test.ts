@@ -55,7 +55,8 @@ describe("payer submission journal", () => {
     const path = submissionJournalPath(join(root, "wallet-state.json"));
     const journal = new SubmissionJournal(path);
     const payment = request();
-    await journal.reserve(payment, `0x${"22".repeat(20)}`, 1_000);
+    const transactionHash = `0x${"33".repeat(32)}`;
+    await journal.reserve(payment, `0x${"22".repeat(20)}`, transactionHash, 7, 1_000);
 
     await expect(journal.assertUnused(payment.id)).rejects.toMatchObject({
       code: "SUBMISSION_ALREADY_RECORDED",
@@ -63,6 +64,8 @@ describe("payer submission journal", () => {
     expect(await journal.get(payment.id)).toMatchObject({
       status: "SUBMITTING",
       createdAt: 1_000,
+      nonce: 7,
+      transactionHash,
     });
     const contents = await readFile(path, "utf8");
     expect(contents).not.toContain(payment.memo);
@@ -79,12 +82,38 @@ describe("payer submission journal", () => {
     const journal = new SubmissionJournal(join(root, "submissions.json"));
     const payment = request();
     const transactionHash = `0x${"33".repeat(32)}`;
-    await journal.reserve(payment, `0x${"22".repeat(20)}`, 1_000);
+    await journal.reserve(payment, `0x${"22".repeat(20)}`, transactionHash, 7, 1_000);
     await journal.markSubmitted(payment.id, transactionHash, 1_001);
     await expect(journal.get(payment.id)).resolves.toMatchObject({
       status: "SUBMITTED",
       transactionHash,
       updatedAt: 1_001,
+    });
+    await journal.markMined(payment.id, 123_456, true, 1_002);
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "MINED",
+      blockNumber: 123_456,
+      transactionHash,
+      updatedAt: 1_002,
+    });
+  });
+
+  it("records a reverted receipt without allowing intent reuse", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const transactionHash = `0x${"44".repeat(32)}`;
+    await journal.reserve(payment, `0x${"22".repeat(20)}`, transactionHash, 8, 1_000);
+    await journal.markSubmitted(payment.id, transactionHash, 1_001);
+    await journal.markMined(payment.id, 123_457, false, 1_002);
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "REVERTED",
+      blockNumber: 123_457,
+      transactionHash,
+    });
+    await expect(journal.assertUnused(payment.id)).rejects.toMatchObject({
+      code: "SUBMISSION_ALREADY_RECORDED",
     });
   });
 

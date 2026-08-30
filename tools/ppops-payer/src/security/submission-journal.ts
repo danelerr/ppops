@@ -14,12 +14,33 @@ const SubmissionRecordSchema = z
     intentId: z.string().regex(/^pi_[0-9a-f]{32}$/),
     requestFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
     selfSigner: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-    status: z.enum(["SUBMITTING", "SUBMITTED"]),
+    status: z.enum(["SUBMITTING", "SUBMITTED", "MINED", "REVERTED"]),
     createdAt: z.number().int().nonnegative().safe(),
     updatedAt: z.number().int().nonnegative().safe(),
+    nonce: z.number().int().nonnegative().safe().optional(),
     transactionHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+    blockNumber: z.number().int().nonnegative().safe().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((record, context) => {
+    if (record.status !== "SUBMITTING" && !record.transactionHash) {
+      context.addIssue({
+        code: "custom",
+        path: ["transactionHash"],
+        message: "Submitted records require a transaction hash",
+      });
+    }
+    if (
+      (record.status === "MINED" || record.status === "REVERTED") &&
+      record.blockNumber === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["blockNumber"],
+        message: "Mined records require a block number",
+      });
+    }
+  });
 
 const SubmissionJournalSchema = z
   .object({
@@ -63,6 +84,8 @@ export class SubmissionJournal {
   async reserve(
     request: PaymentRequest,
     selfSigner: string,
+    transactionHash: string,
+    nonce: number,
     now = Math.floor(Date.now() / 1_000),
   ): Promise<void> {
     const journal = await this.read();
@@ -79,7 +102,30 @@ export class SubmissionJournal {
       status: "SUBMITTING",
       createdAt: now,
       updatedAt: now,
+      nonce,
+      transactionHash,
     });
+    await this.write(journal);
+  }
+
+  async markMined(
+    intentId: string,
+    blockNumber: number,
+    succeeded: boolean,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === intentId);
+    const current = journal.records[index];
+    if (!current?.transactionHash) {
+      throw new Error("Submitted transaction record disappeared");
+    }
+    journal.records[index] = {
+      ...current,
+      status: succeeded ? "MINED" : "REVERTED",
+      blockNumber,
+      updatedAt: now,
+    };
     await this.write(journal);
   }
 
@@ -92,6 +138,12 @@ export class SubmissionJournal {
     const index = journal.records.findIndex((record) => record.intentId === intentId);
     const current = journal.records[index];
     if (!current) throw new Error("Submission reservation disappeared");
+    if (
+      current.transactionHash &&
+      current.transactionHash.toLowerCase() !== transactionHash.toLowerCase()
+    ) {
+      throw new Error("Submitted transaction hash differs from reservation");
+    }
     journal.records[index] = {
       ...current,
       status: "SUBMITTED",

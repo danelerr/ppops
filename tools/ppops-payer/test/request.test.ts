@@ -6,7 +6,12 @@ import {
   PAYMENT_DESCRIPTOR_TYPES,
   type SignedPaymentDescriptor,
 } from "../src/descriptor.js";
-import { verifyPaymentRequest, type PaymentRequest } from "../src/request.js";
+import {
+  assertLivePaymentRequestSource,
+  assertSamePaymentRequest,
+  verifyPaymentRequest,
+  type PaymentRequest,
+} from "../src/request.js";
 
 const RECIPIENT =
   "0zk1qykzjxctynyz4z43pukckpv43jyzhyvy0ehrd5wuc54l5enqf9qfrrv7j6fe3z53la7enqphqvxys9aqyp9xx0km95ehqslx8apmu8l7anc7emau4tvsultrkvd";
@@ -89,5 +94,32 @@ describe("PPOps payment request verification", () => {
     expect(() => verifyPaymentRequest(request, signer.address, 2_000_000_001)).toThrow(
       /expired/,
     );
+  });
+
+  it("requires a live request source for value-bearing submission", () => {
+    expect(() =>
+      assertLivePaymentRequestSource(
+        "http://127.0.0.1:8787/pay/pi_example/request.json",
+      ),
+    ).not.toThrow();
+    expect(() => assertLivePaymentRequestSource("./request.json")).toThrow(/live HTTP/);
+  });
+
+  it("detects request replacement during proof generation", async () => {
+    const { request, signer } = await signedRequest();
+    const original = verifyPaymentRequest(request, signer.address, 1_900_000_000);
+    const same = verifyPaymentRequest(
+      structuredClone(request),
+      signer.address,
+      1_900_000_000,
+    );
+    expect(() => assertSamePaymentRequest(original, same)).not.toThrow();
+
+    const replaced = verifyPaymentRequest(
+      { ...request, id: `pi_${"34".repeat(16)}` },
+      signer.address,
+      1_900_000_000,
+    );
+    expect(() => assertSamePaymentRequest(original, replaced)).toThrow(/changed/);
   });
 });

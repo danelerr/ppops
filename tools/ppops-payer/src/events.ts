@@ -1,10 +1,13 @@
+import { writeSync } from "node:fs";
+
 type EventValue = string | number | boolean | null | undefined;
 
 export const writeEvent = (
   event: string,
   fields: Record<string, EventValue> = {},
 ): void => {
-  process.stderr.write(
+  writeSync(
+    process.stderr.fd,
     `${JSON.stringify({
       event,
       at: Math.floor(Date.now() / 1_000),
@@ -20,6 +23,7 @@ export type SafeFailureCode =
   | "SECRET_INVALID"
   | "REQUEST_INVALID"
   | "ENGINE_START_FAILED"
+  | "ENGINE_STOP_FAILED"
   | "SYNC_FAILED"
   | "INSUFFICIENT_PRIVATE_BALANCE"
   | "INSUFFICIENT_GAS_BALANCE"
@@ -29,6 +33,10 @@ export type SafeFailureCode =
   | "POPULATE_FAILED"
   | "SUBMISSION_ALREADY_RECORDED"
   | "SUBMISSION_FAILED"
+  | "JOURNAL_UPDATE_FAILED"
+  | "RECEIPT_UNAVAILABLE"
+  | "TRANSACTION_REVERTED"
+  | "TRANSACTION_REPLACED"
   | "INTERNAL_ERROR";
 
 export class SafeFailure extends Error {

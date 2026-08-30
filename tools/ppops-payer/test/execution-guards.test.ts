@@ -6,6 +6,7 @@ import {
   assertExpectedSelfSigner,
   assertGasCostWithinLimit,
   assertRequestStillOpen,
+  deriveExpectedSelfSigningKey,
   parseGasCostLimit,
 } from "../src/execution-guards.js";
 
@@ -26,6 +27,26 @@ describe("mainnet execution guards", () => {
     expect(() =>
       assertExpectedSelfSigner(wallet.privateKey, Wallet.createRandom().address),
     ).toThrow(/identity does not match/);
+  });
+
+  it("derives the Railway-compatible EVM signer without printing the mnemonic", () => {
+    const mnemonic = "test test test test test test test test test test test junk";
+    const result = deriveExpectedSelfSigningKey(
+      mnemonic,
+      0,
+      "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    );
+    expect(result).toMatchObject({
+      address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      derivationPath: "m/44'/60'/0'/0/0",
+    });
+    expect(result.privateKey).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(() =>
+      deriveExpectedSelfSigningKey(mnemonic, 0, Wallet.createRandom().address),
+    ).toThrow(/identity does not match/);
+    expect(() =>
+      deriveExpectedSelfSigningKey(mnemonic, 1_001, Wallet.createRandom().address),
+    ).toThrow(/between 0 and 1000/);
   });
 
   it("rejects malformed and uint256-overflowing gas bounds", () => {

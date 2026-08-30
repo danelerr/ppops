@@ -1,4 +1,5 @@
 import { lstat, readFile } from "node:fs/promises";
+import { isDeepStrictEqual } from "node:util";
 import { resolve } from "node:path";
 
 import { formatUnits, getAddress } from "ethers";
@@ -91,6 +92,21 @@ export const verifyPaymentRequest = (
     "Checkout signer field does not match the trusted signer",
   );
   return request;
+};
+
+export const assertSamePaymentRequest = (
+  original: PaymentRequest,
+  refreshed: PaymentRequest,
+): void => {
+  if (!isDeepStrictEqual(original, refreshed)) {
+    throw new Error("Payment request changed while preparing the transfer");
+  }
+};
+
+export const assertLivePaymentRequestSource = (source: string): void => {
+  if (!/^https?:\/\//i.test(source)) {
+    throw new Error("Payment submission requires a live HTTP(S) payment request");
+  }
 };
 
 const readResponseBody = async (response: Response): Promise<string> => {

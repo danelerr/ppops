@@ -1,5 +1,8 @@
 import { MaxUint256, Wallet, getAddress } from "ethers";
-import { validateRailgunAddress } from "@railgun-community/wallet";
+import {
+  mnemonicTo0xPKey,
+  validateRailgunAddress,
+} from "@railgun-community/wallet";
 
 import { SafeFailure } from "./events.js";
 
@@ -27,6 +30,37 @@ export const assertExpectedSelfSigner = (
     throw new SafeFailure("SECRET_INVALID", "Self-signing key identity does not match");
   }
   return derived;
+};
+
+export const deriveExpectedSelfSigningKey = (
+  mnemonic: string,
+  derivationIndex: number,
+  expectedAddress: string,
+): { privateKey: string; address: string; derivationPath: string } => {
+  if (
+    !Number.isSafeInteger(derivationIndex) ||
+    derivationIndex < 0 ||
+    derivationIndex > 1_000
+  ) {
+    throw new SafeFailure(
+      "REQUEST_INVALID",
+      "Self-signing derivation index must be between 0 and 1000",
+    );
+  }
+  let privateKey: string;
+  try {
+    privateKey = mnemonicTo0xPKey(mnemonic, derivationIndex);
+  } catch (error) {
+    throw new SafeFailure("SECRET_INVALID", "Unable to derive the self-signing key", {
+      cause: error,
+    });
+  }
+  const address = assertExpectedSelfSigner(privateKey, expectedAddress);
+  return {
+    privateKey,
+    address,
+    derivationPath: `m/44'/60'/0'/0/${derivationIndex}`,
+  };
 };
 
 export const parseGasCostLimit = (value: string): bigint => {

@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { WalletBalanceBucket } from "@railgun-community/engine";
 import {
   EVMGasType,
+  MerkletreeScanStatus,
   NETWORK_CONFIG,
   NetworkName,
   type FallbackProviderJsonConfig,
@@ -12,12 +13,12 @@ import {
 } from "@railgun-community/shared-models";
 import {
   assertValidRailgunAddress,
-  awaitWalletScan,
   createRailgunWallet,
   fullWalletForID,
   getProver,
   loadProvider,
   loadWalletByID,
+  pauseAllPollingProviders,
   refreshBalances,
   setOnTXIDMerkletreeScanCallback,
   setOnUTXOMerkletreeScanCallback,
@@ -64,8 +65,10 @@ const exists = async (path: string): Promise<boolean> => {
   }
 };
 
-const progressRatio = (value: number): number =>
-  Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+const progressRatio = (value: number, status?: MerkletreeScanStatus): number => {
+  if (status === MerkletreeScanStatus.Complete) return 1;
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+};
 
 const withTimeout = async <T>(
   task: Promise<T>,
@@ -158,6 +161,10 @@ export class PayerRailgunEngine {
         "RAILGUN provider load",
       );
       this.providerLoaded = true;
+      // This short-lived harness performs an explicit, bounded sync. Disable
+      // the SDK listener poller so it cannot race that sync or schedule delayed
+      // TXID work after the LevelDB lifecycle has ended.
+      pauseAllPollingProviders();
       writeEvent("engine.ready", {
         network: PAYER_NETWORK,
         creationBlock: this.walletState.walletCreationBlock,
@@ -197,13 +204,13 @@ export class PayerRailgunEngine {
   }
 
   async syncBalances(): Promise<BalanceSummary> {
-    const walletScan = awaitWalletScan(this.walletID, this.network.chain);
     writeEvent("sync.started");
     try {
-      await Promise.all([
-        refreshBalances(this.network.chain, [this.walletID]),
-        walletScan,
-      ]);
+      // Historical refreshes use deferCompletionEvent=true in this SDK, so
+      // awaitWalletScan may never resolve. The refresh promise owns the actual
+      // history/decryption work; read the current PPOI buckets directly after it.
+      await refreshBalances(this.network.chain, [this.walletID]);
+      writeEvent("sync.history-complete");
       const balances = await this.balanceSummary();
       writeEvent("sync.completed", {
         spendableAtomic: balances[WalletBalanceBucket.Spendable],
@@ -251,7 +258,7 @@ export class PayerRailgunEngine {
       writeEvent("sync.progress", {
         kind,
         status: event.scanStatus,
-        progressRatio: progressRatio(event.progress),
+        progressRatio: progressRatio(event.progress, event.scanStatus),
       });
     };
     setOnUTXOMerkletreeScanCallback((event) => emitScan("utxo", event));
