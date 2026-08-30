@@ -1,5 +1,9 @@
 # Arbitrum USDC mainnet gate
 
+Controlled self-pilot status: **PASS** on 2026-08-30. The signed public report
+is `artifacts/mainnet-gate-report.json`; external adoption remains a separate
+gate.
+
 PPOps is publishable as beta only after every item below has evidence attached
 to a release. This gate deliberately requires a fresh private transfer; the
 public Sepolia fixture is not sufficient.
@@ -32,7 +36,10 @@ public Sepolia fixture is not sufficient.
    executed `tools/ppops-payer` SDK harness documented in `PILOT-GUIDE.md`;
    Railway Wallet is optional compatibility evidence only.
    The harness must revalidate the live request immediately before signing and
-   persist the locally computed transaction hash before broadcast.
+   persist the locally computed transaction hash before broadcast. After the
+   receipt is mined, the payer must generate the output PPOI and obtain node
+   acknowledgement; receiver-side `MissingExternalPOI` is observation, not
+   payment eligibility.
 5. Record the normalized settlement identifier `(chain, TXID version,
    transaction hash, tree, position)`, amount, token, decrypted memo,
    `FINALIZED` state, raw PPOI bucket and `SPENDABLE` state. Redact the opaque

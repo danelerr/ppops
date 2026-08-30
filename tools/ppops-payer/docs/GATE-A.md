@@ -1,6 +1,7 @@
 # Gate A: direct SDK self-signed payment
 
-Status: prepare-only mainnet proof passed; value-bearing submission pending.
+Status: **PASS** on Arbitrum mainnet, 2026-08-30. External adoption and the
+Broadcaster-based Gate B remain pending.
 
 ## Objective
 
@@ -143,7 +144,25 @@ persists the transaction hash and nonce before broadcast, then records
 Arbitrum. `SUBMITTING`, `SUBMITTED` or a returned `PENDING` receipt is not
 permission to delete the record and retry.
 
-## 6. Complete PPOps evidence
+## 6. Finalize the output PPOI
+
+RAILGUN requires the spending wallet to prove the provenance of the newly
+created outputs. A mined transfer can therefore be visible to PPOps while its
+receiver output is still `MissingExternalPOI`. Finalize only the exact mined
+journal record:
+
+```bash
+node dist/cli.js finalize-poi \
+  --config ./payer.config.json \
+  --intent-id INTENT_ID \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS
+```
+
+Optionally add `--expected-railgun-txid` with an independently observed TXID.
+The command performs no second payment; it synchronizes the full payer wallet,
+generates the spent-output PPOI and requires node acknowledgement.
+
+## 7. Complete PPOps evidence
 
 Wait for PPOps to record:
 
@@ -157,6 +176,12 @@ intent      = PAID
 Then follow PPOps `docs/MAINNET-GATE.md` for restart, webhook-deduplication and
 isolated-restore evidence. Redact payer/merchant addresses, transaction hashes,
 references, RPC credentials and local invoice identifiers from public reports.
+
+Controlled result: one `0.01 USDC` transfer mined once with a populated maximum
+gas cost of `54267840000000` wei under the approved `0.001 ETH` ceiling. PPOps
+first recorded `CONFIRMED + PENDING + MATCHED`, then reached
+`FINALIZED + SPENDABLE + MATCHED -> PAID` after the payer submitted PPOI. The
+three-phase signed report is `artifacts/mainnet-gate-report.json`.
 
 ## Decision
 

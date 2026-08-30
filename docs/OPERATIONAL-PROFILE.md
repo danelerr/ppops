@@ -273,13 +273,12 @@ Verification evidence:
   state, reused instances and raw invoice/reference/transaction leakage were
   rejected.
 - Offline state backup completed and produced an integrity manifest.
-- Controlled Arbitrum payer preparation: direct SDK sync confirmed sufficient
-  spendable native USDC, generated a real proof and populated a bounded
-  `0.01 USDC` transaction in 7.8 seconds. A final repeat after cleanup failures
-  were made fatal completed in 10.7 seconds with maximum populated gas cost
-  `54286600000000` wei. Both commands reported `paymentSubmitted: false`; the
-  final status remained `recorded: false`, and no public transaction was
-  created. This is not a completed Mainnet Gate.
+- Controlled Arbitrum mainnet self-pilot: after the no-broadcast preparations,
+  one approved `0.01 USDC` transaction mined once with a populated maximum gas
+  cost of `54267840000000` wei under a `0.001 ETH` ceiling. PPOps first recorded
+  `CONFIRMED + PENDING + MATCHED`, then `FINALIZED + SPENDABLE + MATCHED ->
+  PAID` after the payer submitted its output PPOI. Exact-once webhook replay,
+  restart and an isolated restore all passed.
 - After moving to one explicit scan owner, the merchant reached readiness in
   approximately 6 seconds and, after the final observability correction,
   completed five subsequent scheduled scans at roughly 34-second cadence.
@@ -288,9 +287,8 @@ Verification evidence:
   lock failure was established.
 
 These measurements use public third-party RPC/PPOI endpoints and are not latency
-SLOs. The live fixture had no fresh strict PPOps payment; the actual exact memo
-and `Valid -> Spendable` result comes from controlled RAILGUN primitives and the
-official test PPOI interface documented in the primitive gate.
+SLOs. The fresh mainnet payment is a controlled self-pilot, not an independent
+merchant run or an availability benchmark.
 
 ## Reproducible evidence
 
@@ -302,6 +300,7 @@ Machine-readable reports:
 
 - `artifacts/primitive-gate-report.json`
 - `artifacts/privacy-report.json`
+- `artifacts/mainnet-gate-report.json`
 
 ## Dependencies and residual operational risk
 

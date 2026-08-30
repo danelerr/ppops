@@ -120,8 +120,8 @@ and the reference payer would remain development and conformance tooling.
 | View-only RAILGUN reconciliation | Implemented |
 | Finality, PPOI and matching semantics | Implemented |
 | HMAC webhook outbox | Implemented |
-| Reference payer | Implemented; live Gate A pending |
-| Mainnet end-to-end evidence | Pending |
+| Reference payer | Implemented; Gate A passed 2026-08-30 |
+| Mainnet end-to-end evidence | Self-pilot passed; external pilot pending |
 | Merchant TypeScript SDK | Not implemented; optional |
 | QR/consumer checkout UI | Not implemented |
 | WooCommerce/plugin integrations | Not implemented |
@@ -130,10 +130,11 @@ and the reference payer would remain development and conformance tooling.
 
 ## Claim boundary
 
-Until the Mainnet Gate and an external pilot pass, the defensible claim is:
+Until an external pilot passes, the defensible claim is:
 
-> PPOps implements and tests a self-hosted, view-only reconciliation backend for
-> private RAILGUN payment intents.
+> PPOps implements and has completed a controlled Arbitrum mainnet self-pilot
+> for a self-hosted, view-only reconciliation backend for private RAILGUN
+> payment intents.
 
 The project must not yet claim production readiness, general wallet usability,
 feature parity with established payment servers or verified external adoption.

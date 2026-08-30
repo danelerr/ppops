@@ -18,9 +18,10 @@ PPOps request.json -> verify pinned merchant signer -> RAILGUN proof + memo
                   -> self-signed Arbitrum submission -> PPOps reconciliation
 ```
 
-Current status: the Gate A implementation, unit tests and privacy checks pass.
-No mainnet payment is claimed until an operator completes the runbook and PPOps
-records `FINALIZED + SPENDABLE + MATCHED -> PAID`.
+Current status: Gate A passed on Arbitrum mainnet on 2026-08-30. A bounded
+`0.01 USDC` transfer was mined, its output PPOI was submitted by this payer,
+and PPOps recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. This remains a
+controlled self-pilot, not external adoption or a production-readiness claim.
 
 ## Scope
 
@@ -145,6 +146,11 @@ node dist/cli.js pay-self-signed \
   --max-amount-atomic 100000 \
   --max-gas-cost-wei 1000000000000000 \
   --confirm-intent INTENT_ID
+
+node dist/cli.js finalize-poi \
+  --config ./payer.config.json \
+  --intent-id INTENT_ID \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS
 ```
 
 For native USDC, `100000` atomic units is `0.10 USDC`. Do not reuse an expired
@@ -156,6 +162,13 @@ RAILGUN address with the payer address before approving Gate A.
 population, all bounds and the final live-request recheck, but does not sign,
 journal or broadcast a transaction. It returns `paymentSubmitted: false`. The
 subsequent payment intentionally repeats proof preparation against fresh state.
+
+After the chain receipt is `MINED`, `finalize-poi` resolves that exact journaled
+transaction through the payer's decrypted sent-commitment history, generates
+the output PPOI and requires `ProofSubmitted` or `Valid` acknowledgement. It
+does not submit another EVM transaction or spend additional USDC. An optional
+`--expected-railgun-txid` cross-check may be supplied from independent receiver
+evidence.
 
 The harness owns synchronization explicitly: it pauses the SDK listener poller,
 awaits `refreshBalances`, and reads the resulting PPOI buckets directly. It does
@@ -186,6 +199,12 @@ Gate A proves that Railway Wallet is not required for proof generation,
 encrypted `memoText`, submission and PPOps reconciliation. It does not prove
 sender unlinkability because the self-signing EVM address is public.
 
+The controlled 2026-08-30 run used a `0.001 ETH` gas ceiling. The populated
+maximum was `54267840000000` wei, the transaction mined once, PPOI moved from
+`MissingExternalPOI` through `ProofSubmitted` to `Valid`, and the signed
+metadata-minimal mainnet report passed restart, restore and webhook-deduplication
+checks. Direct identifiers remain in private operator evidence only.
+
 Only after Gate A reaches `PAID` should the same transaction flow be adapted to
 Waku/Broadcaster submission for Gate B. Railway Wallet then remains an optional
 manual compatibility client, not an operational dependency.
@@ -202,6 +221,6 @@ npm run build
 Runtime data, wallet databases, configurations, secrets and local evidence are
 ignored by Git.
 
-`sync` and `pay-self-signed` hold an owner-only runtime lock for the full wallet
-state. Two payer processes therefore cannot scan or submit concurrently from
-the same local wallet cache.
+`sync`, `pay-self-signed` and `finalize-poi` hold an owner-only runtime lock for
+the full wallet state. Two payer processes therefore cannot scan, submit or
+generate PPOI concurrently from the same local wallet cache.

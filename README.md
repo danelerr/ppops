@@ -13,9 +13,10 @@ payment on the merchant's behalf and never becomes a third-party payment
 processor. Its lifecycle is intentionally familiar to developers who use
 payment-intent APIs, while custody and infrastructure remain with the merchant.
 
-This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and the daemon
-flow run, but this is not a production-readiness claim. Review the known risks
-before using real financial data.
+This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and a controlled
+Arbitrum mainnet self-pilot pass, but this is not a production-readiness or
+external-adoption claim. Review the known risks before using real financial
+data.
 
 ## Product model
 
@@ -43,7 +44,7 @@ Available now:
 - idempotent event IDs and HMAC-authenticated webhook delivery;
 - reference payer and reproducible privacy/security evidence.
 
-Possible after the mainnet and adoption gates, but **not implemented today**:
+Possible after the remaining adoption gate, but **not implemented today**:
 
 - merchant client SDKs;
 - QR or consumer wallet checkout UX;
@@ -365,13 +366,14 @@ public-good direction, proposed impact metrics and explicit Octant go/no-go are
 in `docs/IMPACT-ROADMAP.md`. Neither document expands the v0.1 product scope or
 converts an incomplete self-pilot into external traction.
 
-On 2026-08-30 the direct SDK payer completed bounded Arbitrum prepare-only
-runs—sync, PPOI bucket recovery, proof generation and transaction population—in
-7.8 seconds and, after cleanup failures were made fatal, 10.7 seconds. Both
-returned `paymentSubmitted: false`; the final run left no submission record. The
-merchant reached readiness in about 6 seconds and completed repeated scans. This
-validates the non-broadcast path and lifecycle correction; it is not a completed
-mainnet payment or adoption claim.
+On 2026-08-30 the direct SDK payer first completed bounded no-broadcast runs,
+then submitted one approved `0.01 USDC` private transfer under a `0.001 ETH`
+gas ceiling. The transaction mined once; PPOps held the matched amount pending
+until payer-side PPOI moved the receiver output from `MissingExternalPOI` to
+`Valid`, then recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. Exact-once
+webhook replay, restart and isolated restore passed. The signed, redacted result
+is `artifacts/mainnet-gate-report.json`; this is still self-pilot evidence, not
+external adoption.
 
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect

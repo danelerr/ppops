@@ -114,6 +114,11 @@ No new product scope before all of the following exist:
 - a signed, metadata-minimal mainnet gate report;
 - at least one independently controlled merchant or payer completing the flow.
 
+Status on 2026-08-30: the controlled mainnet payment, finality/PPOI/matching,
+exact-once webhook, isolated restore and signed report requirements pass.
+Independent operator evidence is the remaining Gate 0 item; the self-pilot must
+not be counted as adoption.
+
 Failure to complete the private-transfer primitive remains a stop condition.
 
 ### Gate 1 — payer readiness and provider resilience

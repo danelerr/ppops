@@ -44,7 +44,7 @@ available.
 | Scan starts too late and misses funds | Explicit creation block at or before first relevant note | Incorrect operator input can produce an incomplete balance |
 | Concurrent payer processes | Owner-only runtime lock spans wallet load, sync, proof generation and submission | A stale lock whose PID was reused can require operator cleanup |
 | RPC outage or wrong chain | Two distinct configured RPC origins for SDK fallback; self-signer verifies chain ID and fee data | RAILGUN SDK fallback behavior and correlated providers remain dependencies |
-| PPOI delay/block | Balance buckets are reported; payment requires `Spendable` | External list policy and node availability are outside the harness |
+| PPOI delay/block | Balance buckets are reported; `finalize-poi` binds proof generation to an exact `MINED` journal record and requires node acknowledgement; PPOps requires receiver `Spendable` | External list policy and node availability are outside the harness; chain mining does not imply PPOI completion |
 | Transaction response lost after submission | The raw transaction is signed locally; its hash and nonce are persisted before broadcast, reuse is blocked, and receipt state advances through `SUBMITTED`, `MINED` or `REVERTED` | RPC/receipt failure still requires resolving the recorded public hash before any new intent is paid |
 | Public sender correlation | Explicit Gate A warning | Inherent to self-signing; Gate B Broadcaster is required for the final privacy claim |
 | Supply-chain compromise | Exact dependency lockfile, build/tests, audit gate | Official RAILGUN tree retains low/moderate legacy transitive findings and downloaded proving artifacts remain trusted inputs |
@@ -67,3 +67,5 @@ available.
 4. Use a fresh intent and verify the expected signer immediately before payment.
 5. Treat the self-signed path as Gate A evidence only; use Broadcaster submission
    before claiming end-to-end sender privacy.
+6. After mining, finalize PPOI from the existing journal record; never resend the
+   payment merely because the receiver still reports `MissingExternalPOI`.

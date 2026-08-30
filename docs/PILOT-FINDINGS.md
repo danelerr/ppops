@@ -2,10 +2,10 @@
 
 First recorded: 2026-08-23. Updated: 2026-08-30.
 
-Status: living pilot record. The mainnet payment gate is still in progress.
-This document distinguishes observations from upstream guarantees and future
-proposals. It must not be cited as evidence that PPOps has completed its
-mainnet gate or acquired external users.
+Status: living pilot record. The controlled mainnet payment gate passed on
+2026-08-30; Gate B and external adoption remain open. This document
+distinguishes observations from upstream guarantees and future proposals. It
+must not be cited as evidence of an independent merchant deployment.
 
 ## Why this record exists
 
@@ -55,6 +55,18 @@ a cryptographically private payment inaccessible or operationally unsafe.
   prepare-only run finished in 7.8 seconds; a final repeat after cleanup failures
   were made fatal finished in 10.7 seconds. Both reported
   `paymentSubmitted: false`, and the final submission status remained unrecorded.
+- After explicit operator approval, the harness submitted exactly one bounded
+  `0.01 USDC` self-signed transfer. It mined once with a populated maximum gas
+  cost of `54267840000000` wei under the approved `0.001 ETH` ceiling.
+- PPOps decrypted the exact memo from view-only state, matched the native-USDC
+  output and held the intent open at `CONFIRMED + PENDING + MATCHED` while the
+  output was `MissingExternalPOI`.
+- The payer then generated the output PPOI from the exact mined journal record.
+  The payer observed `ProofSubmitted`; PPOps subsequently recovered raw `Valid`,
+  `Spendable` and `FINALIZED`, and moved the intent to `PAID`.
+- A controlled duplicate confirmation delivery remained one stored event;
+  restart and isolated restore preserved the same projection. The signed,
+  identifier-redacted report is `artifacts/mainnet-gate-report.json`.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -77,14 +89,12 @@ reference or invoice identifier belongs in the public version of this record.
 
 ### Not demonstrated yet
 
-- A private native-USDC payment carrying the exact PPOps memo has not yet
-  completed this mainnet pilot.
-- The merchant intent has not yet reached `PAID` from a settlement that is
-  simultaneously `FINALIZED`, `SPENDABLE` and `MATCHED`.
-- Restart, restore and receiver-side duplicate-delivery evidence have not yet
-  been captured for a real mainnet settlement.
 - No independent merchant or payer has completed the full flow. The project
   therefore does not yet have verifiable external traction.
+- Gate B has not submitted through a Waku Broadcaster, so the self-pilot does
+  not demonstrate sender unlinkability from the public gas signer.
+- One successful controlled payment does not establish an availability SLO,
+  general wallet usability or production readiness.
 
 ## Findings and product implications
 
@@ -230,9 +240,12 @@ Controlled results after the correction:
 - merchant first scan: approximately 6 seconds to readiness;
 - after the final observability correction, five following scheduled merchant
   scans completed normally at roughly 34-second cadence.
+- the value-bearing payer proof, broadcast and receipt completed in about ten
+  seconds; merchant detection followed on the scheduled scanner without the
+  earlier multi-minute lifecycle stall.
 
-This does not prove future RPC/PPOI latency or a value-bearing payment. It does
-show that the earlier multi-minute behavior was not an unavoidable Groth16 cost:
+This does not prove future RPC/PPOI latency or an availability SLO. It does show
+that the earlier multi-minute behavior was not an unavoidable Groth16 cost:
 most of it came from incorrect completion/poller ownership around the SDK.
 
 ### F-09: an RPC `block` error was mislabeled as a storage `lock`
@@ -277,23 +290,46 @@ availability dependency. Three public endpoints do not prove organizational
 independence, and production operators should use providers under separately
 verified administrative control.
 
+### F-11: a mined private transfer still needs payer-owned PPOI completion
+
+The first value-bearing run exposed a lifecycle boundary that preparation could
+not reveal. The transfer proof and EVM receipt succeeded, and the view-only
+receiver decrypted and matched the output, but it remained
+`MissingExternalPOI`. The finite payer had closed immediately after the receipt,
+before its full wallet generated the proof that propagates valid provenance to
+the new recipient and change outputs.
+
+The payer now exposes `finalize-poi`. It accepts only an existing `MINED`
+submission-journal record, resolves the corresponding RAILGUN transaction from
+decrypted sent commitments, optionally cross-checks an independently observed
+RAILGUN TXID, generates the output PPOI and requires node acknowledgement. It
+cannot create a second EVM payment. In the controlled run, payer outputs reached
+`ProofSubmitted` and the merchant subsequently recovered raw `Valid` and
+`Spendable`.
+
+This is an important product distinction: chain inclusion, encrypted-note
+detection, PPOI propagation and merchant fulfillment are separate milestones.
+A future wallet integration must own all four; PPOps should continue to fail
+closed while any assurance step is missing.
+
 ## Claim discipline
 
-Until the mainnet and adoption gates pass, PPOps may claim:
+After the controlled mainnet gate but before external adoption, PPOps may claim:
 
 - open-source, self-hosted and view-only architecture;
 - a working local intent, descriptor, reconciliation and evidence pipeline;
 - reproducible primitive/privacy tests;
-- a successfully initialized Arbitrum mainnet profile;
-- one observed mainnet shield and documented payer-onboarding findings;
-- bounded mainnet prepare-only proof runs with no signature or broadcast.
+- a completed, signed and redacted Arbitrum mainnet self-pilot;
+- one exact private native-USDC payment reconciled only after finality, PPOI and
+  matching agreed;
+- restart, restore and webhook-deduplication evidence for that self-pilot.
 
 PPOps must not yet claim:
 
-- completed end-to-end mainnet payment reconciliation;
 - production readiness or general consumer usability;
 - reliable Railway or public-RPC availability;
 - external adoption;
+- sender unlinkability until Broadcaster-based Gate B passes;
 - removal of RAILGUN's one-hour first-funding delay;
 - privacy against voluntary credential, screenshot or support-channel leaks.
 
@@ -301,10 +337,9 @@ PPOps must not yet claim:
 
 1. Keep Railway Wallet out of the critical path and retain the independent
    `tools/ppops-payer` package as the reproducible payer.
-2. Complete Gate A with the already prepared, bounded self-signed exact-memo
-   transfer only after explicit operator confirmation, then complete the PPOps
-   mainnet evidence gate.
-3. If Gate A passes, complete Gate B through a Waku Broadcaster and retain
+2. Preserve the Gate A operator records and signed public report with the beta
+   release.
+3. Complete Gate B through a Waku Broadcaster and retain
    Railway only as an optional compatibility client.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside

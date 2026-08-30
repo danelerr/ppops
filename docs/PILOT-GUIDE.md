@@ -181,6 +181,11 @@ node dist/cli.js pay-self-signed \
   --max-amount-atomic 100000 \
   --max-gas-cost-wei 1000000000000000 \
   --confirm-intent INTENT_ID
+
+node dist/cli.js finalize-poi \
+  --config ./payer.config.json \
+  --intent-id INTENT_ID \
+  --expected-payer PINNED_PAYER_0ZK_ADDRESS
 ```
 
 The example gas bound is `0.001 ETH`; it is a maximum, not a target or fee
@@ -191,6 +196,13 @@ journals the transaction hash before broadcast, and waits up to two minutes for
 a receipt. `PENDING`, `SUBMITTING` or `SUBMITTED` is not permission to retry;
 resolve the recorded hash first.
 
+The mined transfer's output is not immediately PPOI-spendable. `finalize-poi`
+uses the exact `MINED` journal record to locate the payer's sent commitments,
+generate the output PPOI and require `ProofSubmitted` or `Valid`
+acknowledgement. It does not create another payment. Supply
+`--expected-railgun-txid` when independent receiver evidence is available and
+should be cross-checked.
+
 The preparation command exercises sync, proof generation, population and every
 bound but returns `paymentSubmitted: false`; it neither signs nor journals a
 transaction. Inspect that result before running the value-bearing command.
@@ -199,9 +211,11 @@ Controlled result on 2026-08-30: the direct SDK payer prepared a `0.01 USDC`
 Arbitrum transfer in 7.8 seconds, confirmed sufficient spendable native USDC,
 generated the proof and bounded the populated transaction at
 `56190171212000` wei maximum gas cost. It created no submission-journal record
-and broadcast no transaction. This validates the non-broadcast path only; Gate
-A remains pending until the explicitly approved value-bearing transaction is
-mined and PPOps reconciles it to `PAID`.
+and broadcast no transaction. The later approved submission mined once with a
+populated maximum of `54267840000000` wei under the `0.001 ETH` ceiling. PPOps
+observed the exact settlement, held it pending while PPOI was missing, then
+recorded `FINALIZED + SPENDABLE + MATCHED -> PAID` after payer-side PPOI
+submission. Restart, duplicate-webhook and isolated-restore snapshots passed.
 
 A final repeat after cleanup failures were made fatal completed in 10.7 seconds,
 reported `54286600000000` wei maximum gas cost and again left
