@@ -422,6 +422,34 @@ or any new journal write. RAILGUN may still label the underlying balance
 `Spendable`, but PPOps cannot safely authorize it for a different intent while
 the prior encrypted submission remains cryptographically unresolved.
 
+### F-13: repeatable onboarding needs an isolated lineage and a healthy RPC set
+
+A second controlled onboarding run on 2026-08-30 removed Railway Wallet from
+the funding path completely. The operator used a dedicated public EVM signer
+for a bounded ETH-to-native-USDC swap, then used the official RAILGUN Wallet SDK
+to shield into a newly generated payer wallet. The swap and shield both passed
+local calldata simulation before signing and their receipts were independently
+observed after mining. Exact addresses, hashes, blocks and amounts remain in the
+private operator record so this public document does not create an unnecessary
+cross-step correlation artifact.
+
+The run exposed another RPC distinction. Two endpoints could agree on current
+balances and nonce yet fail historical receipt or transaction simulation: one
+required a paid archive token and another returned a temporary internal error.
+They were replaced before shielding by two origins that agreed with the
+Arbitrum public endpoint on chain ID, current block and the already-mined swap
+receipt. With that set, the isolated payer's explicit post-shield sync completed
+in about seven seconds instead of the earlier multi-minute wallet experience.
+This is point-in-time evidence, not an uptime claim or an endorsement of those
+providers.
+
+The SDK reported the protocol-fee-adjusted output entirely in
+`ShieldPending`, with `Spendable = 0`. That proves the harness can own the
+funding and synchronization lifecycle, but it also confirms that fast scanning
+does not bypass RAILGUN's standby policy. A reference payer must therefore keep
+the new lineage isolated, wait for spendability and refuse to construct a
+checkout payment from pending funds.
+
 ## Claim discipline
 
 After the controlled mainnet gate but before external adoption, PPOps may claim:
@@ -449,11 +477,13 @@ PPOps must not yet claim:
    `tools/ppops-payer` package as the reproducible payer.
 2. Preserve the Gate A operator records and signed public report with the beta
    release.
-3. Preserve the failed Gate B journal and stop value-bearing retries. Diagnose
-   the official client/Broadcaster response path, including the passing final
-   calldata simulation, with upstream maintainers or a non-financial
-   reproducible fixture before authorizing another funded trial. Use the
-   metadata-minimal [upstream report](../tools/ppops-payer/docs/UPSTREAM-BROADCASTER-REPORT.md)
+3. Preserve the failed Gate B journal and never retry its reserved nullifiers.
+   Diagnose the official client/Broadcaster response path, including the passing
+   final calldata simulation, with upstream maintainers or a non-financial
+   reproducible fixture. Any separately authorized funded trial must use a new
+   isolated payer lineage, wait until its shield is `Spendable`, and retain the
+   same one-payment fee and submission bounds. Use the metadata-minimal
+   [upstream report](../tools/ppops-payer/docs/UPSTREAM-BROADCASTER-REPORT.md)
    rather than raw wallet/request artifacts.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside
