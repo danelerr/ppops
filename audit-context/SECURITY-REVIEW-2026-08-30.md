@@ -148,6 +148,20 @@ canonical real paths while retaining import safety. A regression covers an
 npm-style symlink, and a newly packed tarball was installed into an empty
 directory where `ppops --help` printed the complete command surface.
 
+### SEC-019 — Scan progress mixed current and previous tree state
+
+Severity: **Low**
+
+Status: **Fixed, regression-tested and exercised live**
+
+The health layer cleared progress when a scan started, but the engine retained
+its previous snapshot. The first UTXO callback of the next scan therefore
+reintroduced the prior scan's `txid: Complete`, presenting mixed-cycle state.
+Each scanner pass now begins a fresh engine progress window before its owned
+`refreshBalances`. A lifecycle regression enforces the ordering. Live health
+showed `hasTxid: false` during the first UTXO phase, followed by both UTXO and
+TXID `Complete` at ratio `1` after the same scan finished.
+
 ### Additional boundary hardening
 
 - Intent creation rejects unknown fields, including accidental mnemonic or key
@@ -162,7 +176,7 @@ directory where `ppops --help` printed the complete command surface.
 
 ## Verification evidence
 
-- Merchant: 18 test files, 57 tests, typecheck, build, privacy conformance,
+- Merchant: 19 test files, 58 tests, typecheck, build, privacy conformance,
   trust-boundary check and enforced coverage passed.
 - Payer: 9 test files, 28 tests, typecheck, build and privacy check passed.
 - Dependency gates: zero Critical/High production advisories; 6 Moderate and 30

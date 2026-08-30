@@ -205,6 +205,10 @@ export class RailgunViewOnlyEngine {
     return () => this.syncProgressListeners.delete(listener);
   }
 
+  beginSyncProgress(): void {
+    this.syncProgress = {};
+  }
+
   async start(): Promise<void> {
     if (this.engineStarted) return;
     await mkdir(dirname(this.config.storage.railgunDbPath), {

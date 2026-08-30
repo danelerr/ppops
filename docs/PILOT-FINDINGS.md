@@ -250,6 +250,11 @@ hide outages: each quorum read gets one bounded retry, then persistent
 disagreement still fails closed, degrades readiness, and is retried by the next
 single-owner scan.
 
+Progress snapshots are also scoped to one explicit scan. Before that reset,
+the first UTXO update of a new pass could carry `txid: Complete` from the prior
+pass into `/v1/health`. A live regression now shows only current UTXO state at
+that point and both trees at `Complete` only after the current scan finishes.
+
 ### F-10: two providers provide verification, not failure tolerance
 
 With two RPC origins, PPOps correctly requires both responses: one timeout or

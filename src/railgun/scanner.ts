@@ -104,6 +104,10 @@ export class RailgunScanner {
     if (this.scanning) throw new Error("A RAILGUN scan is already in progress");
     this.scanning = true;
     try {
+      // Each explicit scan owns a fresh progress window. Without this reset,
+      // the first UTXO update can carry a stale TXID Complete state from the
+      // previous scan into health output.
+      this.engine.beginSyncProgress();
       const wallet = viewOnlyWalletForID(this.engine.walletID);
       // refreshBalances cannot be cancelled. Timing it out would only reject the
       // wrapper while the SDK scan keeps running, allowing the daemon to start
