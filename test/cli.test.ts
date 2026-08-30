@@ -1,10 +1,19 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { main } from "../src/cli.js";
+import { isDirectExecution, main } from "../src/cli.js";
 import { loadConfig } from "../src/config.js";
 import { readSecret } from "../src/security/secrets.js";
 
@@ -19,6 +28,28 @@ afterEach(() => {
 });
 
 describe("CLI initialization", () => {
+  it("recognizes direct execution through an npm-style binary symlink", () => {
+    const root = mkdtempSync(join(tmpdir(), "ppops-cli-link-test-"));
+    roots.push(root);
+    const targetDirectory = join(root, "package", "dist");
+    const binDirectory = join(root, "node_modules", ".bin");
+    mkdirSync(targetDirectory, { recursive: true });
+    mkdirSync(binDirectory, { recursive: true });
+    const target = join(targetDirectory, "cli.js");
+    writeFileSync(target, "// fixture\n");
+    const moduleUrl = pathToFileURL(target).href;
+
+    expect(isDirectExecution(moduleUrl, target)).toBe(true);
+    expect(isDirectExecution(moduleUrl, join(root, "missing"))).toBe(false);
+    expect(isDirectExecution(moduleUrl, undefined)).toBe(false);
+
+    if (process.platform !== "win32") {
+      const link = join(binDirectory, "ppops");
+      symlinkSync(target, link);
+      expect(isDirectExecution(moduleUrl, link)).toBe(true);
+    }
+  });
+
   it("documents the complete mainnet evidence workflow", async () => {
     const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     await main(["help"]);

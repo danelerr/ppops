@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { NETWORK_CONFIG, NetworkName } from "@railgun-community/shared-models";
 import { Wallet, getAddress } from "ethers";
@@ -589,8 +589,22 @@ export const main = async (argv = process.argv.slice(2)): Promise<void> => {
   }
 };
 
-const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
-if (invokedPath === import.meta.url) {
+export const isDirectExecution = (
+  moduleUrl: string,
+  invokedPath: string | undefined,
+): boolean => {
+  if (!invokedPath) return false;
+  try {
+    // npm exposes package binaries through node_modules/.bin symlinks on Unix.
+    // Compare canonical files so the installed CLI runs through that symlink
+    // while importing this module from tests remains side-effect free.
+    return realpathSync(invokedPath) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+};
+
+if (isDirectExecution(import.meta.url, process.argv[1])) {
   main()
     .then(() => {
       if (process.argv[2] === "serve" || process.argv[2] === "scan-once") {

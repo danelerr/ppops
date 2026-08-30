@@ -229,10 +229,10 @@ Primitive gate:
 
 Verification evidence:
 
-- Automated merchant suite on 2026-08-30: 18 test files and 56 tests, including
+- Automated merchant suite on 2026-08-30: 18 test files and 57 tests, including
   1,000 property-based runs across reconciliation conservation/order invariance
-  and opaque memo round trips. Enforced V8 coverage is 66.28% statements,
-  62.51% branches, 70.46% functions and 69.01% lines across all `src/**/*.ts`;
+  and opaque memo round trips. Enforced V8 coverage is 66.36% statements,
+  62.59% branches, 70.54% functions and 69.08% lines across all `src/**/*.ts`;
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
@@ -242,6 +242,9 @@ Verification evidence:
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
+- Clean tarballs for both packages were installed outside the repository and
+  their npm-generated binaries executed. This exposed and then verified the fix
+  for the merchant CLI's former symlink-sensitive direct-execution guard.
 - Arbitrum quorum preflight against two public RPC origins: chain ID `42161`,
   latest block `499967929`, finalized block `499964670`; both providers agreed
   on the conservative finalized block and its hash.

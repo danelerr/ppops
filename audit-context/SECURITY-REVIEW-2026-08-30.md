@@ -134,6 +134,20 @@ The delivery service now serializes its own passes. A concurrent regression
 holds the first HTTP request open, starts a second pass and proves that each
 stored event is sent once while the queued pass observes an empty outbox.
 
+### SEC-018 — Installed merchant CLI did not run through npm's binary symlink
+
+Severity: **Medium**
+
+Status: **Fixed, regression-tested and exercised from a clean install**
+
+The merchant entry point guarded test imports by comparing `process.argv[1]`
+directly with `import.meta.url`. npm invokes Unix package binaries through a
+`node_modules/.bin` symlink, so the comparison failed and the installed `ppops`
+command exited successfully without doing anything. The guard now compares
+canonical real paths while retaining import safety. A regression covers an
+npm-style symlink, and a newly packed tarball was installed into an empty
+directory where `ppops --help` printed the complete command surface.
+
 ### Additional boundary hardening
 
 - Intent creation rejects unknown fields, including accidental mnemonic or key
@@ -148,7 +162,7 @@ stored event is sent once while the queued pass observes an empty outbox.
 
 ## Verification evidence
 
-- Merchant: 18 test files, 56 tests, typecheck, build, privacy conformance,
+- Merchant: 18 test files, 57 tests, typecheck, build, privacy conformance,
   trust-boundary check and enforced coverage passed.
 - Payer: 9 test files, 28 tests, typecheck, build and privacy check passed.
 - Dependency gates: zero Critical/High production advisories; 6 Moderate and 30
@@ -159,6 +173,10 @@ stored event is sent once while the queued pass observes an empty outbox.
 - Merchant runtime: first explicit scan reached ready in approximately 6
   seconds; after the final observability correction, five following scans
   completed normally at roughly 34-second cadence.
+- Clean-install smoke: independently packed merchant and payer tarballs
+  installed into empty directories and both package binaries executed through
+  their generated npm links; the merchant regression was repeated after its
+  direct-execution fix.
 
 ## Remaining release blockers
 
