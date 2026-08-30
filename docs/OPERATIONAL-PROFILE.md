@@ -355,6 +355,8 @@ Docker packaging is built in CI. The Node base image is digest-pinned, GitHub
 Actions are SHA-pinned, and a tag-triggered workflow first requires
 `v<package version>`, then publishes version and commit-addressed GHCR images.
 The release records the immutable image digest and attaches both SBOMs and the
-primitive, privacy and Mainnet Gate reports. Compose bounds memory, CPU and PID
-usage; the production runbook defines readiness, metrics, alert and egress
-policy.
+primitive, privacy and Mainnet Gate reports. Release CI parses both generated
+SBOMs and requires their expected root component plus a nonempty CycloneDX
+component inventory, even when the generator tolerates known overridden
+transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
+production runbook defines readiness, metrics, alert and egress policy.

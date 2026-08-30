@@ -43,6 +43,7 @@ jobs:
             --expected-signer "$PPOPS_REPORT_SIGNER"
           npm run --silent sbom > "$RUNNER_TEMP/ppops-sbom.cdx.json"
           (cd tools/ppops-payer && ../../node_modules/.bin/cyclonedx-npm --ignore-npm-errors --package-lock-only --omit dev --output-reproducible --output-format JSON --output-file "$RUNNER_TEMP/ppops-payer-sbom.cdx.json")
+          node -e "const fs=require('node:fs'); for (const [file,name] of [[process.argv[1],'ppops'],[process.argv[2],'ppops-payer']]) { const bom=JSON.parse(fs.readFileSync(file,'utf8')); if (bom.bomFormat !== 'CycloneDX' || bom.metadata?.component?.name !== name || !Array.isArray(bom.components) || bom.components.length === 0) process.exit(1) }" "$RUNNER_TEMP/ppops-sbom.cdx.json" "$RUNNER_TEMP/ppops-payer-sbom.cdx.json"
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
       - name: Build and publish immutable container
