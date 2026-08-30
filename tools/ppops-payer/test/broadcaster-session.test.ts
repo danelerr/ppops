@@ -1,7 +1,10 @@
 import type { SelectedBroadcaster } from "@railgun-community/shared-models";
 import { describe, expect, it } from "vitest";
 
-import { validateBroadcaster } from "../src/broadcaster/session.js";
+import {
+  selectCurrentBroadcaster,
+  validateBroadcaster,
+} from "../src/broadcaster/session.js";
 
 const BROADCASTER_ADDRESS =
   "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
@@ -53,5 +56,39 @@ describe("Broadcaster quote validation", () => {
         1_000_000,
       ),
     ).toThrow(/invalid/);
+  });
+
+  it("rejects malformed external quote objects with a bounded failure", () => {
+    for (const malformed of [undefined, {}, { tokenFee: {} }]) {
+      expect(() =>
+        validateBroadcaster(malformed, 0.75, 60_000, 1_000_000),
+      ).toThrow(/malformed/);
+    }
+  });
+
+  it("matches the complete quote fingerprint and ignores malformed candidates", () => {
+    const expected = validateBroadcaster(quote(), 0.75, 60_000, 1_000_000);
+    expect(
+      selectCurrentBroadcaster(
+        [{ tokenFee: {} }, quote()],
+        expected,
+        0.75,
+        60_000,
+        1_000_000,
+      )?.fingerprint,
+    ).toBe(expected.fingerprint);
+    expect(
+      selectCurrentBroadcaster(
+        [
+          quote({
+            tokenFee: { ...quote().tokenFee, expiration: 1_200_000 },
+          }),
+        ],
+        expected,
+        0.75,
+        60_000,
+        1_000_000,
+      ),
+    ).toBeUndefined();
   });
 });

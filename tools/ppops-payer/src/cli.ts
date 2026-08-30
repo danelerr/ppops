@@ -578,6 +578,16 @@ const submissionStatus = async (options: ParsedOptions): Promise<void> => {
           ...(record.broadcasterFeeAmountAtomic !== undefined
             ? { broadcasterFeeAmountAtomic: record.broadcasterFeeAmountAtomic }
             : {}),
+          ...(record.submissionMode === "BROADCASTER"
+            ? {
+                broadcasterQuoteFingerprint: record.broadcasterQuoteFingerprint,
+                canonicalTransactionHashResolved:
+                  record.transactionHash !== undefined,
+              }
+            : {}),
+          ...(record.reportedTransactionHash
+            ? { broadcasterReportedTransactionHash: record.reportedTransactionHash }
+            : {}),
           ...(record.nonce !== undefined ? { nonce: record.nonce } : {}),
           ...(record.transactionHash
             ? { transactionHash: record.transactionHash }
@@ -851,7 +861,10 @@ const runBroadcaster = async (
     });
     return;
   }
-  if (!result.transactionHash || result.receiptStatus === "NOT_SUBMITTED") {
+  if (
+    result.receiptStatus === "NOT_SUBMITTED" ||
+    (result.receiptStatus === "MINED" && !result.transactionHash)
+  ) {
     throw new SafeFailure("INTERNAL_ERROR", "Broadcaster submission result is incomplete");
   }
   output({
@@ -860,11 +873,16 @@ const runBroadcaster = async (
     intentId: request.id,
     amountAtomic: request.amountAtomic,
     broadcasterFeeAmountAtomic: result.broadcasterFeeAmountAtomic,
-    transactionHash: result.transactionHash,
+    ...(result.transactionHash ? { transactionHash: result.transactionHash } : {}),
+    ...(result.reportedTransactionHash
+      ? { broadcasterReportedTransactionHash: result.reportedTransactionHash }
+      : {}),
+    canonicalTransactionHashResolved:
+      result.canonicalTransactionHashResolved,
     receiptStatus: result.receiptStatus,
     ...(result.blockNumber !== undefined ? { blockNumber: result.blockNumber } : {}),
     publicSelfSigningAddressUsed: false,
-    poiFinalizationRequired: true,
+    poiFinalizationRequired: result.receiptStatus === "MINED",
     next:
       result.receiptStatus === "PENDING"
         ? `ppops-payer recover-broadcaster --config ${resolve(configPath)} --intent-id ${request.id} --expected-payer PINNED_PAYER_0ZK_ADDRESS`
@@ -889,6 +907,14 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
       "No Broadcaster submission reservation exists for this intent",
     );
   }
+  const expectedPayer = one(options, "expected-payer", { required: true });
+  if (!record.payerRailgunAddress) {
+    throw new SafeFailure(
+      "JOURNAL_UPDATE_FAILED",
+      "Broadcaster reservation has no pinned payer identity",
+    );
+  }
+  assertExpectedPayerAddress(record.payerRailgunAddress, expectedPayer);
   if (record.status === "MINED" || record.status === "REVERTED") {
     output({
       ok: true,
@@ -897,40 +923,49 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
       status: record.status,
       transactionHash: record.transactionHash,
       blockNumber: record.blockNumber,
+      canonicalTransactionHashResolved: true,
       paymentRetryPermitted: false,
     });
     return;
   }
 
-  let transactionHash = record.transactionHash;
+  if (!record.nullifiers) throw new Error("Broadcaster reservation lost its nullifiers");
+  const secrets = await loadRuntimeSecrets(config, false);
+  const transactionHash = await withEngine(config, secrets, async (engine) => {
+    assertExpectedPayerAddress(engine.railgunAddress, expectedPayer);
+    assertExpectedPayerAddress(engine.railgunAddress, record.payerRailgunAddress as string);
+    await engine.syncBalances();
+    return engine.recoverTransactionHashForNullifiers(record.nullifiers as string[]);
+  });
   if (!transactionHash) {
-    if (!record.nullifiers) throw new Error("Broadcaster reservation lost its nullifiers");
-    const secrets = await loadRuntimeSecrets(config, false);
-    transactionHash = await withEngine(config, secrets, async (engine) => {
-      assertExpectedPayerAddress(
-        engine.railgunAddress,
-        one(options, "expected-payer", { required: true }),
-      );
-      await engine.syncBalances();
-      return engine.recoverTransactionHashForNullifiers(record.nullifiers as string[]);
+    output({
+      ok: true,
+      intentId,
+      recovered: false,
+      status: record.status,
+      ...(record.reportedTransactionHash
+        ? { broadcasterReportedTransactionHash: record.reportedTransactionHash }
+        : {}),
+      canonicalTransactionHashResolved: false,
+      paymentRetryPermitted: false,
     });
-    if (!transactionHash) {
-      output({
-        ok: true,
-        intentId,
-        recovered: false,
-        status: "SUBMITTING",
-        paymentRetryPermitted: false,
-      });
-      return;
-    }
-    try {
-      await journal.markSubmitted(intentId, transactionHash);
-    } catch (error) {
-      throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Recovery journal update failed", {
-        cause: error,
-      });
-    }
+    return;
+  }
+  if (
+    record.transactionHash &&
+    record.transactionHash.toLowerCase() !== transactionHash.toLowerCase()
+  ) {
+    throw new SafeFailure(
+      "JOURNAL_UPDATE_FAILED",
+      "Recovered nullifiers conflict with the journaled canonical transaction hash",
+    );
+  }
+  try {
+    await journal.markSubmitted(intentId, transactionHash);
+  } catch (error) {
+    throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Recovery journal update failed", {
+      cause: error,
+    });
   }
 
   const receipt = await readReceiptQuorum(config, transactionHash);
@@ -942,6 +977,7 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
       status: "SUBMITTED",
       transactionHash,
       receiptQuorum: false,
+      canonicalTransactionHashResolved: true,
       paymentRetryPermitted: false,
     });
     return;
@@ -961,6 +997,7 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
     transactionHash,
     blockNumber: receipt.blockNumber,
     receiptQuorum: true,
+    canonicalTransactionHashResolved: true,
     providerAgreement: receipt.providerAgreement,
     paymentRetryPermitted: false,
   });

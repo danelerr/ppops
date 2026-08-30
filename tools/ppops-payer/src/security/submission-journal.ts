@@ -10,25 +10,30 @@ import { SafeFailure } from "../events.js";
 import type { PaymentRequest } from "../request.js";
 import { readOwnerOnlyFile } from "./private-file.js";
 
+const TransactionHashSchema = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
+const RailgunAddressSchema = z
+  .string()
+  .regex(/^0zk\S{32,256}$/)
+  .refine(validateRailgunAddress, "Invalid RAILGUN address");
+
 const SubmissionRecordSchema = z
   .object({
     intentId: z.string().regex(/^pi_[0-9a-f]{32}$/),
     requestFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
     submissionMode: z.enum(["SELF_SIGNED", "BROADCASTER"]).optional(),
     selfSigner: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
-    broadcasterRailgunAddress: z
-      .string()
-      .regex(/^0zk\S{32,256}$/)
-      .refine(validateRailgunAddress, "Invalid Broadcaster RAILGUN address")
-      .optional(),
+    payerRailgunAddress: RailgunAddressSchema.optional(),
+    broadcasterRailgunAddress: RailgunAddressSchema.optional(),
+    broadcasterQuoteFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     broadcasterFeesIDFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
-    broadcasterFeeAmountAtomic: z.string().regex(/^(?:0|[1-9][0-9]*)$/).optional(),
-    nullifiers: z.array(z.string().regex(/^0x[0-9a-fA-F]{64}$/)).min(1).max(64).optional(),
+    broadcasterFeeAmountAtomic: z.string().regex(/^[1-9][0-9]*$/).optional(),
+    nullifiers: z.array(TransactionHashSchema).min(1).max(64).optional(),
+    reportedTransactionHash: TransactionHashSchema.optional(),
     status: z.enum(["SUBMITTING", "SUBMITTED", "MINED", "REVERTED"]),
     createdAt: z.number().int().nonnegative().safe(),
     updatedAt: z.number().int().nonnegative().safe(),
     nonce: z.number().int().nonnegative().safe().optional(),
-    transactionHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+    transactionHash: TransactionHashSchema.optional(),
     blockNumber: z.number().int().nonnegative().safe().optional(),
   })
   .strict()
@@ -41,9 +46,37 @@ const SubmissionRecordSchema = z
         message: "Self-signed records require a signer",
       });
     }
+    if (submissionMode === "SELF_SIGNED" && !record.transactionHash) {
+      context.addIssue({
+        code: "custom",
+        path: ["transactionHash"],
+        message: "Self-signed records require their precomputed transaction hash",
+      });
+    }
+    const broadcasterOnlyFields = [
+      record.payerRailgunAddress,
+      record.broadcasterRailgunAddress,
+      record.broadcasterQuoteFingerprint,
+      record.broadcasterFeesIDFingerprint,
+      record.broadcasterFeeAmountAtomic,
+      record.nullifiers,
+      record.reportedTransactionHash,
+    ];
+    if (
+      submissionMode === "SELF_SIGNED" &&
+      broadcasterOnlyFields.some((value) => value !== undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["submissionMode"],
+        message: "Self-signed records cannot contain Broadcaster state",
+      });
+    }
     if (
       submissionMode === "BROADCASTER" &&
-      (!record.broadcasterRailgunAddress ||
+      (!record.payerRailgunAddress ||
+        !record.broadcasterRailgunAddress ||
+        !record.broadcasterQuoteFingerprint ||
         !record.broadcasterFeesIDFingerprint ||
         record.broadcasterFeeAmountAtomic === undefined ||
         !record.nullifiers)
@@ -54,11 +87,56 @@ const SubmissionRecordSchema = z
         message: "Broadcaster records require quote identity, fee and nullifiers",
       });
     }
+    if (
+      submissionMode === "BROADCASTER" &&
+      (record.selfSigner !== undefined || record.nonce !== undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["submissionMode"],
+        message: "Broadcaster records cannot contain self-signer state",
+      });
+    }
+    if (record.nullifiers) {
+      const normalized = record.nullifiers.map((value) => value.toLowerCase());
+      if (
+        normalized.some((value) => value === `0x${"0".repeat(64)}`) ||
+        new Set(normalized).size !== normalized.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["nullifiers"],
+          message: "Broadcaster nullifiers must be unique and nonzero",
+        });
+      }
+    }
     if (record.status !== "SUBMITTING" && !record.transactionHash) {
       context.addIssue({
         code: "custom",
         path: ["transactionHash"],
         message: "Submitted records require a transaction hash",
+      });
+    }
+    if (
+      submissionMode === "BROADCASTER" &&
+      record.status === "SUBMITTING" &&
+      record.transactionHash !== undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["transactionHash"],
+        message: "Submitting Broadcaster records cannot claim a canonical hash",
+      });
+    }
+    if (
+      record.status !== "MINED" &&
+      record.status !== "REVERTED" &&
+      record.blockNumber !== undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["blockNumber"],
+        message: "Only terminal records may contain a block number",
       });
     }
     if (
@@ -142,10 +220,14 @@ export class SubmissionJournal {
 
   async reserveBroadcaster(
     request: PaymentRequest,
-    broadcasterRailgunAddress: string,
-    broadcasterFeesID: string,
-    broadcasterFeeAmountAtomic: bigint,
-    nullifiers: string[],
+    input: {
+      payerRailgunAddress: string;
+      broadcasterRailgunAddress: string;
+      broadcasterQuoteFingerprint: string;
+      broadcasterFeesID: string;
+      broadcasterFeeAmountAtomic: bigint;
+      nullifiers: string[];
+    },
     now = Math.floor(Date.now() / 1_000),
   ): Promise<void> {
     const journal = await this.read();
@@ -159,17 +241,49 @@ export class SubmissionJournal {
       intentId: request.id,
       requestFingerprint: requestFingerprint(request),
       submissionMode: "BROADCASTER",
-      broadcasterRailgunAddress,
+      payerRailgunAddress: input.payerRailgunAddress,
+      broadcasterRailgunAddress: input.broadcasterRailgunAddress,
+      broadcasterQuoteFingerprint: input.broadcasterQuoteFingerprint,
       broadcasterFeesIDFingerprint: createHash("sha256")
         .update("ppops-broadcaster-fees-id:v1:")
-        .update(broadcasterFeesID)
+        .update(input.broadcasterFeesID)
         .digest("hex"),
-      broadcasterFeeAmountAtomic: broadcasterFeeAmountAtomic.toString(),
-      nullifiers: nullifiers.map((value) => value.toLowerCase()),
+      broadcasterFeeAmountAtomic: input.broadcasterFeeAmountAtomic.toString(),
+      nullifiers: input.nullifiers.map((value) => value.toLowerCase()),
       status: "SUBMITTING",
       createdAt: now,
       updatedAt: now,
     });
+    await this.write(journal);
+  }
+
+  async markBroadcasterReported(
+    intentId: string,
+    reportedTransactionHash: string,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === intentId);
+    const current = journal.records[index];
+    if (!current || current.submissionMode !== "BROADCASTER") {
+      throw new Error("Broadcaster submission reservation disappeared");
+    }
+    if (current.status !== "SUBMITTING") {
+      throw new Error("Only a submitting Broadcaster transaction may record a reported hash");
+    }
+    const normalized = TransactionHashSchema.parse(reportedTransactionHash).toLowerCase();
+    if (
+      current.reportedTransactionHash &&
+      current.reportedTransactionHash.toLowerCase() !== normalized
+    ) {
+      throw new Error("Broadcaster reported a different transaction hash");
+    }
+    if (current.reportedTransactionHash) return;
+    journal.records[index] = {
+      ...current,
+      reportedTransactionHash: normalized,
+      updatedAt: now,
+    };
     await this.write(journal);
   }
 

@@ -129,17 +129,23 @@ describe("payer submission journal", () => {
 
     await journal.reserveBroadcaster(
       payment,
-      broadcaster,
-      "fee-quote-private-id",
-      1_000n,
-      [nullifier],
+      {
+        payerRailgunAddress: broadcaster,
+        broadcasterRailgunAddress: broadcaster,
+        broadcasterQuoteFingerprint: "aa".repeat(32),
+        broadcasterFeesID: "fee-quote-private-id",
+        broadcasterFeeAmountAtomic: 1_000n,
+        nullifiers: [nullifier],
+      },
       1_000,
     );
     const reserved = await journal.get(payment.id);
     expect(reserved).toMatchObject({
       submissionMode: "BROADCASTER",
       status: "SUBMITTING",
+      payerRailgunAddress: broadcaster,
       broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
       broadcasterFeeAmountAtomic: "1000",
       nullifiers: [nullifier],
     });
@@ -148,11 +154,22 @@ describe("payer submission journal", () => {
     expect(contents).not.toContain("fee-quote-private-id");
     expect(contents).not.toContain(payment.memo);
 
+    const reportedTransactionHash = `0x${"44".repeat(32)}`;
     const transactionHash = `0x${"55".repeat(32)}`;
-    await journal.markSubmitted(payment.id, transactionHash, 1_001);
-    await journal.markMined(payment.id, 123_458, true, 1_002);
+    await journal.markBroadcasterReported(
+      payment.id,
+      reportedTransactionHash,
+      1_001,
+    );
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "SUBMITTING",
+      reportedTransactionHash,
+    });
+    await journal.markSubmitted(payment.id, transactionHash, 1_002);
+    await journal.markMined(payment.id, 123_458, true, 1_003);
     await expect(journal.get(payment.id)).resolves.toMatchObject({
       status: "MINED",
+      reportedTransactionHash,
       transactionHash,
       blockNumber: 123_458,
     });
@@ -172,6 +189,74 @@ describe("payer submission journal", () => {
     );
     await expect(journal.markMined(payment.id, 123_460, true, 1_004)).rejects.toThrow(
       /submitted/,
+    );
+  });
+
+  it("rejects zero fees and duplicate Broadcaster nullifiers in durable state", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    const nullifier = `0x${"77".repeat(32)}`;
+    const reservation = {
+      payerRailgunAddress: broadcaster,
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
+      broadcasterFeesID: "fee-id",
+      broadcasterFeeAmountAtomic: 1n,
+      nullifiers: [nullifier],
+    };
+
+    await expect(
+      journal.reserveBroadcaster(payment, {
+        ...reservation,
+        broadcasterFeeAmountAtomic: 0n,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      journal.reserveBroadcaster(payment, {
+        ...reservation,
+        nullifiers: [nullifier, nullifier],
+      }),
+    ).rejects.toThrow(/unique/);
+    await expect(journal.get(payment.id)).resolves.toBeUndefined();
+  });
+
+  it("rejects an impossible canonical hash in a submitting Broadcaster record", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const path = join(root, "submissions.json");
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 1,
+        records: [
+          {
+            intentId: request().id,
+            requestFingerprint: "aa".repeat(32),
+            submissionMode: "BROADCASTER",
+            payerRailgunAddress: broadcaster,
+            broadcasterRailgunAddress: broadcaster,
+            broadcasterQuoteFingerprint: "bb".repeat(32),
+            broadcasterFeesIDFingerprint: "cc".repeat(32),
+            broadcasterFeeAmountAtomic: "1",
+            nullifiers: [`0x${"77".repeat(32)}`],
+            status: "SUBMITTING",
+            transactionHash: `0x${"88".repeat(32)}`,
+            createdAt: 1_000,
+            updatedAt: 1_000,
+          },
+        ],
+      }),
+      { mode: 0o600 },
+    );
+
+    await expect(new SubmissionJournal(path).get(request().id)).rejects.toThrow(
+      /canonical hash/,
     );
   });
 

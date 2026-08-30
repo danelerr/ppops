@@ -61,6 +61,7 @@ const PROXY = "0x0000000000000000000000000000000000001234";
 const BROADCASTER_ADDRESS =
   "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
 const TX_HASH = `0x${"88".repeat(32)}`;
+const CANONICAL_TX_HASH = `0x${"99".repeat(32)}`;
 const NULLIFIER = `0x${"77".repeat(32)}`;
 const roots: string[] = [];
 
@@ -146,8 +147,11 @@ const testContext = async (): Promise<{
   } as PayerConfig;
   const engine = {
     walletID: "wallet-id",
+    railgunAddress: BROADCASTER_ADDRESS,
     network: { proxyContract: PROXY },
     spendableBalance: vi.fn(async () => 100_000n),
+    syncBalances: vi.fn(async () => ({})),
+    recoverTransactionHashForNullifiers: vi.fn(async () => TX_HASH),
   } as unknown as PayerRailgunEngine;
   const request = paymentRequest();
   requestMocks.current = request;
@@ -257,7 +261,82 @@ describe("Broadcaster transfer lifecycle", () => {
     expect(submit).toHaveBeenCalledOnce();
     await expect(journal.get(request.id)).resolves.toMatchObject({
       status: "SUBMITTED",
+      reportedTransactionHash: TX_HASH,
       transactionHash: TX_HASH,
+    });
+  });
+
+  it("keeps a reported hash non-canonical until nullifier recovery succeeds", async () => {
+    const { config, engine, request } = await testContext();
+    vi.mocked(engine.recoverTransactionHashForNullifiers).mockResolvedValue(undefined);
+    const result = await sendBroadcasterTransfer({
+      config,
+      engine,
+      session: fakeSession(),
+      request,
+      dbEncryptionKey: "11".repeat(32),
+      maxBroadcasterFeeAtomic: "1000",
+      requestSource: "http://127.0.0.1/request.json",
+      expectedMerchantSigner: request.expectedMerchantSigner,
+      submit: true,
+    });
+
+    expect(result).toMatchObject({
+      receiptStatus: "PENDING",
+      reportedTransactionHash: TX_HASH,
+      canonicalTransactionHashResolved: false,
+    });
+    expect(result.transactionHash).toBeUndefined();
+    expect(rpcMocks.readReceipt).not.toHaveBeenCalled();
+    const reserved = await new SubmissionJournal(
+      submissionJournalPath(config.storage.walletStatePath),
+    ).get(request.id);
+    expect(reserved).toMatchObject({
+      status: "SUBMITTING",
+      reportedTransactionHash: TX_HASH,
+    });
+    expect(reserved?.transactionHash).toBeUndefined();
+  });
+
+  it("uses the nullifier-derived hash instead of a conflicting Broadcaster response", async () => {
+    const { config, engine, request } = await testContext();
+    vi.mocked(engine.recoverTransactionHashForNullifiers).mockResolvedValue(
+      CANONICAL_TX_HASH,
+    );
+    rpcMocks.readReceipt.mockResolvedValue({
+      transactionHash: CANONICAL_TX_HASH,
+      blockNumber: 123_456,
+      blockHash: `0x${"aa".repeat(32)}`,
+      succeeded: true,
+      providerAgreement: 2,
+    });
+    const result = await sendBroadcasterTransfer({
+      config,
+      engine,
+      session: fakeSession(),
+      request,
+      dbEncryptionKey: "11".repeat(32),
+      maxBroadcasterFeeAtomic: "1000",
+      requestSource: "http://127.0.0.1/request.json",
+      expectedMerchantSigner: request.expectedMerchantSigner,
+      submit: true,
+    });
+
+    expect(result).toMatchObject({
+      receiptStatus: "MINED",
+      reportedTransactionHash: TX_HASH,
+      transactionHash: CANONICAL_TX_HASH,
+      canonicalTransactionHashResolved: true,
+    });
+    expect(rpcMocks.readReceipt).toHaveBeenCalledWith(config, CANONICAL_TX_HASH);
+    await expect(
+      new SubmissionJournal(submissionJournalPath(config.storage.walletStatePath)).get(
+        request.id,
+      ),
+    ).resolves.toMatchObject({
+      status: "MINED",
+      reportedTransactionHash: TX_HASH,
+      transactionHash: CANONICAL_TX_HASH,
     });
   });
 

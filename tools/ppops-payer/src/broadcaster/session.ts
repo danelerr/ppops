@@ -70,11 +70,35 @@ const parseFeePerUnitGas = (value: string): bigint => {
 };
 
 export const validateBroadcaster = (
-  selected: SelectedBroadcaster,
+  value: unknown,
   minimumReliability: number,
   minimumQuoteValidityMs: number,
   now = Date.now(),
 ): ValidatedBroadcaster => {
+  if (!value || typeof value !== "object") {
+    throw new SafeFailure("BROADCASTER_INVALID_QUOTE", "Broadcaster quote is malformed");
+  }
+  const candidate = value as Record<string, unknown>;
+  const tokenFee = candidate.tokenFee;
+  if (
+    typeof candidate.railgunAddress !== "string" ||
+    typeof candidate.tokenAddress !== "string" ||
+    !tokenFee ||
+    typeof tokenFee !== "object"
+  ) {
+    throw new SafeFailure("BROADCASTER_INVALID_QUOTE", "Broadcaster quote is malformed");
+  }
+  const fee = tokenFee as Record<string, unknown>;
+  if (
+    typeof fee.feePerUnitGas !== "string" ||
+    typeof fee.expiration !== "number" ||
+    typeof fee.feesID !== "string" ||
+    typeof fee.availableWallets !== "number" ||
+    typeof fee.reliability !== "number"
+  ) {
+    throw new SafeFailure("BROADCASTER_INVALID_QUOTE", "Broadcaster fee quote is malformed");
+  }
+  const selected = value as SelectedBroadcaster;
   if (
     selected.tokenAddress.toLowerCase() !== PAYER_TOKEN_ADDRESS ||
     !validateRailgunAddress(selected.railgunAddress) ||
@@ -106,6 +130,29 @@ export const validateBroadcaster = (
     .update(selected.tokenFee.expiration.toString())
     .digest("hex");
   return { selected, feePerUnitGas, fingerprint };
+};
+
+export const selectCurrentBroadcaster = (
+  candidates: unknown,
+  expected: ValidatedBroadcaster,
+  minimumReliability: number,
+  minimumQuoteValidityMs: number,
+  now = Date.now(),
+): ValidatedBroadcaster | undefined => {
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    try {
+      const validated = validateBroadcaster(
+        candidate,
+        minimumReliability,
+        minimumQuoteValidityMs,
+        now,
+      );
+      if (validated.fingerprint === expected.fingerprint) return validated;
+    } catch (error) {
+      if (!(error instanceof SafeFailure)) throw error;
+    }
+  }
+  return undefined;
 };
 
 export class BroadcasterSession {
@@ -245,23 +292,19 @@ export class BroadcasterSession {
       PAYER_TOKEN_ADDRESS,
       false,
     );
-    const selected = candidates?.find(
-      (candidate: SelectedBroadcaster) =>
-        candidate.railgunAddress === expected.selected.railgunAddress &&
-        candidate.tokenFee.feesID === expected.selected.tokenFee.feesID &&
-        candidate.tokenFee.feePerUnitGas === expected.selected.tokenFee.feePerUnitGas,
+    const current = selectCurrentBroadcaster(
+      candidates,
+      expected,
+      this.config.minimumReliability,
+      this.config.minimumQuoteValidityMs,
     );
-    if (!selected) {
+    if (!current) {
       throw new SafeFailure(
         "BROADCASTER_INVALID_QUOTE",
         "The selected Broadcaster quote changed during proof generation",
       );
     }
-    return validateBroadcaster(
-      selected,
-      this.config.minimumReliability,
-      this.config.minimumQuoteValidityMs,
-    );
+    return current;
   }
 
   connectionStatus(): BroadcasterConnectionStatus {

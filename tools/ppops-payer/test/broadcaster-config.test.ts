@@ -55,6 +55,16 @@ describe("Broadcaster trust configuration", () => {
         minimumQuoteValidityMs: 119_999,
       }),
     ).toThrow();
+    expect(() =>
+      BroadcasterTrustConfigSchema.parse({
+        schemaVersion: 1,
+        trustedFeeSigners: [TRUSTED_SIGNER],
+        broadcasterVersionRange: {
+          minVersion: "8.0.0",
+          maxVersion: "9007199254740992.0.0",
+        },
+      }),
+    ).toThrow(/safe integers/);
   });
 
   it("loads only an owner-only regular file", async () => {

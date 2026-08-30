@@ -11,7 +11,13 @@ const RailgunAddressSchema = z
   .trim()
   .refine(validateRailgunAddress, "Expected a valid RAILGUN address");
 const MillisecondsSchema = z.number().int().positive().safe();
-const VersionSchema = z.string().regex(/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/);
+const VersionSchema = z
+  .string()
+  .regex(/^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/)
+  .refine(
+    (value) => value.split(".").every((part) => Number.isSafeInteger(Number(part))),
+    "Version components must be safe integers",
+  );
 
 const versionParts = (value: string): [number, number, number] => {
   const parts = value.split(".").map(Number);

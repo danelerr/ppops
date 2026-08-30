@@ -45,6 +45,8 @@ import {
 
 export type BroadcasterTransferResult = {
   transactionHash?: string;
+  reportedTransactionHash?: string;
+  canonicalTransactionHashResolved: boolean;
   broadcasterFeeAmountAtomic: string;
   gasEstimate: string;
   providerAgreement: number;
@@ -285,6 +287,7 @@ export const sendBroadcasterTransfer = async (input: {
       providerAgreement,
       quoteReliability: current.selected.tokenFee.reliability,
       quoteValidityMs,
+      canonicalTransactionHashResolved: false,
       receiptStatus: "NOT_SUBMITTED",
     };
   }
@@ -302,10 +305,14 @@ export const sendBroadcasterTransfer = async (input: {
   try {
     await submissionJournal.reserveBroadcaster(
       request,
-      current.selected.railgunAddress,
-      current.selected.tokenFee.feesID,
-      broadcasterFee.amount,
-      nullifiers,
+      {
+        payerRailgunAddress: engine.railgunAddress,
+        broadcasterRailgunAddress: current.selected.railgunAddress,
+        broadcasterQuoteFingerprint: current.fingerprint,
+        broadcasterFeesID: current.selected.tokenFee.feesID,
+        broadcasterFeeAmountAtomic: broadcasterFee.amount,
+        nullifiers,
+      },
     );
   } catch (error) {
     throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Broadcaster reservation failed", {
@@ -313,7 +320,41 @@ export const sendBroadcasterTransfer = async (input: {
     });
   }
 
-  const transactionHash = await session.submitPrepared(preparedSubmission);
+  const reportedTransactionHash = await session.submitPrepared(preparedSubmission);
+  try {
+    await submissionJournal.markBroadcasterReported(
+      request.id,
+      reportedTransactionHash,
+    );
+  } catch (error) {
+    throw new SafeFailure(
+      "JOURNAL_UPDATE_FAILED",
+      "Broadcaster reported-hash journal update failed",
+      { cause: error },
+    );
+  }
+  writeEvent("broadcaster.transfer-reported", { reportedTransactionHash });
+
+  await engine.syncBalances();
+  const transactionHash = await engine.recoverTransactionHashForNullifiers(
+    nullifiers,
+  );
+  if (!transactionHash) {
+    writeEvent("broadcaster.transfer-canonical-pending");
+    return {
+      reportedTransactionHash,
+      canonicalTransactionHashResolved: false,
+      broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
+      gasEstimate: gasEstimate.toString(),
+      providerAgreement,
+      quoteReliability: current.selected.tokenFee.reliability,
+      quoteValidityMs,
+      receiptStatus: "PENDING",
+    };
+  }
+  if (transactionHash.toLowerCase() !== reportedTransactionHash.toLowerCase()) {
+    writeEvent("broadcaster.transfer-reported-hash-mismatch");
+  }
   try {
     await submissionJournal.markSubmitted(request.id, transactionHash);
   } catch (error) {
@@ -328,6 +369,8 @@ export const sendBroadcasterTransfer = async (input: {
     writeEvent("broadcaster.transfer-receipt-pending", { transactionHash });
     return {
       transactionHash,
+      reportedTransactionHash,
+      canonicalTransactionHashResolved: true,
       broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
       gasEstimate: gasEstimate.toString(),
       providerAgreement,
@@ -357,6 +400,8 @@ export const sendBroadcasterTransfer = async (input: {
   });
   return {
     transactionHash,
+    reportedTransactionHash,
+    canonicalTransactionHashResolved: true,
     broadcasterFeeAmountAtomic: broadcasterFee.amount.toString(),
     gasEstimate: gasEstimate.toString(),
     providerAgreement,
