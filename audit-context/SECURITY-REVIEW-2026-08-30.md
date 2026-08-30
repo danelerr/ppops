@@ -37,7 +37,7 @@ Both runtimes now own one explicit `refreshBalances` call and then read the
 current TXOs/PPOI buckets. `PENDING` remains fail-closed and can become
 `SPENDABLE` on a later scan. Controlled payer prepares completed in 7.8 and
 10.7 seconds; the latter made any cleanup failure fatal and still exited cleanly.
-the merchant reached readiness in about 6 seconds and, after the final
+The merchant reached readiness in about 6 seconds and, after the final
 observability correction, completed five more scheduled scans at roughly
 34-second cadence.
 
@@ -154,7 +154,9 @@ paths in the merchant tarball.
 3. Mainnet restart, restore and webhook duplicate-delivery artifact.
 4. Waku/Broadcaster Gate B for sender unlinkability.
 5. At least one independent operator installation and payment.
-6. CI or local Docker image evidence for the final commit.
+
+CI verification and Docker-image build evidence for the final hardening commit
+completed successfully in [GitHub Actions run 33319219724](https://github.com/danelerr/ppops/actions/runs/33319219724).
 
 The known dependency advisories, external RPC/PPOI trust, unencrypted backup
 bundles and public self-signer linkage described in the 2026-08-29 review remain

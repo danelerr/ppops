@@ -113,7 +113,8 @@ These live values demonstrate the bound; they are not future fee estimates.
 
 ## 5. Submit with explicit bounds
 
-For a `0.10 USDC` pilot:
+For the prepared `0.01 USDC` pilot, with an independently accepted ceiling of
+`0.10 USDC`:
 
 ```bash
 node dist/cli.js pay-self-signed \
