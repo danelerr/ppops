@@ -203,10 +203,47 @@ standard.
 
 ### Research gate — reduce time to first private payment
 
+The working thesis is:
+
+> Private payments cannot become normal payments if entering the private state
+> requires an hour of pre-planning.
+
+This is not a claim that every RAILGUN payment waits an hour. The standby applies
+to newly shielded liquidity; completed Private POI assurance is carried forward
+through later private transfers when the sender finishes output PPOI. The
+dominant first-use cost may therefore be privacy-liquidity onboarding rather
+than private transaction execution.
+
+Before proposing a protocol change, PPOps should publish a metadata-safe
+**Private Payments Operational Benchmark** that separates:
+
+```text
+T_shield_to_spendable
+T_spendable_to_broadcast
+T_broadcast_to_observed
+T_observed_to_finalized
+T_finalized_to_spendable
+```
+
+The benchmark must attribute each interval and failure to its actual layer:
+wallet, RPC, chain/L2, RAILGUN proving, Broadcaster, PPOI or PPOps. Median and
+p95 measurements need a sufficiently large or delayed cohort so they do not
+become a public timing-correlation oracle.
+
+RAILGUN documents the initial one-hour standby as time for List Providers to
+update data so recently shielded assets cannot outrun those updates; Railway
+documents that the policy may be shortened in the future. This makes a later
+research question legitimate but conditional: **can measured data freshness,
+propagation and proof performance support a shorter delay without weakening the
+PPOI threat model?** PPOps v0.1 does not change the parameter, and no research
+path may bypass PPOI or relabel pending funds as spendable.
+
 Investigate, with separate kill tests, without committing v0.1 to any option:
 
 1. **Pre-positioned user-owned private liquidity.** Best trust model, but still
-   requires users to prepare before checkout.
+   requires users to prepare before checkout. A wallet-maintained private
+   working balance is the first product experiment because it amortizes the
+   delay without changing assurance or giving PPOps custody.
 2. **Sponsored or liquidity-assisted private settlement.** Could make the payer
    experience faster, but introduces liquidity, availability, pricing,
    compliance and possible custody/trust assumptions.
@@ -218,7 +255,12 @@ Investigate, with separate kill tests, without committing v0.1 to any option:
    operational cost must be measured rather than hidden.
 
 Each research path needs a threat model and a binary kill test before it becomes
-a roadmap commitment.
+a roadmap commitment. A protocol-level standby reduction additionally requires
+upstream collaboration and evidence that List Provider freshness and PPOI
+security remain at least equivalent. This follows the empirical performance
+discipline reflected in Ethlabs' Hegota analysis—measure user-visible latency,
+implementation complexity and adoption impact—without implying that Ethlabs is
+working on this RAILGUN-specific issue.
 
 ## Proposed public metrics
 
@@ -279,6 +321,8 @@ The evidence-backed, explicitly blocked answer bank is maintained in
 - [Octant Epoch 13 application and eligibility criteria](https://octant.fillout.com/epoch-13)
 - [Octant Epoch 13 privacy-round announcement](https://octant.substack.com/p/epoch-13-the-privacy-round)
 - [RAILGUN Private Proofs of Innocence](https://docs.railgun.org/wiki/assurance/private-proofs-of-innocence)
+- [Railway Wallet Private Proofs of Innocence](https://help.railway.xyz/private-proofs-of-innocence)
 - [RAILGUN balance and sync callbacks](https://docs.railgun.org/developer-guide/wallet/private-balances/balance-and-sync-callbacks)
 - [RAILGUN Broadcasters](https://docs.railgun.org/developer-guide/wallet/broadcasters)
+- [Ethlabs Hegota view](https://ethlabs.org/writings/hegota-view.html)
 - [Controlled pilot findings](PILOT-FINDINGS.md)

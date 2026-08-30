@@ -130,15 +130,49 @@ pilot the wallet itself estimated roughly one hour until the funds could be
 spent. A checkout that begins before payer readiness creates urgency, expired
 intents and support burden.
 
+That delay is an **onboarding-liquidity constraint**, not the latency of every
+private payment. It applies when assets enter RAILGUN through a new shield.
+Once those assets are `Spendable`, their Private POI assurance is carried
+forward through subsequent 0zk-to-0zk transfers. A receiver can use a private
+transfer without another one-hour standby after the sender completes the
+transaction's output PPOI. The product problem is therefore how users enter and
+maintain the private state, as well as how quickly one payment executes inside
+it.
+
 PPOps can:
 
 - require payer readiness before creating a short-lived intent;
 - distinguish onboarding from checkout;
 - expose explicit `PENDING` and `SPENDABLE` semantics;
-- measure time from public funding to first eligible private payment.
+- measure time from public funding to first eligible private payment;
+- separately measure shield-to-spendable, proving, Broadcaster, chain finality,
+  PPOI propagation and reconciliation latency;
+- help wallets evaluate a user-owned private working balance that is replenished
+  before checkout, amortizing the standby without introducing merchant custody.
 
 PPOps cannot remove a protocol-enforced RAILGUN standby period while remaining
-a view-only reconciler.
+a view-only reconciler. Reducing it is explicitly outside v0.1. The future
+research question is narrower and security-preserving: **what is the minimum
+delay needed for List Providers and PPOI infrastructure to update without
+weakening the assurance threat model?** The one-hour wallet policy gives those
+providers time to update and is documented as potentially reducible; it is not
+presented as a mathematical requirement of zero-knowledge proofs. PPOps should
+first produce operational measurements, then investigate faster data updates,
+propagation, proof generation or alternative assurance designs with upstream
+maintainers. It must never frame bypassing PPOI as an optimization.
+
+The benchmark dimensions are:
+
+```text
+T_shield_to_spendable
+T_spendable_to_broadcast
+T_broadcast_to_observed
+T_observed_to_finalized
+T_finalized_to_spendable
+```
+
+Aggregate publication must preserve the metadata safeguards described below;
+individual timestamps can recreate a payment graph.
 
 ### F-02: wallet and RPC reliability are part of payment privacy
 
@@ -491,6 +525,7 @@ PPOps must not yet claim:
 
 ## Sources
 
+- [Railway Wallet Private Proofs of Innocence](https://help.railway.xyz/private-proofs-of-innocence)
 - [RAILGUN Private Proofs of Innocence](https://docs.railgun.org/wiki/assurance/private-proofs-of-innocence)
 - [RAILGUN balance and sync callbacks](https://docs.railgun.org/developer-guide/wallet/private-balances/balance-and-sync-callbacks)
 - [RAILGUN costs and fees](https://docs.railgun.org/community-faqs/readme/costs-and-fees)
