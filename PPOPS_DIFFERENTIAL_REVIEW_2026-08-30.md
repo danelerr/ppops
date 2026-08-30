@@ -12,6 +12,8 @@ Operational follow-up: `e09245e`
 
 Ambiguity/retry remediation: `5d07fa0`
 
+Final-calldata simulation remediation: `b6d5e3d`
+
 Reviewer: repository-grounded automated differential review; not an independent
 third-party audit
 
@@ -23,9 +25,10 @@ not gain payer spending authority.
 
 The initial adversarial review found one Medium and two Low implementation
 issues. The funded trial and follow-up review found one additional Medium
-cross-intent nullifier risk and two Low ambiguity/retry risks. All six are fixed
-in `136c4bc` and `5d07fa0` with regression coverage. No open Critical, High or
-Medium application finding is confirmed in the reviewed delta.
+cross-intent nullifier risk and two Low ambiguity/retry risks. A post-trial
+review found one further Low pre-submission simulation gap. All seven are fixed
+in `136c4bc`, `5d07fa0` and `b6d5e3d` with regression coverage. No open Critical,
+High or Medium application finding is confirmed in the reviewed delta.
 
 The most important correction separates three different facts:
 
@@ -50,8 +53,8 @@ unexecuted. The review methods themselves moved no funds.
 
 ## Scope and change surface
 
-The reviewed range `716b54d..5d07fa0` contains 12 commits, 41 changed files and
-approximately 7,305 additions / 137 deletions. Much of that volume is the
+The reviewed range `716b54d..b6d5e3d` contains 17 commits, 52 changed files and
+approximately 9,776 additions / 297 deletions. Much of that volume is the
 pinned Waku dependency lockfile and new tests. The security-sensitive production
 surface is concentrated in:
 
@@ -79,6 +82,7 @@ not a removed control.
 | DR-004 | Medium | Fixed | A different intent could reserve nullifiers already held by an unresolved Broadcaster submission |
 | DR-005 | Low | Fixed | Broadcaster rejection and chain-ambiguous post-send failures were not separated into durable safe categories |
 | DR-006 | Low | Fixed | A bounded ambiguity retry could repeatedly select the same failing Broadcaster identity |
+| DR-007 | Low | Fixed | The exact post-proof populated calldata was not independently simulated before Waku |
 
 ### DR-001 — Broadcaster-reported hash was not bound to reserved nullifiers
 
@@ -199,10 +203,36 @@ candidate counts and fails before proof/submission if no different valid
 identity exists. Selection among eligible quotes is deterministic by fee,
 reliability and fingerprint. The retry count is capped at three.
 
+### DR-007 — final populated calldata needed a pre-Waku simulation
+
+The payer obtained the Wallet SDK's unproven-transfer gas estimate before proof
+generation and later validated the populated target, calldata shape and zero
+ETH value. It did not independently ask the configured RPC set to execute
+`eth_estimateGas` against the exact post-proof calldata. An SDK regression or
+proof/population mismatch could therefore have reached the durable reservation
+and Waku boundary before being detected, turning a locally diagnosable failure
+into an ambiguous relay outcome.
+
+Merchant settlement would still fail closed and the amount/fee ceilings would
+remain intact, so the practical impact was availability and evidence ambiguity,
+not direct false fulfillment. The fix simulates the exact validated target and
+calldata from the same non-funded dummy sender used by the upstream estimation
+path. A strict majority of distinct configured RPC origins must return a
+positive estimate within bounded deadlines; the upper median is selected. This
+happens before encrypted-request construction, journal reservation or Waku.
+
+The post-trial no-send diagnostic passed on all three configured RPCs: the
+pre-proof estimate was `1128365`, the final estimate was `1123239`, and the
+point-in-time Broadcaster fee was `64892` atomic (`0.064892 USDC`). No payment
+or journal record was created. This makes invalid final calldata unlikely under
+those RPC views and narrows, but does not solve, the remote Broadcaster failure.
+
 ## State and trust-boundary invariants after remediation
 
 - PPOps merchant runtime remains view-only and cannot import payer code.
 - `prepare-broadcaster` performs no journal write or Waku submission.
+- A strict configured-RPC majority simulates the exact populated proof/calldata
+  before Waku construction or journal mutation.
 - `pay-broadcaster` still requires exact intent, payer, amount, fee and explicit
   intent confirmation.
 - The payer's optional EVM self-signing key is not loaded in Gate B.
@@ -243,7 +273,7 @@ protection was found.
 `npm run verify:all` passed after remediation:
 
 - merchant: 19 test files, 58 tests;
-- reference payer: 15 test files, 76 tests;
+- reference payer: 15 test files, 78 tests;
 - TypeScript typechecks and production builds;
 - merchant coverage thresholds;
 - merchant and payer privacy checks;
@@ -267,6 +297,7 @@ The new payer regressions specifically exercise:
 - safe-integer version bounds;
 - unique/nonzero nullifiers and cross-state journal validation;
 - RPC deadline behavior, majority retention and high-outlier gas selection.
+- exact populated-calldata simulation majority and pre-reservation failure.
 
 ## Limitations and residual risks
 
@@ -277,6 +308,10 @@ The new payer regressions specifically exercise:
 - A live no-send preparation generated the proof and observed a `70373`-atomic
   Broadcaster fee for a `10000`-atomic request, but wrote no journal and left
   the merchant intent open with zero received.
+- A later no-send run successfully quorum-simulated the exact populated
+  calldata and observed a `64892`-atomic fee, but this cannot reproduce the
+  Broadcaster's private off-chain fee/PPOI/runtime validation or sanitized
+  response path.
 - The RAILGUN Wallet SDK, engine, Waku client, proving artifacts, PPOI services,
   Broadcasters and protocol cryptography were treated as dependencies, not
   independently audited.
@@ -293,8 +328,9 @@ The new payer regressions specifically exercise:
 
 ## Recommendation
 
-Keep `136c4bc`, follow-up `e09245e`, ambiguity remediation `5d07fa0` and the
-updated runbooks. Before any Gate B claim:
+Keep `136c4bc`, follow-up `e09245e`, ambiguity remediation `5d07fa0`, final-call
+simulation remediation `b6d5e3d` and the updated runbooks. Before any Gate B
+claim:
 
 1. retain the unresolved journal and do not delete, reset or bypass its
    nullifier reservation;

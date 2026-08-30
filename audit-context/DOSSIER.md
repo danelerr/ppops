@@ -1,8 +1,8 @@
 # PPOps audit context dossier
 
 Context-building snapshot: 2026-08-30. This document describes the source tree
-through Gate B ambiguity/retry remediation commit
-`5d07fa0a3ca115452a0a626c378afcaaebfc0d68`. Review began from root commit
+through Gate B final-calldata simulation remediation commit
+`b6d5e3dee1d39968a2ae96c5827e65e84d87124e`. Review began from root commit
 `89256e9e2fa2f4d388c9b2dd96adb5ef588fe8ef`; the payer subtree was originally
 imported from commit
 `300bcb7c5a52ad7955ce317f15a120b3138c48e6`. This is an orientation record, not
@@ -44,7 +44,7 @@ package through its own `verify` script (`tools/ppops-payer/package.json:L23-L28
 Root `verify:all` composes the two runs without merging their test discovery or
 coverage accounting (`package.json:L41-L46`).
 The latest separate verification reported by the coordinating run contained 19
-merchant test files / 58 tests and 15 payer test files / 76 tests; those counts
+merchant test files / 58 tests and 15 payer test files / 78 tests; those counts
 are execution observations rather than source invariants.
 
 The protocol path is:
@@ -156,6 +156,7 @@ unauthenticated. Static payer assets are also unauthenticated
 | Scanner -> RPC providers | Chain ID, latest/finalized heights, receipts, blocks | Majority grouping/height clustering in `src/railgun/rpc-quorum.ts:L68-L175` |
 | Wallet SDK -> PPOI nodes | PPOI health/proof/bucket data | URL/profile constraints at `src/config.ts:L144-L221`; health preflight at `src/railgun/ppoi-preflight.ts:L18-L68`; proof semantics remain an SDK/PPOI dependency |
 | Payer -> one submission RPC | Network/fee reads and raw transaction submission | First healthy provider selection with chain-ID check at `tools/ppops-payer/src/railgun/self-signed-transfer.ts:L49-L75` |
+| Payer -> configured simulation RPCs | Exact validated post-proof Broadcaster target/calldata | Bounded strict-majority `eth_estimateGas` and upper-median selection before Waku/journal effects at `tools/ppops-payer/src/railgun/rpc-quorum.ts` and `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` |
 | Operator trust file -> Waku fee cache | One to sixteen trusted fee-signer 0zk addresses, Waku topic, time/reliability/version bounds | Owner-only strict trust config at `tools/ppops-payer/src/broadcaster/config.ts:L37-L104`; passed to the SDK at `tools/ppops-payer/src/broadcaster/session.ts:L262-L290`; local SDK verifies broadcaster fee-message signatures and applies trusted-signer fee authorization at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/fees/handle-fees-message.js:L32-L128` |
 | Payer -> Waku/Broadcaster | RAILGUN proxy target/calldata, fee ID, gas floor and pre-transaction PPOI payload encrypted to selected Broadcaster viewing key; retry excludes every previously attempted Broadcaster identity and preserves the exact original nullifier set | Retry selection at `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L138-L178` and `tools/ppops-payer/src/broadcaster/session.ts:L196-L260`; `prepareSubmission` at `tools/ppops-payer/src/broadcaster/session.ts:L445-L478`; retry binding at `tools/ppops-payer/src/security/submission-journal.ts:L412-L468`; pinned local client encryption at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transaction.js:L41-L68` |
 | Waku/Broadcaster -> payer | Encrypted transact response text or completion inferred from the reserved nullifiers | SDK response-key state/decryption at `tools/ppops-payer/node_modules/@railgun-community/waku-broadcaster-client-node/dist/transact/broadcaster-transact-response.js:L5-L44`; exact response classifiers plus unclassified fallback at `tools/ppops-payer/src/broadcaster/failures.ts:L39-L165` and `tools/ppops-payer/src/broadcaster/session.ts:L480-L517`; reported/canonical split at `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L357-L448` |
@@ -295,12 +296,13 @@ unauthenticated. Static payer assets are also unauthenticated
     (`tools/ppops-payer/src/cli.ts:L793-L853`;
     `tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L120-L244`).
 17. **Gate B preparation is separated from the irreversible call.** Proof and
-    population complete, the proxy/zero-value/nullifier set and live request are
-    checked, and `submit=false` returns without constructing a Waku transaction
-    or journal record. On `submit=true`, local encrypted-message construction
-    completes before the journal reservation; `submitPrepared` is called only
-    after that reservation returns
-    (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts:L246-L359`).
+    population complete, the proxy/zero-value/nullifier set is checked and a
+    configured RPC majority simulates the exact final calldata. The live request
+    and quote are then revalidated, and `submit=false` returns without
+    constructing a Waku transaction or journal record. On `submit=true`, local
+    encrypted-message construction completes before the journal reservation;
+    `submitPrepared` is called only after that reservation returns
+    (`tools/ppops-payer/src/railgun/broadcaster-transfer.ts`).
 18. **Canonical Gate B identity comes from nullifiers.** The hash returned by
     the Waku client is journaled only as `reportedTransactionHash`. Wallet/engine
     lookup requires all reserved nullifiers to map to one transaction; only that
@@ -614,8 +616,16 @@ ignored runtime files:
   canonical hash; the reported private balance remained `189500` atomic units
   and the merchant intent remained open at zero received/pending value.
 
+A later no-send diagnostic generated a fresh proof and passed exact populated
+calldata simulation through all three configured RPCs (`1128365` pre-proof
+estimate, `1123239` final estimate). It observed a `64892`-atomic fee, submitted
+no payment and wrote no journal. This narrows the unresolved outcome to the
+Broadcaster's off-chain path or sanitized response boundary; it does not pass
+Gate B.
+
 No secret, ignored config, wallet database or journal contents were opened to
-record this observation; the values above were supplied by the operator.
+record these observations; the values above were emitted by bounded tooling
+during operator-authorized runs.
 
 ## Function record index
 

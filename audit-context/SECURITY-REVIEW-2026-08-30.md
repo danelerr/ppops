@@ -28,12 +28,15 @@ implementation, non-financial connectivity preflight and no-send proof
 preparation also passed. A bounded value-bearing Gate B trial subsequently sent
 same-nullifier variants through two selected identities, but returned no usable
 hash; recovery found no transaction and balance remained unchanged. Gate B did
-not pass. The post-review payer suite now has 15 test files and 76 tests; its
-Waku-enabled dependency graph has 10 Moderate and 30 Low findings, with zero
-Critical/High findings. This paragraph records
-later state and does not retroactively expand the review scope below. The
-subsequent Broadcaster-specific differential review is recorded separately in
-[the 2026-08-30 differential review](../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md).
+not pass. A later no-send run added and passed three-RPC simulation of the exact
+post-proof calldata before any Waku or journal effect, narrowing the unresolved
+failure to Broadcaster-side processing without passing Gate B. The post-review
+payer suite now has 15 test files and 78 tests; its Waku-enabled dependency graph
+has 10 Moderate and 30 Low findings, with zero Critical/High findings. This
+paragraph records later state and does not retroactively expand the review
+scope below. The subsequent Broadcaster-specific differential review is
+recorded separately in [the 2026-08-30 differential
+review](../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md).
 
 ## Reviewed changes
 

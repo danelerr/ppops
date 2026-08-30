@@ -256,13 +256,24 @@ estimate with three-provider agreement. It returned `paymentSubmitted: false`,
 wrote no journal and left the merchant intent open with zero received. The
 observed fee is not a later quote or spending authorization.
 
+After the failed funded trial, a second no-send diagnostic exercised the
+post-proof guard. Its pre-proof estimate was `1128365`, the exact populated
+calldata simulated at `1123239` through all three configured RPCs, and the live
+fee was `64892` atomic (`0.064892 USDC`). It returned
+`paymentSubmitted: false` and wrote no journal. This rules out an obvious final
+calldata/proof rejection under those RPC views, but it does not validate remote
+fee extraction, PPOI checks, Broadcaster runtime health or transaction sending.
+
 For a new, independently approved intent, run `prepare-broadcaster` with exact
 amount and atomic-USDC fee ceilings. Only after reviewing that no-send result may
-the operator run `pay-broadcaster` with `--confirm-intent`. The payer journals
-the exact encrypted-submission quote fingerprint, bounded fee, payer identity
-and nullifiers before Waku. It tolerates fee-ID/expiry rotation only when the
-Broadcaster address, token and fee rate remain identical; otherwise it requires
-a new proof.
+the operator run `pay-broadcaster` with `--confirm-intent`. After proof
+generation, a strict configured-RPC majority must first simulate the exact
+populated proxy calldata with a positive gas estimate. Failure aborts before
+journal reservation or Waku. The payer then reloads the live signed request and
+journals the exact encrypted-submission quote fingerprint, bounded fee, payer
+identity and nullifiers before Waku. It tolerates fee-ID/expiry rotation only
+when the Broadcaster address, token and fee rate remain identical; otherwise it
+requires a new proof.
 
 A Waku-returned hash is only an untrusted report: the payer must recover the
 canonical transaction hash from those nullifiers before receipt lookup or

@@ -237,15 +237,15 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 15 test files and 76 tests,
+- Automated reference-payer suite on 2026-08-30: 15 test files and 78 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
   adversarial hash mismatch, proof-compatible quote rotation,
   exact-submission-quote persistence, classified rejection/ambiguity,
   exact-nullifier bounded retries, alternate-Broadcaster exclusion,
   cross-intent nullifier collision rejection, bounded RPC reads, gas outlier
-  handling, receipt agreement, no-broadcast preparation and clean CLI-process
-  termination.
+  handling, exact populated-calldata simulation quorum, receipt agreement,
+  no-broadcast preparation and clean CLI-process termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
@@ -300,6 +300,12 @@ Verification evidence:
   submitted no payment, wrote no journal record and left the intent open at
   zero received. The fee is point-in-time evidence, not a later quote. The
   value-bearing Gate B remained unproven at this stage.
+- Post-trial no-send diagnosis: the pre-proof SDK estimate was `1128365`, and
+  all three configured RPCs accepted the exact final populated calldata at an
+  upper-median `1123239` estimate. The point-in-time fee was `64892` atomic
+  (`0.064892 USDC`). The run submitted no payment and wrote no journal. This
+  narrows the failed value-bearing path to off-chain Broadcaster processing or
+  its sanitized response boundary; it does not pass Gate B.
 - Controlled value-bearing Gate B trial: one initial Waku submission and three
   bounded same-nullifier variants used fee quotes between `0.058867` and
   `0.071154 USDC`, each below the operator's `0.08 USDC` ceiling. The first

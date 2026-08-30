@@ -128,6 +128,12 @@ USDC` Broadcaster fee for a `0.01 USDC` test payment, illustrating why explicit
 fee visibility and ceilings are impact-relevant usability controls rather than
 implementation detail.
 
+A later no-send diagnostic also passed a strict three-RPC simulation of the
+exact post-proof calldata before any Waku or journal effect. Its pre-proof and
+final estimates were `1128365` and `1123239`, respectively. This removes an
+obvious malformed-final-call explanation and makes the remaining Broadcaster
+failure more actionable, while still providing no sender-unlinkability claim.
+
 The later funded trial also remains a failure, not evidence of sender
 unlinkability. Four same-nullifier variants reached two selected Broadcaster
 identities without a usable response or canonical transaction; a final recovery

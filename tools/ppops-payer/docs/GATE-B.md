@@ -95,9 +95,11 @@ extreme high outlier cannot set the price. The explicit token-fee ceiling
 remains the final financial bound. The payer obtains an authorized quote,
 calculates the exact token fee, checks
 `payment + fee` against spendable balance, generates the proof and validates the
-populated RAILGUN proxy call. It then reloads and re-verifies the live merchant
-request and quote. It returns `paymentSubmitted: false`, does not create a
-journal entry and does not load the EVM self-signing key.
+populated RAILGUN proxy call. A strict configured-RPC majority must then simulate
+that exact calldata with a positive gas estimate. After simulation, the payer
+reloads and re-verifies the live merchant request and quote. It returns
+`paymentSubmitted: false`, does not create a journal entry and does not load the
+EVM self-signing key.
 
 Broadcaster fee messages can rotate while proof generation is in progress. The
 payer prefers the exact original quote. It may use a live successor only when
@@ -127,6 +129,19 @@ covered by regression tests before the passing repeat. RAILGUN's
 [private-transaction UX guidance](https://docs.railgun.org/developer-guide/wallet/transactions/ux-private-transactions)
 likewise treats proof generation and fee expiry as separate lifecycle steps.
 
+After the funded trial failed closed, a second no-send diagnostic exercised the
+new exact-call simulation guard:
+
+- pre-proof SDK estimate: `1128365`;
+- final populated-calldata estimate: `1123239`;
+- final simulation agreement: all three configured RPCs;
+- exact observed fee: `64892` atomic (`0.064892 USDC`);
+- proof generated: yes; payment submitted: no; journal record: none.
+
+This makes invalid final calldata/proof an unlikely explanation under those RPC
+views. It does not validate the Broadcaster's off-chain fee extraction, PPOI
+checks, wallet/runtime/provider state or send path, and it is not a Gate B pass.
+
 ## 4. Submit only after a separate value-bearing approval
 
 The value-bearing command deliberately repeats all preparation against fresh
@@ -154,6 +169,10 @@ from the reserved nullifiers. Only that canonical hash can move the journal to
 `SUBMITTED`. A strict configured-provider majority must then agree on hash,
 block hash, block number and receipt status before it moves to `MINED` or
 `REVERTED`. Each provider receipt request has a 15-second deadline.
+
+The final calldata quorum occurs before the encrypted Waku request is prepared
+and before this reservation. A failed or minority-only simulation therefore
+has no relay ambiguity and consumes no retry slot.
 
 The upstream Waku client can retransmit the same encrypted transaction while it
 waits and can identify a mined transaction from those same nullifiers. PPOps

@@ -113,7 +113,7 @@ v0.1.
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
-| Broadcaster path without payer EVM self-signer | Waku preflight, no-send proof and bounded value-bearing trial | FAIL-CLOSED; two selected identities returned no hash, so no completed-payment claim |
+| Broadcaster path without payer EVM self-signer | Waku preflight, proof, three-RPC final-calldata simulation and bounded value-bearing trial | FAIL-CLOSED; exact calldata simulated successfully, but two selected identities returned no hash, so no completed-payment claim |
 | Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
 | Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — public main is not yet a tagged release** |
 
@@ -193,6 +193,10 @@ standard in the v0.1 funding scope.
   transaction hash. The balance remained unchanged and no fee was observed as
   charged. PPOps cannot claim a completed Broadcaster payment or sender
   unlinkability from this result.
+- A later no-send proof passed exact final-calldata simulation on all three
+  configured RPCs (`1123239` gas estimate). This narrows the failure to remote
+  Broadcaster processing or its sanitized response boundary, but does not turn
+  preparation into a successful payment.
 - Public RPC/PPOI/Waku services remain availability and metadata dependencies.
 - The pinned RAILGUN/Waku dependency graphs retain Moderate/Low advisories but
   no known High/Critical advisory under the current audit gate.

@@ -18,9 +18,12 @@ Arbitrum mainnet self-pilot pass. Direct Waku/Broadcaster connectivity and a
 complete no-send proof preparation also pass. A bounded value-bearing
 Broadcaster trial failed closed across two selected Broadcaster identities:
 neither returned a usable hash, nullifier recovery found no transaction and the
-payer balance remained unchanged. Gate B and external adoption therefore remain
-open. This is not a production-readiness claim. Review the known risks before
-using real financial data.
+payer balance remained unchanged. A later no-send diagnostic also simulated the
+final populated proof/calldata successfully through a three-RPC quorum, which
+narrows the unresolved failure to the Broadcaster's off-chain path but does not
+turn Gate B into a pass. Gate B and external adoption therefore remain open.
+This is not a production-readiness claim. Review the known risks before using
+real financial data.
 
 ## Product model
 
@@ -237,11 +240,13 @@ It verifies `request.json`, imports a full payer only on the payer host and send
 the exact private ERC-20 transfer with `memoText`. Its Broadcaster mode pins fee
 signers locally, bounds the token fee, journals nullifiers before Waku, derives
 the canonical transaction hash from those nullifiers instead of trusting the
-Broadcaster response, prevents those nullifiers from being assigned to another
-intent, and does not load an EVM self-signing key. Ambiguous recovery can
-regenerate only a conflicting variant with the exact same nullifiers, a
-different Broadcaster identity and a bounded retry count. Railway Wallet remains
-an optional manual compatibility client, not a critical PPOps dependency. See
+Broadcaster response, and requires a configured RPC majority to simulate the
+final populated calldata before any Waku submission or journal reservation. It
+prevents unresolved nullifiers from being assigned to another intent and does
+not load an EVM self-signing key. Ambiguous recovery can regenerate only a
+conflicting variant with the exact same nullifiers, a different Broadcaster
+identity and a bounded retry count. Railway Wallet remains an optional manual
+compatibility client, not a critical PPOps dependency. See
 [`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the evidence procedure.
 
 ## Settlement semantics
@@ -394,8 +399,11 @@ The payer's separate
 [`Gate B runbook`](tools/ppops-payer/docs/GATE-B.md) distinguishes the passing
 non-financial Waku preflight and no-send proof preparation from the
 attempted-but-failed value-bearing Broadcaster payment. The payer failed closed:
-no canonical transaction was found and its balance did not change. Preparation
-and failed submission are not sender-unlinkability evidence.
+no canonical transaction was found and its balance did not change. A subsequent
+no-send run passed final populated-calldata simulation on all three configured
+RPCs, so invalid calldata is no longer the leading explanation; remote
+Broadcaster processing remains unresolved. Preparation and failed submission
+are not sender-unlinkability evidence.
 
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect

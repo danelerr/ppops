@@ -385,6 +385,21 @@ Gas selection uses the upper median from a healthy strict majority so one high
 outlier cannot set the value when at least three healthy readings exist, while
 the explicit token-fee ceiling remains the financial stop.
 
+A follow-up no-send diagnostic added one more boundary before any journal or
+Waku effect: after generating the real proof and populating the final proxy
+calldata, every configured RPC simulates that exact call and a strict majority
+must return a positive estimate. All three providers accepted the diagnostic
+call. The Wallet SDK's pre-proof estimate was `1128365`; the final populated
+call estimate was `1123239`; and the point-in-time fee was `64892` atomic
+(`0.064892 USDC`) for a `10000`-atomic payment. The run submitted no payment and
+wrote no journal record.
+
+That result does not prove Broadcaster acceptance. It does rule out an obvious
+invalid final proof/calldata explanation under the three configured RPC views,
+and narrows the unresolved failure to off-chain Broadcaster processing such as
+fee extraction, PPOI validation, operator runtime/provider state, transaction
+send, or the server's sanitized response boundary.
+
 The value-bearing trial then exposed the remaining dependency limit. Four
 same-nullifier variants across two selected identities returned no usable hash;
 one response was the upstream-sanitized `UNKNOWN_ERROR` and another was an
@@ -428,8 +443,9 @@ PPOps must not yet claim:
 2. Preserve the Gate A operator records and signed public report with the beta
    release.
 3. Preserve the failed Gate B journal and stop value-bearing retries. Diagnose
-   the official client/Broadcaster response path with upstream maintainers or a
-   non-financial reproducible fixture before authorizing another funded trial.
+   the official client/Broadcaster response path, including the passing final
+   calldata simulation, with upstream maintainers or a non-financial
+   reproducible fixture before authorizing another funded trial.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside
    the existing settlement evidence.

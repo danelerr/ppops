@@ -132,14 +132,15 @@ and abuse monitoring before exposure.
   an owner-only write-ahead submission journal before broadcasting. Gate A
   records a precomputed signed transaction hash; Gate B records the bounded fee
   identity, payer, exact encrypted-submission quote fingerprint and nullifiers
-  before Waku submission. After proof generation, a quote may rotate only when
-  Broadcaster, token and fee rate remain identical. A Waku-returned hash remains
-  untrusted metadata until the full payer wallet derives the canonical
-  transaction hash from those nullifiers. Recovery precedes every explicit
-  ambiguity retry; a retry must preserve the signed request, payer and complete
-  nullifier set, exclude all previously attempted Broadcaster identities and
-  remain within a three-retry cap. A different intent cannot reserve any
-  unresolved nullifier. Evidence:
+  before Waku submission. After proof generation, a configured RPC majority
+  must simulate the exact populated calldata before any encrypted-request or
+  journal effect. A quote may rotate only when Broadcaster, token and fee rate
+  remain identical. A Waku-returned hash remains untrusted metadata until the
+  full payer wallet derives the canonical transaction hash from those
+  nullifiers. Recovery precedes every explicit ambiguity retry; a retry must
+  preserve the signed request, payer and complete nullifier set, exclude all
+  previously attempted Broadcaster identities and remain within a three-retry
+  cap. A different intent cannot reserve any unresolved nullifier. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
   `tools/ppops-payer/src/security/runtime-lock.ts` and
   `tools/ppops-payer/src/security/submission-journal.ts`.
@@ -325,8 +326,9 @@ flowchart LR
     that may already be in flight → double-pay or permanently strand the local
     workflow. The payer instead reserves nullifiers before Waku, recovers first,
     permits only bounded conflicting same-nullifier variants through previously
-    unattempted identities and then requires manual review (TM-003, TM-004,
-    TM-009).
+    unattempted identities and then requires manual review. Before any
+    reservation or Waku effect, a strict RPC majority must also simulate the
+    exact final populated calldata (TM-003, TM-004, TM-009).
 
 ## Threat model table
 
@@ -388,7 +390,7 @@ flowchart LR
 | `Dockerfile` | Defines runtime privilege, copied dependencies and base-image trust | TM-005, TM-008 |
 | `scripts/trust-boundary-check.ts` | Prevents payer spending code from entering the merchant build/image boundary | TM-001, TM-003, TM-005 |
 | `tools/ppops-payer/src/security/submission-journal.ts` | Prevents cross-intent nullifier reuse, bounds same-nullifier retries and separates rejection, ambiguity, reported hash and canonical transaction identity | TM-003, TM-009 |
-| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates the populated call, reserves recovery identity before Waku, rotates retry identity and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
+| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates and quorum-simulates the exact populated call before Waku, reserves recovery identity, rotates retry identity and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
 
 ## Quality check
 

@@ -34,8 +34,9 @@ recovery and receipt-quorum state.
 
 **Outputs & Effects:**
 
-- Prepare mode returns bounded fee/gas/quote evidence and `NOT_SUBMITTED`; it
-  creates neither SDK Waku transaction nor submission-journal record.
+- Prepare mode returns bounded fee/gas/quote plus final-calldata simulation
+  evidence and `NOT_SUBMITTED`; it creates neither SDK Waku transaction nor
+  submission-journal record.
 - Initial submit creates one `BROADCASTER/SUBMITTING` record. Retry submit adds
   one of at most three retry-attempt records while preserving exact request,
   payer and nullifier set.
@@ -112,26 +113,30 @@ assert fee token, fee limit, and spendable >= amount + fee;
 - **Depended on by:** Proof and quote-compatibility checks.
 
 ```ts
-// L246-L305
+// post-proof/population boundary
 await generateTransferProof(...payment, memo, broadcaster fee, gas...);
 const populated = await populateProvedTransfer(...same inputs...);
 const transaction = assertPopulatedPrivateTransfer(...configured proxy...);
 const nullifiers = assertPopulatedNullifiers(populated.nullifiers);
+const finalSimulation = await simulatePopulatedTransferQuorum(config, transaction);
 await revalidateLiveRequest(request, requestSource, expectedMerchantSigner);
 const current = session.assertQuoteStillCurrent(selected);
 ```
 
 - **What:** Generates/populates the private transfer, validates its visible
-  proxy/nullifier output, refetches the exact signed request and refreshes quote
-  compatibility.
-- **Why here:** Only a still-live request and admitted populated result can reach
-  Waku preparation or durable state.
+  proxy/nullifier output, quorum-simulates the exact final calldata, refetches
+  the exact signed request and refreshes quote compatibility.
+- **Why here:** Only a still-live request and admitted, RPC-executable populated
+  result can reach Waku preparation or durable state. Simulation occurs before
+  the final request/quote freshness checks so those checks remain closest to
+  submission.
 - **Assumes:** Wallet SDK binds memo, token, amount, recipient, fee, gas, PPOI and
   nullifiers into one proof. Established locally by repeated equal arguments and
   common population output; the cryptographic guarantee is established by:
   **nothing found in project source**.
 - **Establishes:** Configured proxy/zero-value calldata, one to 64 unique nonzero
-  nullifiers, unchanged request and a live compatible quote.
+  nullifiers, a positive exact-call gas estimate from a strict configured-RPC
+  majority, unchanged request and a live compatible quote.
 - **Depended on by:** Prepare-only return or encrypted submission construction.
 
 ```ts
@@ -276,6 +281,9 @@ return { transactionHash, receiptStatus: "MINED", blockNumber, ... };
   eligible Broadcaster remains before the three-attempt journal limit?
 - What evidence distinguishes the causes grouped under
   `UNCLASSIFIED_FAILURE` before a same-nullifier retry decision?
+- Does a passing public-RPC simulation differ materially from the selected
+  Broadcaster's funded-sender/provider simulation, fee extraction or PPOI
+  validation path?
 - Is receipt-quorum `MINED` intentionally terminal before finalized height?
-- Does `providerAgreement` in the result intentionally remain the gas-price
-  agreement count rather than the later receipt-agreement count?
+- The result exposes gas-price and final-simulation agreement separately; should
+  a future evidence schema also retain the final/pre-proof estimate ratio?
