@@ -6,6 +6,12 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { validateRailgunAddress } from "@railgun-community/wallet";
 
+import {
+  BROADCASTER_AMBIGUITY_CODES,
+  BROADCASTER_REJECTION_CODES,
+  type BroadcasterAmbiguityCode,
+  type BroadcasterRejectionCode,
+} from "../broadcaster/failures.js";
 import { SafeFailure } from "../events.js";
 import type { PaymentRequest } from "../request.js";
 import { readOwnerOnlyFile } from "./private-file.js";
@@ -15,6 +21,51 @@ const RailgunAddressSchema = z
   .string()
   .regex(/^0zk\S{32,256}$/)
   .refine(validateRailgunAddress, "Invalid RAILGUN address");
+const BroadcasterRejectionCodeSchema = z.enum(BROADCASTER_REJECTION_CODES);
+const BroadcasterAmbiguityCodeSchema = z.enum(BROADCASTER_AMBIGUITY_CODES);
+const BroadcasterRetryAttemptSchema = z
+  .object({
+    broadcasterRailgunAddress: RailgunAddressSchema,
+    broadcasterQuoteFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    broadcasterFeesIDFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    broadcasterFeeAmountAtomic: z.string().regex(/^[1-9][0-9]*$/),
+    outcome: z.enum(["RESERVED", "REJECTED", "AMBIGUOUS", "REPORTED"]),
+    rejectionCode: BroadcasterRejectionCodeSchema.optional(),
+    ambiguityCode: BroadcasterAmbiguityCodeSchema.optional(),
+    createdAt: z.number().int().nonnegative().safe(),
+    updatedAt: z.number().int().nonnegative().safe(),
+  })
+  .strict()
+  .superRefine((attempt, context) => {
+    if (attempt.outcome === "REJECTED" && !attempt.rejectionCode) {
+      context.addIssue({
+        code: "custom",
+        path: ["rejectionCode"],
+        message: "Rejected retry attempts require a rejection code",
+      });
+    }
+    if (attempt.outcome !== "REJECTED" && attempt.rejectionCode !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["rejectionCode"],
+        message: "Only rejected retry attempts may contain a rejection code",
+      });
+    }
+    if (attempt.outcome === "AMBIGUOUS" && !attempt.ambiguityCode) {
+      context.addIssue({
+        code: "custom",
+        path: ["ambiguityCode"],
+        message: "Ambiguous retry attempts require an ambiguity code",
+      });
+    }
+    if (attempt.outcome !== "AMBIGUOUS" && attempt.ambiguityCode !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ambiguityCode"],
+        message: "Only ambiguous retry attempts may contain an ambiguity code",
+      });
+    }
+  });
 
 const SubmissionRecordSchema = z
   .object({
@@ -28,8 +79,24 @@ const SubmissionRecordSchema = z
     broadcasterFeesIDFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     broadcasterFeeAmountAtomic: z.string().regex(/^[1-9][0-9]*$/).optional(),
     nullifiers: z.array(TransactionHashSchema).min(1).max(64).optional(),
+    broadcasterRetryAttempts: z
+      .array(BroadcasterRetryAttemptSchema)
+      .max(3)
+      .optional(),
+    broadcasterAmbiguityCodes: z
+      .array(BroadcasterAmbiguityCodeSchema)
+      .min(1)
+      .max(4)
+      .optional(),
     reportedTransactionHash: TransactionHashSchema.optional(),
-    status: z.enum(["SUBMITTING", "SUBMITTED", "MINED", "REVERTED"]),
+    rejectionCode: BroadcasterRejectionCodeSchema.optional(),
+    status: z.enum([
+      "SUBMITTING",
+      "SUBMITTED",
+      "MINED",
+      "REVERTED",
+      "REJECTED",
+    ]),
     createdAt: z.number().int().nonnegative().safe(),
     updatedAt: z.number().int().nonnegative().safe(),
     nonce: z.number().int().nonnegative().safe().optional(),
@@ -60,7 +127,10 @@ const SubmissionRecordSchema = z
       record.broadcasterFeesIDFingerprint,
       record.broadcasterFeeAmountAtomic,
       record.nullifiers,
+      record.broadcasterRetryAttempts,
+      record.broadcasterAmbiguityCodes,
       record.reportedTransactionHash,
+      record.rejectionCode,
     ];
     if (
       submissionMode === "SELF_SIGNED" &&
@@ -110,7 +180,10 @@ const SubmissionRecordSchema = z
         });
       }
     }
-    if (record.status !== "SUBMITTING" && !record.transactionHash) {
+    if (
+      ["SUBMITTED", "MINED", "REVERTED"].includes(record.status) &&
+      !record.transactionHash
+    ) {
       context.addIssue({
         code: "custom",
         path: ["transactionHash"],
@@ -126,6 +199,27 @@ const SubmissionRecordSchema = z
         code: "custom",
         path: ["transactionHash"],
         message: "Submitting Broadcaster records cannot claim a canonical hash",
+      });
+    }
+    if (record.status === "REJECTED") {
+      if (
+        submissionMode !== "BROADCASTER" ||
+        !record.rejectionCode ||
+        record.transactionHash !== undefined ||
+        record.reportedTransactionHash !== undefined ||
+        record.blockNumber !== undefined
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["status"],
+          message: "Rejected Broadcaster records require only a classified pre-submission rejection",
+        });
+      }
+    } else if (record.rejectionCode !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["rejectionCode"],
+        message: "Only rejected records may contain a rejection code",
       });
     }
     if (
@@ -171,6 +265,24 @@ const requestFingerprint = (request: PaymentRequest): string =>
     .update(request.descriptor.signature)
     .digest("hex");
 
+const fingerprintFeesID = (feesID: string): string =>
+  createHash("sha256")
+    .update("ppops-broadcaster-fees-id:v1:")
+    .update(feesID)
+    .digest("hex");
+
+const normalizedNullifiers = (nullifiers: string[]): string[] =>
+  nullifiers.map((value) => value.toLowerCase()).sort();
+
+const sameNullifierSet = (left: string[], right: string[]): boolean => {
+  const normalizedLeft = normalizedNullifiers(left);
+  const normalizedRight = normalizedNullifiers(right);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
+};
+
 export const submissionJournalPath = (walletStatePath: string): string =>
   `${walletStatePath}.submissions.json`;
 
@@ -188,6 +300,35 @@ export class SubmissionJournal {
         "This intent already has a local submission record",
       );
     }
+  }
+
+  async assertBroadcasterRetryable(
+    request: PaymentRequest,
+    payerRailgunAddress: string,
+  ): Promise<SubmissionRecord> {
+    const current = await this.get(request.id);
+    if (
+      !current ||
+      current.submissionMode !== "BROADCASTER" ||
+      current.status !== "SUBMITTING" ||
+      current.transactionHash !== undefined ||
+      current.reportedTransactionHash !== undefined ||
+      current.requestFingerprint !== requestFingerprint(request) ||
+      current.payerRailgunAddress?.toLowerCase() !==
+        payerRailgunAddress.toLowerCase()
+    ) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "Only an unresolved Broadcaster reservation without a reported hash may be retried",
+      );
+    }
+    if ((current.broadcasterRetryAttempts?.length ?? 0) >= 3) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "Maximum bounded Broadcaster retry attempts reached",
+      );
+    }
+    return current;
   }
 
   async reserve(
@@ -237,6 +378,20 @@ export class SubmissionJournal {
         "This intent already has a local submission record",
       );
     }
+    const normalized = normalizedNullifiers(input.nullifiers);
+    const conflicting = journal.records.find(
+      (record) =>
+        record.submissionMode === "BROADCASTER" &&
+        record.status !== "REJECTED" &&
+        record.status !== "REVERTED" &&
+        record.nullifiers?.some((value) => normalized.includes(value.toLowerCase())),
+    );
+    if (conflicting) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "A nullifier is already reserved by another local submission",
+      );
+    }
     journal.records.push({
       intentId: request.id,
       requestFingerprint: requestFingerprint(request),
@@ -244,16 +399,201 @@ export class SubmissionJournal {
       payerRailgunAddress: input.payerRailgunAddress,
       broadcasterRailgunAddress: input.broadcasterRailgunAddress,
       broadcasterQuoteFingerprint: input.broadcasterQuoteFingerprint,
-      broadcasterFeesIDFingerprint: createHash("sha256")
-        .update("ppops-broadcaster-fees-id:v1:")
-        .update(input.broadcasterFeesID)
-        .digest("hex"),
+      broadcasterFeesIDFingerprint: fingerprintFeesID(input.broadcasterFeesID),
       broadcasterFeeAmountAtomic: input.broadcasterFeeAmountAtomic.toString(),
-      nullifiers: input.nullifiers.map((value) => value.toLowerCase()),
+      nullifiers: normalized,
       status: "SUBMITTING",
       createdAt: now,
       updatedAt: now,
     });
+    await this.write(journal);
+  }
+
+  async reserveBroadcasterRetry(
+    request: PaymentRequest,
+    input: {
+      payerRailgunAddress: string;
+      broadcasterRailgunAddress: string;
+      broadcasterQuoteFingerprint: string;
+      broadcasterFeesID: string;
+      broadcasterFeeAmountAtomic: bigint;
+      nullifiers: string[];
+    },
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === request.id);
+    const current = journal.records[index];
+    if (
+      !current ||
+      current.submissionMode !== "BROADCASTER" ||
+      current.status !== "SUBMITTING" ||
+      current.transactionHash !== undefined ||
+      current.reportedTransactionHash !== undefined ||
+      current.requestFingerprint !== requestFingerprint(request) ||
+      current.payerRailgunAddress?.toLowerCase() !==
+        input.payerRailgunAddress.toLowerCase() ||
+      !current.nullifiers ||
+      !sameNullifierSet(current.nullifiers, input.nullifiers)
+    ) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "Broadcaster retry must preserve the unresolved request, payer and exact nullifier set",
+      );
+    }
+    const attempts = current.broadcasterRetryAttempts ?? [];
+    if (attempts.length >= 3) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "Maximum bounded Broadcaster retry attempts reached",
+      );
+    }
+    journal.records[index] = {
+      ...current,
+      broadcasterRetryAttempts: [
+        ...attempts,
+        {
+          broadcasterRailgunAddress: input.broadcasterRailgunAddress,
+          broadcasterQuoteFingerprint: input.broadcasterQuoteFingerprint,
+          broadcasterFeesIDFingerprint: fingerprintFeesID(input.broadcasterFeesID),
+          broadcasterFeeAmountAtomic: input.broadcasterFeeAmountAtomic.toString(),
+          outcome: "RESERVED",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      updatedAt: now,
+    };
+    await this.write(journal);
+  }
+
+  async markRejected(
+    intentId: string,
+    rejectionCode: BroadcasterRejectionCode,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === intentId);
+    const current = journal.records[index];
+    if (
+      !current ||
+      current.submissionMode !== "BROADCASTER" ||
+      current.status !== "SUBMITTING" ||
+      current.transactionHash !== undefined ||
+      current.reportedTransactionHash !== undefined ||
+      (current.broadcasterRetryAttempts?.length ?? 0) !== 0
+    ) {
+      throw new Error("Only a fresh pre-submission Broadcaster reservation may be rejected");
+    }
+    journal.records[index] = {
+      ...current,
+      status: "REJECTED",
+      rejectionCode,
+      updatedAt: now,
+    };
+    await this.write(journal);
+  }
+
+  async markBroadcasterRetryRejected(
+    intentId: string,
+    broadcasterQuoteFingerprint: string,
+    rejectionCode: BroadcasterRejectionCode,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === intentId);
+    const current = journal.records[index];
+    const attempts = current?.broadcasterRetryAttempts;
+    const attemptIndex = attempts
+      ? attempts.findLastIndex(
+          (attempt) =>
+            attempt.broadcasterQuoteFingerprint === broadcasterQuoteFingerprint &&
+            attempt.outcome === "RESERVED",
+        )
+      : -1;
+    if (
+      !current ||
+      current.submissionMode !== "BROADCASTER" ||
+      current.status !== "SUBMITTING" ||
+      current.transactionHash !== undefined ||
+      current.reportedTransactionHash !== undefined ||
+      !attempts ||
+      attemptIndex < 0
+    ) {
+      throw new Error("Retry rejection does not match an unresolved Broadcaster attempt");
+    }
+    const currentAttempt = attempts[attemptIndex];
+    if (!currentAttempt) {
+      throw new Error("Retry rejection attempt disappeared");
+    }
+    const updatedAttempts = [...attempts];
+    updatedAttempts[attemptIndex] = {
+      ...currentAttempt,
+      outcome: "REJECTED",
+      rejectionCode,
+      updatedAt: now,
+    };
+    journal.records[index] = {
+      ...current,
+      broadcasterRetryAttempts: updatedAttempts,
+      updatedAt: now,
+    };
+    await this.write(journal);
+  }
+
+  async markBroadcasterAmbiguous(
+    intentId: string,
+    ambiguityCode: BroadcasterAmbiguityCode,
+    retryQuoteFingerprint?: string,
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    const index = journal.records.findIndex((record) => record.intentId === intentId);
+    const current = journal.records[index];
+    if (
+      !current ||
+      current.submissionMode !== "BROADCASTER" ||
+      current.status !== "SUBMITTING" ||
+      current.transactionHash !== undefined ||
+      current.reportedTransactionHash !== undefined
+    ) {
+      throw new Error("Ambiguous response does not match a submitting Broadcaster record");
+    }
+
+    let updatedAttempts = current.broadcasterRetryAttempts;
+    if (retryQuoteFingerprint) {
+      const attempts = current.broadcasterRetryAttempts;
+      const attemptIndex = attempts
+        ? attempts.findLastIndex(
+            (attempt) =>
+              attempt.broadcasterQuoteFingerprint === retryQuoteFingerprint &&
+              attempt.outcome === "RESERVED",
+          )
+        : -1;
+      const attempt = attempts?.[attemptIndex];
+      if (!attempts || attemptIndex < 0 || !attempt) {
+        throw new Error("Ambiguous response does not match a reserved retry attempt");
+      }
+      updatedAttempts = [...attempts];
+      updatedAttempts[attemptIndex] = {
+        ...attempt,
+        outcome: "AMBIGUOUS",
+        ambiguityCode,
+        updatedAt: now,
+      };
+    } else if ((current.broadcasterRetryAttempts?.length ?? 0) !== 0) {
+      throw new Error("Initial ambiguity cannot be recorded after retry attempts");
+    }
+
+    const ambiguityCodes = current.broadcasterAmbiguityCodes ?? [];
+    journal.records[index] = {
+      ...current,
+      ...(updatedAttempts ? { broadcasterRetryAttempts: updatedAttempts } : {}),
+      broadcasterAmbiguityCodes: ambiguityCodes.includes(ambiguityCode)
+        ? ambiguityCodes
+        : [...ambiguityCodes, ambiguityCode],
+      updatedAt: now,
+    };
     await this.write(journal);
   }
 
@@ -279,8 +619,28 @@ export class SubmissionJournal {
       throw new Error("Broadcaster reported a different transaction hash");
     }
     if (current.reportedTransactionHash) return;
+    const attempts = current.broadcasterRetryAttempts;
+    let updatedAttempts = attempts;
+    if (attempts?.length) {
+      const attemptIndex = attempts.findLastIndex(
+        (attempt) => attempt.outcome === "RESERVED",
+      );
+      if (attemptIndex >= 0) {
+        const currentAttempt = attempts[attemptIndex];
+        if (!currentAttempt) {
+          throw new Error("Broadcaster retry attempt disappeared");
+        }
+        updatedAttempts = [...attempts];
+        updatedAttempts[attemptIndex] = {
+          ...currentAttempt,
+          outcome: "REPORTED",
+          updatedAt: now,
+        };
+      }
+    }
     journal.records[index] = {
       ...current,
+      ...(updatedAttempts ? { broadcasterRetryAttempts: updatedAttempts } : {}),
       reportedTransactionHash: normalized,
       updatedAt: now,
     };

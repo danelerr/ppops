@@ -16,6 +16,12 @@ import {
 } from "../constants.js";
 import { SafeFailure, writeEvent } from "../events.js";
 import type { BroadcasterTrustConfig } from "./config.js";
+import {
+  BroadcasterAmbiguousResponseFailure,
+  BroadcasterRejectedFailure,
+  classifyAmbiguousBroadcasterResponse,
+  classifyDefinitiveBroadcasterRejection,
+} from "./failures.js";
 
 type BroadcasterModule = typeof import("@railgun-community/waku-broadcaster-client-node");
 
@@ -30,6 +36,14 @@ export type ValidatedBroadcaster = {
   selected: SelectedBroadcaster;
   feePerUnitGas: bigint;
   fingerprint: string;
+};
+
+export type BroadcasterDiscovery = {
+  selected?: ValidatedBroadcaster;
+  validQuoteCount: number;
+  uniqueBroadcasterCount: number;
+  eligibleBroadcasterCount: number;
+  excludedBroadcasterCount: number;
 };
 
 export type PreparedBroadcasterSubmission = {
@@ -179,6 +193,72 @@ export const selectSubmissionBroadcaster = (
   );
 };
 
+const compareDiscoverableBroadcasters = (
+  left: ValidatedBroadcaster,
+  right: ValidatedBroadcaster,
+): number => {
+  if (left.feePerUnitGas !== right.feePerUnitGas) {
+    return left.feePerUnitGas < right.feePerUnitGas ? -1 : 1;
+  }
+  const reliabilityDifference =
+    right.selected.tokenFee.reliability - left.selected.tokenFee.reliability;
+  if (reliabilityDifference !== 0) return reliabilityDifference;
+  return left.fingerprint.localeCompare(right.fingerprint);
+};
+
+export const selectDiscoverableBroadcaster = (
+  candidates: unknown,
+  minimumReliability: number,
+  minimumQuoteValidityMs: number,
+  excludedRailgunAddresses: readonly string[] = [],
+  now = Date.now(),
+): BroadcasterDiscovery => {
+  const validatedCandidates: ValidatedBroadcaster[] = [];
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    try {
+      validatedCandidates.push(
+        validateBroadcaster(
+          candidate,
+          minimumReliability,
+          minimumQuoteValidityMs,
+          now,
+        ),
+      );
+    } catch (error) {
+      if (!(error instanceof SafeFailure)) throw error;
+    }
+  }
+
+  const excluded = new Set(
+    excludedRailgunAddresses.map((address) => address.toLowerCase()),
+  );
+  const uniqueBroadcasters = new Set(
+    validatedCandidates.map((candidate) =>
+      candidate.selected.railgunAddress.toLowerCase(),
+    ),
+  );
+  const excludedBroadcasters = new Set(
+    [...uniqueBroadcasters].filter((address) => excluded.has(address)),
+  );
+  const eligibleCandidates = validatedCandidates.filter(
+    (candidate) =>
+      !excluded.has(candidate.selected.railgunAddress.toLowerCase()),
+  );
+  const eligibleBroadcasters = new Set(
+    eligibleCandidates.map((candidate) =>
+      candidate.selected.railgunAddress.toLowerCase(),
+    ),
+  );
+
+  return {
+    selected: [...eligibleCandidates].sort(compareDiscoverableBroadcasters)[0],
+    validQuoteCount: validatedCandidates.length,
+    uniqueBroadcasterCount: uniqueBroadcasters.size,
+    eligibleBroadcasterCount: eligibleBroadcasters.size,
+    excludedBroadcasterCount: excludedBroadcasters.size,
+  };
+};
+
 export class BroadcasterSession {
   private module?: BroadcasterModule;
   private started = false;
@@ -258,33 +338,55 @@ export class BroadcasterSession {
     }
   }
 
-  async discover(): Promise<ValidatedBroadcaster> {
+  async discover(
+    excludedRailgunAddresses: readonly string[] = [],
+  ): Promise<ValidatedBroadcaster> {
     const module = this.requireStarted();
     const chain = NETWORK_CONFIG[PAYER_NETWORK].chain;
     const deadline = Date.now() + this.config.discoveryTimeoutMs;
+    let previousCandidateSummary: string | undefined;
     while (Date.now() < deadline) {
-      const selected = module.WakuBroadcasterClient.findBestBroadcaster(
+      const candidates = module.WakuBroadcasterClient.findBroadcastersForToken(
         chain,
         PAYER_TOKEN_ADDRESS,
         false,
       );
-      if (selected) {
+      const discovery = selectDiscoverableBroadcaster(
+        candidates,
+        this.config.minimumReliability,
+        this.config.minimumQuoteValidityMs,
+        excludedRailgunAddresses,
+      );
+      const candidateSummary = JSON.stringify({
+        validQuoteCount: discovery.validQuoteCount,
+        uniqueBroadcasterCount: discovery.uniqueBroadcasterCount,
+        eligibleBroadcasterCount: discovery.eligibleBroadcasterCount,
+        excludedBroadcasterCount: discovery.excludedBroadcasterCount,
+      });
+      if (candidateSummary !== previousCandidateSummary) {
+        previousCandidateSummary = candidateSummary;
+        writeEvent("broadcaster.discovery-candidates", {
+          validQuoteCount: discovery.validQuoteCount,
+          uniqueBroadcasterCount: discovery.uniqueBroadcasterCount,
+          eligibleBroadcasterCount: discovery.eligibleBroadcasterCount,
+          excludedBroadcasterCount: discovery.excludedBroadcasterCount,
+        });
+      }
+      if (discovery.selected) {
         try {
-          const validated = validateBroadcaster(
-            selected,
-            this.config.minimumReliability,
-            this.config.minimumQuoteValidityMs,
-          );
           const peers = await this.peerCounts();
           if (peers.lightPush > 0 && peers.filter > 0) {
             writeEvent("broadcaster.discovered", {
-              reliability: selected.tokenFee.reliability,
-              availableWallets: selected.tokenFee.availableWallets,
-              quoteValidityMs: selected.tokenFee.expiration - Date.now(),
+              reliability: discovery.selected.selected.tokenFee.reliability,
+              availableWallets:
+                discovery.selected.selected.tokenFee.availableWallets,
+              quoteValidityMs:
+                discovery.selected.selected.tokenFee.expiration - Date.now(),
+              eligibleBroadcasterCount: discovery.eligibleBroadcasterCount,
               lightPushPeers: peers.lightPush,
               filterPeers: peers.filter,
             });
-            return validated;
+            return discovery.selected;
           }
         } catch (error) {
           if (!(error instanceof SafeFailure)) throw error;
@@ -381,13 +483,34 @@ export class BroadcasterSession {
     try {
       const transactionHash = await prepared.send();
       if (!/^0x[0-9a-fA-F]{64}$/.test(transactionHash)) {
-        throw new Error("Broadcaster returned an invalid transaction hash");
+        throw new BroadcasterAmbiguousResponseFailure(
+          "INVALID_TRANSACTION_HASH",
+        );
       }
       return transactionHash;
     } catch (error) {
-      throw new SafeFailure(
-        "BROADCASTER_SUBMISSION_FAILED",
-        "Broadcaster submission did not return a valid transaction hash",
+      if (
+        error instanceof BroadcasterRejectedFailure ||
+        error instanceof BroadcasterAmbiguousResponseFailure
+      ) {
+        throw error;
+      }
+      const rejectionCode = classifyDefinitiveBroadcasterRejection(error);
+      if (rejectionCode) {
+        throw new BroadcasterRejectedFailure(rejectionCode, { cause: error });
+      }
+      const ambiguityCode = classifyAmbiguousBroadcasterResponse(error);
+      if (ambiguityCode) {
+        throw new BroadcasterAmbiguousResponseFailure(ambiguityCode, {
+          cause: error,
+        });
+      }
+      // Once send() starts, an unrecognized client/transport failure cannot
+      // prove that the encrypted request never reached the Broadcaster. Keep
+      // it in the same conservative, recover-before-retry state as all other
+      // chain-ambiguous responses.
+      throw new BroadcasterAmbiguousResponseFailure(
+        "UNCLASSIFIED_FAILURE",
         { cause: error },
       );
     }

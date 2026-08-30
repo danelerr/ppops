@@ -14,6 +14,10 @@ import {
 import { MaxUint256 } from "ethers";
 
 import type { BroadcasterSession } from "../broadcaster/session.js";
+import {
+  BroadcasterAmbiguousResponseFailure,
+  BroadcasterRejectedFailure,
+} from "../broadcaster/failures.js";
 import type { PayerConfig } from "../config.js";
 import {
   PAYER_NETWORK,
@@ -123,6 +127,7 @@ export const sendBroadcasterTransfer = async (input: {
   requestSource: string;
   expectedMerchantSigner: string;
   submit: boolean;
+  retryAmbiguous?: boolean;
 }): Promise<BroadcasterTransferResult> => {
   const { config, engine, request, session } = input;
   const amount = BigInt(request.amountAtomic);
@@ -130,7 +135,23 @@ export const sendBroadcasterTransfer = async (input: {
   const submissionJournal = new SubmissionJournal(
     submissionJournalPath(config.storage.walletStatePath),
   );
-  await submissionJournal.assertUnused(request.id);
+  let retryRecord: Awaited<
+    ReturnType<SubmissionJournal["assertBroadcasterRetryable"]>
+  > | undefined;
+  if (input.retryAmbiguous) {
+    if (!input.submit) {
+      throw new SafeFailure(
+        "REQUEST_INVALID",
+        "Ambiguous Broadcaster retry is only valid for a submission",
+      );
+    }
+    retryRecord = await submissionJournal.assertBroadcasterRetryable(
+      request,
+      engine.railgunAddress,
+    );
+  } else {
+    await submissionJournal.assertUnused(request.id);
+  }
 
   const spendable = await engine.spendableBalance();
   if (spendable < amount) {
@@ -146,7 +167,15 @@ export const sendBroadcasterTransfer = async (input: {
 
   const { gasPrice, providerAgreement } =
     await readConservativeLegacyGasPrice(config);
-  const selected = await session.discover();
+  const attemptedBroadcasterAddresses = retryRecord
+    ? [
+        retryRecord.broadcasterRailgunAddress,
+        ...(retryRecord.broadcasterRetryAttempts ?? []).map(
+          (attempt) => attempt.broadcasterRailgunAddress,
+        ),
+      ].filter((address): address is string => address !== undefined)
+    : [];
+  const selected = await session.discover(attemptedBroadcasterAddresses);
   const feeTokenDetails: FeeTokenDetails = {
     tokenAddress: PAYER_TOKEN_ADDRESS,
     feePerUnitGas: selected.feePerUnitGas,
@@ -305,25 +334,76 @@ export const sendBroadcasterTransfer = async (input: {
   const submissionQuoteValidityMs =
     submissionQuote.selected.tokenFee.expiration - Date.now();
 
+  const reservation = {
+    payerRailgunAddress: engine.railgunAddress,
+    broadcasterRailgunAddress: submissionQuote.selected.railgunAddress,
+    broadcasterQuoteFingerprint: submissionQuote.fingerprint,
+    broadcasterFeesID: submissionQuote.selected.tokenFee.feesID,
+    broadcasterFeeAmountAtomic: broadcasterFee.amount,
+    nullifiers,
+  };
   try {
-    await submissionJournal.reserveBroadcaster(
-      request,
-      {
-        payerRailgunAddress: engine.railgunAddress,
-        broadcasterRailgunAddress: submissionQuote.selected.railgunAddress,
-        broadcasterQuoteFingerprint: submissionQuote.fingerprint,
-        broadcasterFeesID: submissionQuote.selected.tokenFee.feesID,
-        broadcasterFeeAmountAtomic: broadcasterFee.amount,
-        nullifiers,
-      },
-    );
+    if (input.retryAmbiguous) {
+      await submissionJournal.reserveBroadcasterRetry(request, reservation);
+    } else {
+      await submissionJournal.reserveBroadcaster(request, reservation);
+    }
   } catch (error) {
     throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Broadcaster reservation failed", {
       cause: error,
     });
   }
 
-  const reportedTransactionHash = await session.submitPrepared(preparedSubmission);
+  let reportedTransactionHash: string;
+  try {
+    reportedTransactionHash = await session.submitPrepared(preparedSubmission);
+  } catch (error) {
+    if (error instanceof BroadcasterRejectedFailure) {
+      try {
+        if (input.retryAmbiguous) {
+          await submissionJournal.markBroadcasterRetryRejected(
+            request.id,
+            submissionQuote.fingerprint,
+            error.rejectionCode,
+          );
+        } else {
+          await submissionJournal.markRejected(
+            request.id,
+            error.rejectionCode,
+          );
+        }
+      } catch (journalError) {
+        throw new SafeFailure(
+          "JOURNAL_UPDATE_FAILED",
+          "Broadcaster rejection journal update failed",
+          { cause: journalError },
+        );
+      }
+      writeEvent("broadcaster.transfer-rejected", {
+        rejectionCode: error.rejectionCode,
+        ambiguousPriorAttempt: input.retryAmbiguous === true,
+      });
+    } else if (error instanceof BroadcasterAmbiguousResponseFailure) {
+      try {
+        await submissionJournal.markBroadcasterAmbiguous(
+          request.id,
+          error.ambiguityCode,
+          input.retryAmbiguous ? submissionQuote.fingerprint : undefined,
+        );
+      } catch (journalError) {
+        throw new SafeFailure(
+          "JOURNAL_UPDATE_FAILED",
+          "Broadcaster ambiguity journal update failed",
+          { cause: journalError },
+        );
+      }
+      writeEvent("broadcaster.transfer-ambiguous", {
+        ambiguityCode: error.ambiguityCode,
+        ambiguousPriorAttempt: input.retryAmbiguous === true,
+      });
+    }
+    throw error;
+  }
   try {
     await submissionJournal.markBroadcasterReported(
       request.id,

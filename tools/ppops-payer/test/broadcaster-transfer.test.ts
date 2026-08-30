@@ -9,6 +9,10 @@ import type {
   BroadcasterSession,
   PreparedBroadcasterSubmission,
 } from "../src/broadcaster/session.js";
+import {
+  BroadcasterAmbiguousResponseFailure,
+  BroadcasterRejectedFailure,
+} from "../src/broadcaster/failures.js";
 import type { PayerConfig } from "../src/config.js";
 import { SafeFailure } from "../src/events.js";
 import type { PaymentRequest } from "../src/request.js";
@@ -398,5 +402,114 @@ describe("Broadcaster transfer lifecycle", () => {
       status: "SUBMITTING",
     });
     expect(reserved?.transactionHash).toBeUndefined();
+  });
+
+  it("records an explicit pre-submission rejection as terminal and hashless", async () => {
+    const { config, engine, request } = await testContext();
+    const submit = vi.fn(async () => {
+      throw new BroadcasterRejectedFailure("POI_INVALID");
+    });
+    await expect(
+      sendBroadcasterTransfer({
+        config,
+        engine,
+        session: fakeSession(submit),
+        request,
+        dbEncryptionKey: "11".repeat(32),
+        maxBroadcasterFeeAtomic: "1000",
+        requestSource: "http://127.0.0.1/request.json",
+        expectedMerchantSigner: request.expectedMerchantSigner,
+        submit: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "BROADCASTER_REJECTED",
+      rejectionCode: "POI_INVALID",
+    });
+    const rejected = await new SubmissionJournal(
+      submissionJournalPath(config.storage.walletStatePath),
+    ).get(request.id);
+    expect(rejected).toMatchObject({
+      status: "REJECTED",
+      rejectionCode: "POI_INVALID",
+    });
+    expect(rejected?.transactionHash).toBeUndefined();
+    expect(rejected?.reportedTransactionHash).toBeUndefined();
+  });
+
+  it("journals a classified chain-ambiguous response without claiming a hash", async () => {
+    const { config, engine, request } = await testContext();
+    const submit = vi.fn(async () => {
+      throw new BroadcasterAmbiguousResponseFailure("REPEAT_TRANSACTION");
+    });
+    await expect(
+      sendBroadcasterTransfer({
+        config,
+        engine,
+        session: fakeSession(submit),
+        request,
+        dbEncryptionKey: "11".repeat(32),
+        maxBroadcasterFeeAtomic: "1000",
+        requestSource: "http://127.0.0.1/request.json",
+        expectedMerchantSigner: request.expectedMerchantSigner,
+        submit: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "BROADCASTER_SUBMISSION_FAILED",
+      ambiguityCode: "REPEAT_TRANSACTION",
+    });
+    await expect(
+      new SubmissionJournal(submissionJournalPath(config.storage.walletStatePath)).get(
+        request.id,
+      ),
+    ).resolves.toMatchObject({
+      status: "SUBMITTING",
+      broadcasterAmbiguityCodes: ["REPEAT_TRANSACTION"],
+    });
+  });
+
+  it("retries an ambiguous intent only with the same proof nullifiers", async () => {
+    const { config, engine, request } = await testContext();
+    const session = fakeSession();
+    const journal = new SubmissionJournal(
+      submissionJournalPath(config.storage.walletStatePath),
+    );
+    await journal.reserveBroadcaster(request, {
+      payerRailgunAddress: engine.railgunAddress,
+      broadcasterRailgunAddress: BROADCASTER_ADDRESS,
+      broadcasterQuoteFingerprint: "cc".repeat(32),
+      broadcasterFeesID: "initial-fee-id",
+      broadcasterFeeAmountAtomic: 400n,
+      nullifiers: [NULLIFIER],
+    });
+
+    const result = await sendBroadcasterTransfer({
+      config,
+      engine,
+      session,
+      request,
+      dbEncryptionKey: "11".repeat(32),
+      maxBroadcasterFeeAtomic: "1000",
+      requestSource: "http://127.0.0.1/request.json",
+      expectedMerchantSigner: request.expectedMerchantSigner,
+      submit: true,
+      retryAmbiguous: true,
+    });
+
+    expect(result).toMatchObject({
+      receiptStatus: "PENDING",
+      transactionHash: TX_HASH,
+    });
+    expect(session.discover).toHaveBeenCalledWith([BROADCASTER_ADDRESS]);
+    await expect(journal.get(request.id)).resolves.toMatchObject({
+      status: "SUBMITTED",
+      transactionHash: TX_HASH,
+      reportedTransactionHash: TX_HASH,
+      broadcasterRetryAttempts: [
+        {
+          outcome: "REPORTED",
+          broadcasterFeeAmountAtomic: "500",
+        },
+      ],
+    });
   });
 });

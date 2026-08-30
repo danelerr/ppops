@@ -94,6 +94,10 @@ Commands:
     --request URL --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
     --expected-payer 0zk_ADDRESS --max-broadcaster-fee-atomic AMOUNT \\
     --confirm-intent pi_ID
+  ppops-payer retry-broadcaster --config PATH --broadcaster-config PATH \\
+    --request URL --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
+    --expected-payer 0zk_ADDRESS --max-broadcaster-fee-atomic AMOUNT \\
+    --confirm-intent pi_ID
   ppops-payer recover-broadcaster --config PATH --intent-id pi_ID \\
     --expected-payer 0zk_ADDRESS
 
@@ -581,9 +585,19 @@ const submissionStatus = async (options: ParsedOptions): Promise<void> => {
           ...(record.submissionMode === "BROADCASTER"
             ? {
                 broadcasterQuoteFingerprint: record.broadcasterQuoteFingerprint,
+                broadcasterRetryAttemptCount:
+                  record.broadcasterRetryAttempts?.length ?? 0,
+                broadcasterRetryLimitReached:
+                  (record.broadcasterRetryAttempts?.length ?? 0) >= 3,
                 canonicalTransactionHashResolved:
                   record.transactionHash !== undefined,
               }
+            : {}),
+          ...(record.rejectionCode
+            ? { broadcasterRejectionCode: record.rejectionCode }
+            : {}),
+          ...(record.broadcasterAmbiguityCodes
+            ? { broadcasterAmbiguityCodes: record.broadcasterAmbiguityCodes }
             : {}),
           ...(record.reportedTransactionHash
             ? { broadcasterReportedTransactionHash: record.reportedTransactionHash }
@@ -781,6 +795,7 @@ const runSelfSigned = async (
 const runBroadcaster = async (
   options: ParsedOptions,
   submit: boolean,
+  retryAmbiguous = false,
 ): Promise<void> => {
   assertAllowed(options, [
     "config",
@@ -836,6 +851,7 @@ const runBroadcaster = async (
         requestSource,
         expectedMerchantSigner: expectedSigner,
         submit,
+        retryAmbiguous,
       });
     } finally {
       await session.stop();
@@ -869,7 +885,7 @@ const runBroadcaster = async (
   }
   output({
     ok: true,
-    mode: "broadcaster",
+    mode: retryAmbiguous ? "broadcaster-retry" : "broadcaster",
     intentId: request.id,
     amountAtomic: request.amountAtomic,
     broadcasterFeeAmountAtomic: result.broadcasterFeeAmountAtomic,
@@ -915,6 +931,19 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
     );
   }
   assertExpectedPayerAddress(record.payerRailgunAddress, expectedPayer);
+  if (record.status === "REJECTED") {
+    output({
+      ok: true,
+      intentId,
+      recovered: true,
+      status: record.status,
+      broadcasterRejectionCode: record.rejectionCode,
+      canonicalTransactionHashResolved: false,
+      paymentRetryPermitted: false,
+      freshIntentPermitted: true,
+    });
+    return;
+  }
   if (record.status === "MINED" || record.status === "REVERTED") {
     output({
       ok: true,
@@ -948,6 +977,15 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
         : {}),
       canonicalTransactionHashResolved: false,
       paymentRetryPermitted: false,
+      sameNullifierRetryAvailable:
+        record.status === "SUBMITTING" &&
+        record.reportedTransactionHash === undefined &&
+        (record.broadcasterRetryAttempts?.length ?? 0) < 3,
+      broadcasterRetryLimitReached:
+        (record.broadcasterRetryAttempts?.length ?? 0) >= 3,
+      freshIntentPermitted: false,
+      manualReviewRequired:
+        (record.broadcasterRetryAttempts?.length ?? 0) >= 3,
     });
     return;
   }
@@ -1052,6 +1090,9 @@ const main = async (): Promise<void> => {
       return;
     case "pay-broadcaster":
       await runBroadcaster(options, true);
+      return;
+    case "retry-broadcaster":
+      await runBroadcaster(options, true, true);
       return;
     case "recover-broadcaster":
       await recoverBroadcaster(options);

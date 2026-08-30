@@ -224,6 +224,170 @@ describe("payer submission journal", () => {
     await expect(journal.get(payment.id)).resolves.toBeUndefined();
   });
 
+  it("blocks nullifier reuse across unresolved intents", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const first = request();
+    const second = {
+      ...request(),
+      id: `pi_${"34".repeat(16)}`,
+    };
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    const reservation = {
+      payerRailgunAddress: broadcaster,
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
+      broadcasterFeesID: "fee-id",
+      broadcasterFeeAmountAtomic: 1n,
+      nullifiers: [`0x${"77".repeat(32)}`],
+    };
+
+    await journal.reserveBroadcaster(first, reservation);
+    await expect(
+      journal.reserveBroadcaster(second, {
+        ...reservation,
+        broadcasterQuoteFingerprint: "bb".repeat(32),
+      }),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+    await expect(journal.get(second.id)).resolves.toBeUndefined();
+  });
+
+  it("allows only bounded same-request retries with the exact reserved nullifiers", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    const nullifier = `0x${"77".repeat(32)}`;
+    const reservation = {
+      payerRailgunAddress: broadcaster,
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
+      broadcasterFeesID: "fee-id",
+      broadcasterFeeAmountAtomic: 1n,
+      nullifiers: [nullifier],
+    };
+
+    await journal.reserveBroadcaster(payment, reservation);
+    await expect(
+      journal.assertBroadcasterRetryable(payment, broadcaster),
+    ).resolves.toMatchObject({ status: "SUBMITTING" });
+    await expect(
+      journal.reserveBroadcasterRetry(payment, {
+        ...reservation,
+        broadcasterQuoteFingerprint: "bb".repeat(32),
+        broadcasterFeesID: "retry-fee-id",
+        broadcasterFeeAmountAtomic: 2n,
+        nullifiers: [`0x${"88".repeat(32)}`],
+      }),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+
+    await journal.reserveBroadcasterRetry(payment, {
+      ...reservation,
+      broadcasterQuoteFingerprint: "cc".repeat(32),
+      broadcasterFeesID: "retry-fee-id",
+      broadcasterFeeAmountAtomic: 2n,
+    });
+    await journal.markBroadcasterRetryRejected(
+      payment.id,
+      "cc".repeat(32),
+      "POI_INVALID",
+    );
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "SUBMITTING",
+      broadcasterRetryAttempts: [
+        {
+          broadcasterQuoteFingerprint: "cc".repeat(32),
+          broadcasterFeeAmountAtomic: "2",
+          outcome: "REJECTED",
+          rejectionCode: "POI_INVALID",
+        },
+      ],
+    });
+
+    for (const fingerprint of ["dd".repeat(32), "ee".repeat(32)]) {
+      await journal.reserveBroadcasterRetry(payment, {
+        ...reservation,
+        broadcasterQuoteFingerprint: fingerprint,
+        broadcasterFeesID: `retry-${fingerprint.slice(0, 2)}`,
+        broadcasterFeeAmountAtomic: 2n,
+      });
+      await journal.markBroadcasterRetryRejected(
+        payment.id,
+        fingerprint,
+        "POI_INVALID",
+      );
+    }
+    await expect(
+      journal.assertBroadcasterRetryable(payment, broadcaster),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+    await expect(
+      journal.reserveBroadcasterRetry(payment, {
+        ...reservation,
+        broadcasterQuoteFingerprint: "ff".repeat(32),
+        broadcasterFeesID: "retry-over-limit",
+      }),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+  });
+
+  it("records a definitive fresh rejection without claiming an on-chain hash", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    await journal.reserveBroadcaster(payment, {
+      payerRailgunAddress: broadcaster,
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
+      broadcasterFeesID: "fee-id",
+      broadcasterFeeAmountAtomic: 1n,
+      nullifiers: [`0x${"77".repeat(32)}`],
+    });
+
+    await journal.markRejected(payment.id, "BAD_TOKEN_FEE", 1_001);
+    const rejected = await journal.get(payment.id);
+    expect(rejected).toMatchObject({
+      status: "REJECTED",
+      rejectionCode: "BAD_TOKEN_FEE",
+    });
+    expect(rejected?.transactionHash).toBeUndefined();
+    expect(rejected?.reportedTransactionHash).toBeUndefined();
+    await expect(journal.assertUnused(payment.id)).rejects.toMatchObject({
+      code: "SUBMISSION_ALREADY_RECORDED",
+    });
+  });
+
+  it("records only a stable category for an ambiguous Broadcaster response", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    await journal.reserveBroadcaster(payment, {
+      payerRailgunAddress: broadcaster,
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterQuoteFingerprint: "aa".repeat(32),
+      broadcasterFeesID: "fee-id",
+      broadcasterFeeAmountAtomic: 1n,
+      nullifiers: [`0x${"77".repeat(32)}`],
+    });
+
+    await journal.markBroadcasterAmbiguous(
+      payment.id,
+      "TRANSACTION_SEND_RPC_ERROR",
+    );
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "SUBMITTING",
+      broadcasterAmbiguityCodes: ["TRANSACTION_SEND_RPC_ERROR"],
+    });
+  });
+
   it("rejects an impossible canonical hash in a submitting Broadcaster record", async () => {
     const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
     roots.push(root);
