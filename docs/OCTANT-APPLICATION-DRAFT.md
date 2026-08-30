@@ -17,6 +17,10 @@ partnerships.
 
 **Repository:** <https://github.com/danelerr/ppops>
 
+**Tagline (90-character form limit):**
+
+> PPOps reconciles private RAILGUN USDC payments without merchant spending keys.
+
 **One-line description:**
 
 > PPOps is an open-source, self-hosted, view-only reconciler that lets merchant
@@ -109,7 +113,7 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615) at `6f5a93c` |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33337865296`](https://github.com/danelerr/ppops/actions/runs/33337865296) at `207837c` |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
@@ -179,6 +183,20 @@ the live form's rules. The defensible work packages are:
 Do not promise a second rail, hosted custody, token incentives or a universal
 standard in the v0.1 funding scope.
 
+## Applicant-supplied form inputs
+
+Current Octant application guidance also requires inputs that cannot be inferred
+from this repository. Before submission, the applicant must provide and verify:
+
+- the Ethereum sign-in wallet and payout/treasury address;
+- project category and stage in the live form's available choices;
+- the requested amount in USD and a matching use-of-funds explanation;
+- team, contact and any required legal/compliance information;
+- final repository, release, website and demo links.
+
+The live Epoch 13 form remains authoritative. Its dynamic questions must be
+reviewed manually before copying this answer bank.
+
 ## Honest limitations
 
 - The merchant viewing capability exposes the complete receiver history if the
@@ -210,7 +228,7 @@ standard in the v0.1 funding scope.
 ## Submission checklist
 
 - [x] Push the reviewed implementation and obtain green public verify + Docker
-      CI at `6f5a93c` (including Broadcaster and shield-key remediations).
+      CI at `207837c` (including Broadcaster and shield-key remediations).
 - [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
 - [x] Record the failed value-bearing Gate B honestly and remove every
       sender-unlinkability implication from the application.
@@ -228,3 +246,4 @@ Until the external-user checkbox is complete, the honest recommendation is
 
 - [Epoch 13 application](https://octant.fillout.com/epoch-13)
 - [Epoch 13 Privacy Round announcement](https://octant.substack.com/p/epoch-13-the-privacy-round)
+- [Current Octant application requirements](https://docs.octant.app/docs/projects/apply-for-funding/)

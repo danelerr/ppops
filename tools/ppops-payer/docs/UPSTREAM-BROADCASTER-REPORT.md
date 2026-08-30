@@ -115,7 +115,7 @@ funded attempt; increasing the fee ceiling is not.
   and
   [`d70057e`](https://github.com/danelerr/ppops/commit/d70057e)
 - Passing public verification:
-  [GitHub Actions run 33337619615](https://github.com/danelerr/ppops/actions/runs/33337619615)
+  [GitHub Actions run 33337865296](https://github.com/danelerr/ppops/actions/runs/33337865296)
 - Full bounded workflow and outcome: [Gate B runbook](GATE-B.md)
 - Security disposition:
   [Broadcaster differential review](../../../PPOPS_DIFFERENTIAL_REVIEW_2026-08-30.md)

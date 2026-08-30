@@ -231,8 +231,8 @@ Primitive gate:
 Verification evidence:
 
 - Public CI run
-  [`33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615)
-  passed both `verify` and `docker` for commit `6f5a93c`, including the final
+  [`33337865296`](https://github.com/danelerr/ppops/actions/runs/33337865296)
+  passed both `verify` and `docker` for commit `207837c`, including the final
   populated-calldata simulation, prepare-time nullifier admission and tested
   shield-key derivation remediations.
 - Automated merchant suite on 2026-08-30: 19 test files and 58 tests, including
@@ -242,7 +242,7 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 15 test files and 81 tests,
+- Automated reference-payer suite on 2026-08-30: 15 test files and 82 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
   pre-Waku nullifier journaling, reported-versus-canonical hash separation,
   adversarial hash mismatch, proof-compatible quote rotation,
@@ -395,7 +395,7 @@ transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
 production runbook defines readiness, metrics, alert and egress policy.
 
 Public GitHub Actions
-[run `33337619615`](https://github.com/danelerr/ppops/actions/runs/33337619615)
+[run `33337865296`](https://github.com/danelerr/ppops/actions/runs/33337865296)
 passed both the full verify job and the Docker build job for implementation
-commit `6f5a93c` on 2026-08-30. This proves that commit's CI build, not the
+commit `207837c` on 2026-08-30. This proves that commit's CI build, not the
 still-pending tag-triggered GHCR publication.
