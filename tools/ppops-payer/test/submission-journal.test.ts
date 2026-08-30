@@ -117,6 +117,64 @@ describe("payer submission journal", () => {
     });
   });
 
+  it("persists a recoverable Broadcaster reservation before any transaction hash", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const path = join(root, "submissions.json");
+    const journal = new SubmissionJournal(path);
+    const payment = request();
+    const broadcaster =
+      "0zk1qyjyhqjdkqd9qxusgj092ppxl92plvrk3s3cna9u73h5rwt0ghxvfrv7j6fe3z53l7lrzyqw5te7ku5v8fsrpeadzvpkudgawjv9dg08htj7z3mph5kd6dw50jc";
+    const nullifier = `0x${"77".repeat(32)}`;
+
+    await journal.reserveBroadcaster(
+      payment,
+      broadcaster,
+      "fee-quote-private-id",
+      1_000n,
+      [nullifier],
+      1_000,
+    );
+    const reserved = await journal.get(payment.id);
+    expect(reserved).toMatchObject({
+      submissionMode: "BROADCASTER",
+      status: "SUBMITTING",
+      broadcasterRailgunAddress: broadcaster,
+      broadcasterFeeAmountAtomic: "1000",
+      nullifiers: [nullifier],
+    });
+    expect(reserved?.transactionHash).toBeUndefined();
+    const contents = await readFile(path, "utf8");
+    expect(contents).not.toContain("fee-quote-private-id");
+    expect(contents).not.toContain(payment.memo);
+
+    const transactionHash = `0x${"55".repeat(32)}`;
+    await journal.markSubmitted(payment.id, transactionHash, 1_001);
+    await journal.markMined(payment.id, 123_458, true, 1_002);
+    await expect(journal.get(payment.id)).resolves.toMatchObject({
+      status: "MINED",
+      transactionHash,
+      blockNumber: 123_458,
+    });
+  });
+
+  it("does not allow terminal journal states to move backwards", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));
+    roots.push(root);
+    const journal = new SubmissionJournal(join(root, "submissions.json"));
+    const payment = request();
+    const transactionHash = `0x${"66".repeat(32)}`;
+    await journal.reserve(payment, `0x${"22".repeat(20)}`, transactionHash, 9, 1_000);
+    await journal.markSubmitted(payment.id, transactionHash, 1_001);
+    await journal.markMined(payment.id, 123_459, true, 1_002);
+    await expect(journal.markSubmitted(payment.id, transactionHash, 1_003)).rejects.toThrow(
+      /submitting/,
+    );
+    await expect(journal.markMined(payment.id, 123_460, true, 1_004)).rejects.toThrow(
+      /submitted/,
+    );
+  });
+
   it("rejects a symlinked journal", async () => {
     if (process.platform === "win32") return;
     const root = await mkdtemp(join(tmpdir(), "ppops-payer-journal-"));

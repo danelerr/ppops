@@ -4,6 +4,7 @@ import { mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { z } from "zod";
+import { validateRailgunAddress } from "@railgun-community/wallet";
 
 import { SafeFailure } from "../events.js";
 import type { PaymentRequest } from "../request.js";
@@ -13,7 +14,16 @@ const SubmissionRecordSchema = z
   .object({
     intentId: z.string().regex(/^pi_[0-9a-f]{32}$/),
     requestFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
-    selfSigner: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+    submissionMode: z.enum(["SELF_SIGNED", "BROADCASTER"]).optional(),
+    selfSigner: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+    broadcasterRailgunAddress: z
+      .string()
+      .regex(/^0zk\S{32,256}$/)
+      .refine(validateRailgunAddress, "Invalid Broadcaster RAILGUN address")
+      .optional(),
+    broadcasterFeesIDFingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    broadcasterFeeAmountAtomic: z.string().regex(/^(?:0|[1-9][0-9]*)$/).optional(),
+    nullifiers: z.array(z.string().regex(/^0x[0-9a-fA-F]{64}$/)).min(1).max(64).optional(),
     status: z.enum(["SUBMITTING", "SUBMITTED", "MINED", "REVERTED"]),
     createdAt: z.number().int().nonnegative().safe(),
     updatedAt: z.number().int().nonnegative().safe(),
@@ -23,6 +33,27 @@ const SubmissionRecordSchema = z
   })
   .strict()
   .superRefine((record, context) => {
+    const submissionMode = record.submissionMode ?? "SELF_SIGNED";
+    if (submissionMode === "SELF_SIGNED" && !record.selfSigner) {
+      context.addIssue({
+        code: "custom",
+        path: ["selfSigner"],
+        message: "Self-signed records require a signer",
+      });
+    }
+    if (
+      submissionMode === "BROADCASTER" &&
+      (!record.broadcasterRailgunAddress ||
+        !record.broadcasterFeesIDFingerprint ||
+        record.broadcasterFeeAmountAtomic === undefined ||
+        !record.nullifiers)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["submissionMode"],
+        message: "Broadcaster records require quote identity, fee and nullifiers",
+      });
+    }
     if (record.status !== "SUBMITTING" && !record.transactionHash) {
       context.addIssue({
         code: "custom",
@@ -98,12 +129,46 @@ export class SubmissionJournal {
     journal.records.push({
       intentId: request.id,
       requestFingerprint: requestFingerprint(request),
+      submissionMode: "SELF_SIGNED",
       selfSigner,
       status: "SUBMITTING",
       createdAt: now,
       updatedAt: now,
       nonce,
       transactionHash,
+    });
+    await this.write(journal);
+  }
+
+  async reserveBroadcaster(
+    request: PaymentRequest,
+    broadcasterRailgunAddress: string,
+    broadcasterFeesID: string,
+    broadcasterFeeAmountAtomic: bigint,
+    nullifiers: string[],
+    now = Math.floor(Date.now() / 1_000),
+  ): Promise<void> {
+    const journal = await this.read();
+    if (journal.records.some((record) => record.intentId === request.id)) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "This intent already has a local submission record",
+      );
+    }
+    journal.records.push({
+      intentId: request.id,
+      requestFingerprint: requestFingerprint(request),
+      submissionMode: "BROADCASTER",
+      broadcasterRailgunAddress,
+      broadcasterFeesIDFingerprint: createHash("sha256")
+        .update("ppops-broadcaster-fees-id:v1:")
+        .update(broadcasterFeesID)
+        .digest("hex"),
+      broadcasterFeeAmountAtomic: broadcasterFeeAmountAtomic.toString(),
+      nullifiers: nullifiers.map((value) => value.toLowerCase()),
+      status: "SUBMITTING",
+      createdAt: now,
+      updatedAt: now,
     });
     await this.write(journal);
   }
@@ -120,9 +185,14 @@ export class SubmissionJournal {
     if (!current?.transactionHash) {
       throw new Error("Submitted transaction record disappeared");
     }
+    const targetStatus = succeeded ? "MINED" : "REVERTED";
+    if (current.status === targetStatus && current.blockNumber === blockNumber) return;
+    if (current.status !== "SUBMITTED") {
+      throw new Error("Only a submitted transaction may record a receipt");
+    }
     journal.records[index] = {
       ...current,
-      status: succeeded ? "MINED" : "REVERTED",
+      status: targetStatus,
       blockNumber,
       updatedAt: now,
     };
@@ -143,6 +213,10 @@ export class SubmissionJournal {
       current.transactionHash.toLowerCase() !== transactionHash.toLowerCase()
     ) {
       throw new Error("Submitted transaction hash differs from reservation");
+    }
+    if (current.status === "SUBMITTED") return;
+    if (current.status !== "SUBMITTING") {
+      throw new Error("Only a submitting transaction may become submitted");
     }
     journal.records[index] = {
       ...current,

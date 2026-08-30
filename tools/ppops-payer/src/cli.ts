@@ -11,6 +11,13 @@ import { dirname, resolve } from "node:path";
 
 import { z } from "zod";
 
+import {
+  BroadcasterTrustConfigSchema,
+  broadcasterTrustFingerprint,
+  loadBroadcasterTrustConfig,
+  type BroadcasterTrustConfig,
+} from "./broadcaster/config.js";
+import { BroadcasterSession } from "./broadcaster/session.js";
 import { loadConfig, PayerConfigSchema, type PayerConfig } from "./config.js";
 import {
   PAYER_CHAIN_ID,
@@ -26,7 +33,9 @@ import {
   assertExpectedSelfSigner,
   deriveExpectedSelfSigningKey,
 } from "./execution-guards.js";
+import { sendBroadcasterTransfer } from "./railgun/broadcaster-transfer.js";
 import { PayerRailgunEngine } from "./railgun/engine.js";
+import { readReceiptQuorum } from "./railgun/rpc-quorum.js";
 import { sendSelfSignedTransfer } from "./railgun/self-signed-transfer.js";
 import {
   assertLivePaymentRequestSource,
@@ -59,6 +68,9 @@ Commands:
     [--mnemonic-file PATH] [--self-signing-key-file PATH]
 
   ppops-payer config-validate --config PATH
+  ppops-payer broadcaster-config-init --output PATH \\
+    --trusted-fee-signer 0zk_ADDRESS [--trusted-fee-signer 0zk_ADDRESS]
+  ppops-payer broadcaster-preflight --config PATH --broadcaster-config PATH
   ppops-payer derive-self-signing-key --config PATH \\
     --expected-address EVM_ADDRESS [--derivation-index INDEX]
   ppops-payer secrets-check --config PATH
@@ -75,10 +87,20 @@ Commands:
     --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
     --expected-payer 0zk_ADDRESS --expected-self-signer EVM_ADDRESS \\
     --max-gas-cost-wei WEI --confirm-intent pi_ID
+  ppops-payer prepare-broadcaster --config PATH --broadcaster-config PATH \\
+    --request URL --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
+    --expected-payer 0zk_ADDRESS --max-broadcaster-fee-atomic AMOUNT
+  ppops-payer pay-broadcaster --config PATH --broadcaster-config PATH \\
+    --request URL --expected-signer ADDRESS --max-amount-atomic AMOUNT \\
+    --expected-payer 0zk_ADDRESS --max-broadcaster-fee-atomic AMOUNT \\
+    --confirm-intent pi_ID
+  ppops-payer recover-broadcaster --config PATH --intent-id pi_ID \\
+    --expected-payer 0zk_ADDRESS
 
 Secrets are read only from private files. Never pass a mnemonic or private key
 as a CLI argument. pay-self-signed is an explicit diagnostic Gate A and links
 the public self-signing address to the otherwise encrypted transaction.
+pay-broadcaster uses Waku and does not load the optional EVM self-signing key.
 `;
 
 type ParsedOptions = Map<string, string[]>;
@@ -142,8 +164,28 @@ const parseNonNegativeInteger = (value: string, name: string): number => {
   return parsed;
 };
 
+const parseFiniteNumber = (value: string, name: string): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`--${name} must be finite`);
+  return parsed;
+};
+
 const output = (value: unknown): void => {
   writeSync(process.stdout.fd, `${JSON.stringify(value)}\n`);
+};
+
+const trustedBroadcasterConfigFrom = async (
+  path: string,
+): Promise<BroadcasterTrustConfig> => {
+  try {
+    return await loadBroadcasterTrustConfig(path);
+  } catch (error) {
+    throw new SafeFailure(
+      "BROADCASTER_CONFIG_INVALID",
+      "Broadcaster trust configuration is unavailable or invalid",
+      { cause: error },
+    );
+  }
 };
 
 const PPOpsConfigSourceSchema = z.object({
@@ -245,7 +287,8 @@ const init = async (options: ParsedOptions): Promise<void> => {
     mnemonicFile: resolveFromRoot(mnemonicFile),
     selfSigningKeyFile: resolveFromRoot(selfSigningKeyFile),
     spendingMaterialCopied: false,
-    next: `ppops-payer derive-self-signing-key --config ${configPath} --expected-address PINNED_EVM_ADDRESS`,
+    selfSigningKeyRequiredForBroadcaster: false,
+    next: `ppops-payer sync --config ${configPath}`,
   });
 };
 
@@ -288,6 +331,112 @@ const configValidate = async (options: ParsedOptions): Promise<void> => {
     poiNodeCount: config.poiNodeUrls.length,
     walletCreationBlock: config.network.walletCreationBlock,
   });
+};
+
+const broadcasterConfigInit = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, [
+    "output",
+    "trusted-fee-signer",
+    "pubsub-topic",
+    "peer-discovery-timeout-ms",
+    "discovery-timeout-ms",
+    "fee-expiration-timeout-ms",
+    "minimum-quote-validity-ms",
+    "minimum-reliability",
+    "minimum-version",
+    "maximum-version",
+  ]);
+  const outputPath = resolve(one(options, "output", { required: true }));
+  if (await exists(outputPath)) {
+    throw new SafeFailure(
+      "BROADCASTER_CONFIG_INVALID",
+      "Refusing to overwrite Broadcaster trust configuration",
+    );
+  }
+  let config: BroadcasterTrustConfig;
+  try {
+    const optionalMilliseconds = (name: string): number | undefined => {
+      const value = one(options, name);
+      return value ? parsePositiveInteger(value, name) : undefined;
+    };
+    const reliability = one(options, "minimum-reliability");
+    config = BroadcasterTrustConfigSchema.parse({
+      schemaVersion: 1,
+      trustedFeeSigners: many(options, "trusted-fee-signer"),
+      pubSubTopic: one(options, "pubsub-topic") || undefined,
+      peerDiscoveryTimeoutMs: optionalMilliseconds("peer-discovery-timeout-ms"),
+      discoveryTimeoutMs: optionalMilliseconds("discovery-timeout-ms"),
+      feeExpirationTimeoutMs: optionalMilliseconds("fee-expiration-timeout-ms"),
+      minimumQuoteValidityMs: optionalMilliseconds("minimum-quote-validity-ms"),
+      minimumReliability: reliability
+        ? parseFiniteNumber(reliability, "minimum-reliability")
+        : undefined,
+      broadcasterVersionRange: {
+        minVersion: one(options, "minimum-version") || undefined,
+        maxVersion: one(options, "maximum-version") || undefined,
+      },
+    });
+  } catch (error) {
+    throw new SafeFailure(
+      "BROADCASTER_CONFIG_INVALID",
+      "Broadcaster trust configuration inputs are invalid",
+      { cause: error },
+    );
+  }
+  await mkdir(dirname(outputPath), { recursive: true, mode: 0o700 });
+  try {
+    await writeFile(outputPath, `${JSON.stringify(config, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+    });
+    await chmod(outputPath, 0o600);
+  } catch (error) {
+    throw new SafeFailure(
+      "BROADCASTER_CONFIG_INVALID",
+      "Unable to persist Broadcaster trust configuration",
+      { cause: error },
+    );
+  }
+  output({
+    ok: true,
+    configPath: outputPath,
+    trustedFeeSignerCount: config.trustedFeeSigners.length,
+    trustFingerprint: broadcasterTrustFingerprint(config),
+    valuesSourcePinnedByOperator: true,
+  });
+};
+
+const broadcasterPreflight = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, ["config", "broadcaster-config"]);
+  await loadConfig(one(options, "config", { required: true }));
+  const trustConfig = await trustedBroadcasterConfigFrom(
+    one(options, "broadcaster-config", { required: true }),
+  );
+  const session = new BroadcasterSession(trustConfig);
+  try {
+    await session.start();
+    const selected = await session.discover();
+    const peers = await session.peerCounts();
+    output({
+      ok: true,
+      broadcasterReady: true,
+      chainId: PAYER_CHAIN_ID,
+      token: PAYER_TOKEN_SYMBOL,
+      connectionStatus: session.connectionStatus(),
+      trustedFeeSignerCount: trustConfig.trustedFeeSigners.length,
+      trustFingerprint: broadcasterTrustFingerprint(trustConfig),
+      quoteFingerprint: selected.fingerprint,
+      quoteReliability: selected.selected.tokenFee.reliability,
+      quoteValidityMs: selected.selected.tokenFee.expiration - Date.now(),
+      availableWallets: selected.selected.tokenFee.availableWallets,
+      peers,
+      proofGenerated: false,
+      paymentSubmitted: false,
+    });
+  } finally {
+    await session.stop();
+  }
 };
 
 const deriveSelfSigningKey = async (options: ParsedOptions): Promise<void> => {
@@ -354,19 +503,24 @@ const secretsCheck = async (options: ParsedOptions): Promise<void> => {
     if (!walletImported) {
       await readSecret(config.secrets.mnemonicFile, "mnemonic");
     }
-    await readSecret(config.secrets.selfSigningKeyFile, "evm-private-key");
+    const selfSigningKeyAvailable = await exists(config.secrets.selfSigningKeyFile);
+    if (selfSigningKeyAvailable) {
+      await readSecret(config.secrets.selfSigningKeyFile, "evm-private-key");
+    }
+    output({
+      ok: true,
+      walletImported,
+      mnemonicRequired: !walletImported,
+      selfSigningKeyAvailable,
+      broadcasterModeRequiresSelfSigningKey: false,
+      valuesReturned: false,
+      privateFilePolicy: "owner-only",
+    });
   } catch (error) {
     throw new SafeFailure("SECRET_INVALID", "A required local secret is unavailable", {
       cause: error,
     });
   }
-  output({
-    ok: true,
-    walletImported,
-    mnemonicRequired: !walletImported,
-    valuesReturned: false,
-    privateFilePolicy: "owner-only",
-  });
 };
 
 const verifiedRequestFrom = async (
@@ -419,7 +573,11 @@ const submissionStatus = async (options: ParsedOptions): Promise<void> => {
     recorded: record !== undefined,
     ...(record
       ? {
+          submissionMode: record.submissionMode ?? "SELF_SIGNED",
           status: record.status,
+          ...(record.broadcasterFeeAmountAtomic !== undefined
+            ? { broadcasterFeeAmountAtomic: record.broadcasterFeeAmountAtomic }
+            : {}),
           ...(record.nonce !== undefined ? { nonce: record.nonce } : {}),
           ...(record.transactionHash
             ? { transactionHash: record.transactionHash }
@@ -610,6 +768,204 @@ const runSelfSigned = async (
   });
 };
 
+const runBroadcaster = async (
+  options: ParsedOptions,
+  submit: boolean,
+): Promise<void> => {
+  assertAllowed(options, [
+    "config",
+    "broadcaster-config",
+    "request",
+    "expected-signer",
+    "expected-payer",
+    "max-amount-atomic",
+    "max-broadcaster-fee-atomic",
+    ...(submit ? ["confirm-intent"] : []),
+  ]);
+  const requestSource = one(options, "request", { required: true });
+  const expectedSigner = one(options, "expected-signer", { required: true });
+  try {
+    assertLivePaymentRequestSource(requestSource);
+  } catch (error) {
+    throw new SafeFailure("REQUEST_INVALID", "A live payment request is required", {
+      cause: error,
+    });
+  }
+  const request = await verifiedRequestFrom(requestSource, expectedSigner);
+  if (submit && one(options, "confirm-intent", { required: true }) !== request.id) {
+    throw new SafeFailure("REQUEST_INVALID", "Explicit intent confirmation does not match");
+  }
+  const maxAmount = one(options, "max-amount-atomic", { required: true });
+  if (!/^[1-9][0-9]*$/.test(maxAmount) || BigInt(request.amountAtomic) > BigInt(maxAmount)) {
+    throw new SafeFailure("REQUEST_INVALID", "Payment amount exceeds the explicit limit");
+  }
+  const configPath = one(options, "config", { required: true });
+  const config = await loadConfig(configPath);
+  const trustConfig = await trustedBroadcasterConfigFrom(
+    one(options, "broadcaster-config", { required: true }),
+  );
+  const secrets = await loadRuntimeSecrets(config, false);
+  const result = await withEngine(config, secrets, async (engine) => {
+    assertExpectedPayerAddress(
+      engine.railgunAddress,
+      one(options, "expected-payer", { required: true }),
+    );
+    await engine.syncBalances();
+    const session = new BroadcasterSession(trustConfig);
+    try {
+      await session.start();
+      return await sendBroadcasterTransfer({
+        config,
+        engine,
+        session,
+        request,
+        dbEncryptionKey: secrets.dbEncryptionKey,
+        maxBroadcasterFeeAtomic: one(options, "max-broadcaster-fee-atomic", {
+          required: true,
+        }),
+        requestSource,
+        expectedMerchantSigner: expectedSigner,
+        submit,
+      });
+    } finally {
+      await session.stop();
+    }
+  });
+
+  if (!submit) {
+    output({
+      ok: true,
+      mode: "prepare-broadcaster",
+      intentId: request.id,
+      amountAtomic: request.amountAtomic,
+      broadcasterFeeAmountAtomic: result.broadcasterFeeAmountAtomic,
+      maxBroadcasterFeeAtomic: one(options, "max-broadcaster-fee-atomic", {
+        required: true,
+      }),
+      gasEstimate: result.gasEstimate,
+      quoteReliability: result.quoteReliability,
+      quoteValidityMs: result.quoteValidityMs,
+      proofGenerated: true,
+      paymentSubmitted: false,
+      selfSigningKeyLoaded: false,
+    });
+    return;
+  }
+  if (!result.transactionHash || result.receiptStatus === "NOT_SUBMITTED") {
+    throw new SafeFailure("INTERNAL_ERROR", "Broadcaster submission result is incomplete");
+  }
+  output({
+    ok: true,
+    mode: "broadcaster",
+    intentId: request.id,
+    amountAtomic: request.amountAtomic,
+    broadcasterFeeAmountAtomic: result.broadcasterFeeAmountAtomic,
+    transactionHash: result.transactionHash,
+    receiptStatus: result.receiptStatus,
+    ...(result.blockNumber !== undefined ? { blockNumber: result.blockNumber } : {}),
+    publicSelfSigningAddressUsed: false,
+    poiFinalizationRequired: true,
+    next:
+      result.receiptStatus === "PENDING"
+        ? `ppops-payer recover-broadcaster --config ${resolve(configPath)} --intent-id ${request.id} --expected-payer PINNED_PAYER_0ZK_ADDRESS`
+        : `ppops-payer finalize-poi --config ${resolve(configPath)} --intent-id ${request.id} --expected-payer PINNED_PAYER_0ZK_ADDRESS`,
+  });
+};
+
+const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, ["config", "intent-id", "expected-payer"]);
+  const config = await loadConfig(one(options, "config", { required: true }));
+  const intentId = one(options, "intent-id", { required: true });
+  if (!/^pi_[0-9a-f]{32}$/.test(intentId)) {
+    throw new SafeFailure("REQUEST_INVALID", "Intent ID is invalid");
+  }
+  const journal = new SubmissionJournal(
+    submissionJournalPath(config.storage.walletStatePath),
+  );
+  const record = await journal.get(intentId);
+  if (!record || record.submissionMode !== "BROADCASTER") {
+    throw new SafeFailure(
+      "REQUEST_INVALID",
+      "No Broadcaster submission reservation exists for this intent",
+    );
+  }
+  if (record.status === "MINED" || record.status === "REVERTED") {
+    output({
+      ok: true,
+      intentId,
+      recovered: true,
+      status: record.status,
+      transactionHash: record.transactionHash,
+      blockNumber: record.blockNumber,
+      paymentRetryPermitted: false,
+    });
+    return;
+  }
+
+  let transactionHash = record.transactionHash;
+  if (!transactionHash) {
+    if (!record.nullifiers) throw new Error("Broadcaster reservation lost its nullifiers");
+    const secrets = await loadRuntimeSecrets(config, false);
+    transactionHash = await withEngine(config, secrets, async (engine) => {
+      assertExpectedPayerAddress(
+        engine.railgunAddress,
+        one(options, "expected-payer", { required: true }),
+      );
+      await engine.syncBalances();
+      return engine.recoverTransactionHashForNullifiers(record.nullifiers as string[]);
+    });
+    if (!transactionHash) {
+      output({
+        ok: true,
+        intentId,
+        recovered: false,
+        status: "SUBMITTING",
+        paymentRetryPermitted: false,
+      });
+      return;
+    }
+    try {
+      await journal.markSubmitted(intentId, transactionHash);
+    } catch (error) {
+      throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Recovery journal update failed", {
+        cause: error,
+      });
+    }
+  }
+
+  const receipt = await readReceiptQuorum(config, transactionHash);
+  if (!receipt) {
+    output({
+      ok: true,
+      intentId,
+      recovered: true,
+      status: "SUBMITTED",
+      transactionHash,
+      receiptQuorum: false,
+      paymentRetryPermitted: false,
+    });
+    return;
+  }
+  try {
+    await journal.markMined(intentId, receipt.blockNumber, receipt.succeeded);
+  } catch (error) {
+    throw new SafeFailure("JOURNAL_UPDATE_FAILED", "Recovery receipt update failed", {
+      cause: error,
+    });
+  }
+  output({
+    ok: true,
+    intentId,
+    recovered: true,
+    status: receipt.succeeded ? "MINED" : "REVERTED",
+    transactionHash,
+    blockNumber: receipt.blockNumber,
+    receiptQuorum: true,
+    providerAgreement: receipt.providerAgreement,
+    paymentRetryPermitted: false,
+  });
+};
+
 const main = async (): Promise<void> => {
   const [command, ...args] = process.argv.slice(2);
   if (!command || command === "help" || command === "--help") {
@@ -623,6 +979,12 @@ const main = async (): Promise<void> => {
       return;
     case "config-validate":
       await configValidate(options);
+      return;
+    case "broadcaster-config-init":
+      await broadcasterConfigInit(options);
+      return;
+    case "broadcaster-preflight":
+      await broadcasterPreflight(options);
       return;
     case "derive-self-signing-key":
       await deriveSelfSigningKey(options);
@@ -647,6 +1009,15 @@ const main = async (): Promise<void> => {
       return;
     case "pay-self-signed":
       await runSelfSigned(options, true);
+      return;
+    case "prepare-broadcaster":
+      await runBroadcaster(options, false);
+      return;
+    case "pay-broadcaster":
+      await runBroadcaster(options, true);
+      return;
+    case "recover-broadcaster":
+      await recoverBroadcaster(options);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

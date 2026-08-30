@@ -5,6 +5,7 @@ import {
   buildBoundedSelfSignedTransaction,
   signBoundedSelfSignedTransaction,
 } from "../src/railgun/self-signed-transfer.js";
+import { assertPopulatedNullifiers } from "../src/railgun/populated-transfer.js";
 
 const PROXY = "0x0000000000000000000000000000000000001234";
 
@@ -79,5 +80,18 @@ describe("bounded self-signed transaction", () => {
         populatedTransaction: { to: PROXY, data: "0x1234", value: 1n },
       }),
     ).toThrow(/sends ETH/);
+  });
+
+  it("normalizes a bounded, unique nullifier set", () => {
+    expect(assertPopulatedNullifiers([`0x${"AB".repeat(32)}`])).toEqual([
+      `0x${"ab".repeat(32)}`,
+    ]);
+    expect(() => assertPopulatedNullifiers(undefined)).toThrow(/nullifier/);
+    expect(() =>
+      assertPopulatedNullifiers([`0x${"11".repeat(32)}`, `0x${"11".repeat(32)}`]),
+    ).toThrow(/invalid/);
+    expect(() => assertPopulatedNullifiers([`0x${"00".repeat(32)}`])).toThrow(
+      /invalid/,
+    );
   });
 });

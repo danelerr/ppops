@@ -16,6 +16,7 @@ import {
   createRailgunWallet,
   fullWalletForID,
   generatePOIsForWalletAndRailgunTxid,
+  getCompletedTxidFromNullifiers,
   getProver,
   getTXOsSpentPOIStatusInfoForWallet,
   loadProvider,
@@ -247,6 +248,29 @@ export class PayerRailgunEngine {
         [WalletBalanceBucket.Spendable],
       )) ?? 0n
     );
+  }
+
+  async recoverTransactionHashForNullifiers(
+    nullifiers: string[],
+  ): Promise<string | undefined> {
+    try {
+      const { txid } = await getCompletedTxidFromNullifiers(
+        PAYER_TXID_VERSION,
+        this.network.chain,
+        nullifiers,
+      );
+      if (txid === undefined) return undefined;
+      if (!/^0x[0-9a-fA-F]{64}$/.test(txid)) {
+        throw new Error("Recovered transaction hash is invalid");
+      }
+      return txid.toLowerCase();
+    } catch (error) {
+      throw new SafeFailure(
+        "RECEIPT_UNAVAILABLE",
+        "Unable to recover a transaction hash from the reserved nullifiers",
+        { cause: error },
+      );
+    }
   }
 
   async finalizePOIForTransaction(

@@ -24,7 +24,11 @@ for (const { path, text } of sources) {
   if (/error\.message/.test(text)) failures.push(`${path}: raw error message`);
   const eventCalls = text.match(/writeEvent\([\s\S]{0,500}?\);/g) ?? [];
   for (const call of eventCalls) {
-    if (/mnemonic|evmPrivateKey|dbEncryptionKey/.test(call)) {
+    if (
+      /mnemonic|evmPrivateKey|dbEncryptionKey|nullifiers|feesID|broadcasterRailgunAddress/.test(
+        call,
+      )
+    ) {
       failures.push(`${path}: spending material near telemetry call`);
     }
   }
@@ -34,7 +38,14 @@ if (/--(?:mnemonic|private-key)(?=[=\s"']|$)/.test(cli)) {
   failures.push("src/cli.ts: secret accepted directly as a CLI argument");
 }
 const gitignore = await readFile(resolve(root, ".gitignore"), "utf8");
-for (const required of ["secrets/", "data/", "payer.config.json", "*.mnemonic", "*.key"]) {
+for (const required of [
+  "secrets/",
+  "data/",
+  "payer.config.json",
+  "broadcaster.config.json",
+  "*.mnemonic",
+  "*.key",
+]) {
   if (!gitignore.includes(required)) failures.push(`.gitignore: missing ${required}`);
 }
 if (failures.length > 0) {

@@ -46,6 +46,7 @@ import {
   submissionJournalPath,
 } from "../security/submission-journal.js";
 import type { PayerRailgunEngine } from "./engine.js";
+import { assertPopulatedPrivateTransfer } from "./populated-transfer.js";
 
 type ProviderContext = {
   provider: JsonRpcProvider;
@@ -115,15 +116,7 @@ export const buildBoundedSelfSignedTransaction = (input: {
   nonce: number;
 }): TransactionRequest => {
   const transaction = input.populatedTransaction;
-  if (!transaction.to || !transaction.data) {
-    throw new SafeFailure("POPULATE_FAILED", "Populated transfer is incomplete");
-  }
-  if (getAddress(String(transaction.to)) !== getAddress(input.proxyContract)) {
-    throw new SafeFailure("POPULATE_FAILED", "Populated transfer target is unexpected");
-  }
-  if (transaction.value && BigInt(transaction.value) !== 0n) {
-    throw new SafeFailure("POPULATE_FAILED", "Private transfer unexpectedly sends ETH");
-  }
+  assertPopulatedPrivateTransfer(transaction, input.proxyContract);
   return {
     ...transaction,
     from: undefined,
