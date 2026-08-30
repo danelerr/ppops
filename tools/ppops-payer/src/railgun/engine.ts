@@ -36,6 +36,7 @@ import {
   PAYER_NETWORK,
   PAYER_TOKEN_ADDRESS,
   PAYER_TXID_VERSION,
+  PAYER_WALLET_SOURCE,
 } from "../constants.js";
 import { SafeFailure, writeEvent } from "../events.js";
 import { readOwnerOnlyFile } from "../security/private-file.js";
@@ -131,7 +132,7 @@ export class PayerRailgunEngine {
     const createLevelDown = leveldown as unknown as (location: string) => LevelDown;
     try {
       await startRailgunEngine(
-        "ppops-payer",
+        PAYER_WALLET_SOURCE,
         createLevelDown(this.config.storage.railgunDbPath),
         false,
         createArtifactStore(this.config.storage.artifactsPath),

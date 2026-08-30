@@ -6,6 +6,7 @@ import {
   PAYER_DEPLOYMENT_BLOCK,
   PAYER_NETWORK,
   PAYER_TOKEN_ADDRESS,
+  PAYER_WALLET_SOURCE,
 } from "../src/constants.js";
 
 const config = () => ({
@@ -35,6 +36,10 @@ const config = () => ({
 });
 
 describe("payer configuration", () => {
+  it("uses a RAILGUN-compatible wallet source", () => {
+    expect(PAYER_WALLET_SOURCE).toMatch(/^[a-z0-9 ]{1,16}$/);
+  });
+
   it("accepts only the pinned Arbitrum/native-USDC profile", () => {
     expect(PayerConfigSchema.safeParse(config()).success).toBe(true);
     const wrongToken = config();

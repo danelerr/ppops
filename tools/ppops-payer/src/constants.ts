@@ -11,6 +11,8 @@ export const PAYER_TOKEN_ADDRESS =
 export const PAYER_TOKEN_SYMBOL = "USDC";
 export const PAYER_TOKEN_DECIMALS = 6;
 export const PAYER_TXID_VERSION = TXIDVersion.V2_PoseidonMerkle;
+// RAILGUN wallet sources are limited to 16 lowercase letters, numerals and spaces.
+export const PAYER_WALLET_SOURCE = "ppopspayer";
 
 const railgunNetwork = NETWORK_CONFIG[PAYER_NETWORK];
 if (railgunNetwork.chain.id !== PAYER_CHAIN_ID) {
