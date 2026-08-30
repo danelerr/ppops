@@ -61,12 +61,13 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
 - Gate A self-signing links the payer's public EVM address to the RAILGUN
   transaction. It is diagnostic evidence, not the final sender-privacy path;
   Gate B still requires Broadcaster submission.
-- The payer's write-ahead journal blocks automatic reuse of an intent. A
-  `SUBMITTING` record left by a lost RPC response is intentionally ambiguous and
-  must be reconciled against the payer nonce, chain and PPOps before any new
-  intent is paid; deleting the journal to retry can double-pay.
-- A fresh end-to-end Arbitrum USDC mainnet payment, completed Mainnet Gate
-  artifact and external pilot evidence are still required before any
-  production-readiness claim.
+- The payer's write-ahead journal blocks automatic reuse of an intent. Gate A
+  resolves ambiguity through its precomputed hash and nonce. Gate B stores a
+  Waku-reported hash separately and accepts only the canonical hash recovered
+  from reserved nullifiers. Any unresolved record remains intentionally
+  fail-closed; deleting the journal to retry can double-pay.
+- The controlled Gate A payment and signed Mainnet Gate artifact pass. A fresh
+  value-bearing Gate B payment and independently operated pilot evidence are
+  still required before any sender-unlinkability or production-readiness claim.
 
 See `docs/OPERATIONAL-PROFILE.md` and `docs/ppops-threat-model.md` for detail.

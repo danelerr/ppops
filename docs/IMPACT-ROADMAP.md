@@ -132,7 +132,8 @@ Current groundwork:
 - the reference payer reports PPOI-aware spendable balance, enforces exact
   amount and Broadcaster-fee ceilings, and checks payment-plus-fee affordability;
 - direct Waku preflight reports aggregate peer/quote health without loading the
-  wallet, while payer gas/receipt reads require two provider responses;
+  wallet, while payer gas reads use bounded upper-median majority selection and
+  receipt reads require a strict identical-response majority;
 - Railway Wallet is no longer on the critical path.
 
 Candidate v0.2 work beyond that groundwork:

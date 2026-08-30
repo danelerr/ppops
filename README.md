@@ -232,9 +232,11 @@ adapter has passed the mainnet gate. The reference pilot payer is the separate,
 minimal `ppops-payer` harness built directly on the official RAILGUN Wallet SDK.
 It verifies `request.json`, imports a full payer only on the payer host and sends
 the exact private ERC-20 transfer with `memoText`. Its Broadcaster mode pins fee
-signers locally, bounds the token fee, journals nullifiers before Waku and does
-not load an EVM self-signing key. Railway Wallet remains an optional manual
-compatibility client, not a critical PPOps dependency. See
+signers locally, bounds the token fee, journals nullifiers before Waku, derives
+the canonical transaction hash from those nullifiers instead of trusting the
+Broadcaster response, and does not load an EVM self-signing key. Railway Wallet
+remains an optional manual compatibility client, not a critical PPOps
+dependency. See
 [`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the evidence procedure.
 
 ## Settlement semantics

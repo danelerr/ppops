@@ -252,10 +252,13 @@ submit a transaction.
 For a new, independently approved intent, run `prepare-broadcaster` with exact
 amount and atomic-USDC fee ceilings. Only after reviewing that no-send result may
 the operator run `pay-broadcaster` with `--confirm-intent`. The payer journals
-the quote fingerprint, bounded fee and nullifiers before Waku; `PENDING` or an
-error must be resolved with `recover-broadcaster`, never by deleting the journal
-or blindly retrying. A configured-provider majority must agree on a receipt
-before `MINED`.
+the quote fingerprint, bounded fee, payer identity and nullifiers before Waku.
+A Waku-returned hash is only an untrusted report: the payer must recover the
+canonical transaction hash from those nullifiers before receipt lookup or
+`SUBMITTED`. Gas reads use a bounded upper-median policy, while a strict
+configured-provider majority must agree on an identical receipt before
+`MINED`. `PENDING` or an error must be resolved with `recover-broadcaster`,
+never by deleting the journal or blindly retrying.
 
 A future passing Gate B will prove only that the payment was submitted by a
 Broadcaster instead of the payer's public EVM self-signer. It will not prove

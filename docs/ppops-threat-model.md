@@ -131,7 +131,10 @@ and abuse monitoring before exposure.
   serializes wallet access with a local runtime lock and reserves an intent in
   an owner-only write-ahead submission journal before broadcasting. Gate A
   records a precomputed signed transaction hash; Gate B records the bounded fee
-  identity and nullifiers before encrypted Waku submission. Evidence:
+  identity, payer, complete quote fingerprint and nullifiers before encrypted
+  Waku submission. A Waku-returned hash remains untrusted metadata until the
+  full payer wallet derives the canonical transaction hash from those
+  nullifiers. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
   `tools/ppops-payer/src/security/runtime-lock.ts` and
   `tools/ppops-payer/src/security/submission-journal.ts`.
@@ -369,8 +372,8 @@ flowchart LR
 | `package-lock.json` | Captures the large vulnerable upstream dependency surface | TM-005 |
 | `Dockerfile` | Defines runtime privilege, copied dependencies and base-image trust | TM-005, TM-008 |
 | `scripts/trust-boundary-check.ts` | Prevents payer spending code from entering the merchant build/image boundary | TM-001, TM-003, TM-005 |
-| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents an automatic second spend after an ambiguous payer submission | TM-003, TM-009 |
-| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates the populated call and reserves recovery identity before Waku | TM-003, TM-004, TM-005, TM-009 |
+| `tools/ppops-payer/src/security/submission-journal.ts` | Prevents an automatic second spend and separates an untrusted Broadcaster report from canonical transaction identity | TM-003, TM-009 |
+| `tools/ppops-payer/src/railgun/broadcaster-transfer.ts` | Bounds fee/payment, validates the populated call, reserves recovery identity before Waku and binds receipts to nullifier-derived canonical identity | TM-003, TM-004, TM-005, TM-009 |
 
 ## Quality check
 

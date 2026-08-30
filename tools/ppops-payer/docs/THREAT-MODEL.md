@@ -51,10 +51,10 @@ available.
 | Broadcaster redirects the populated call | Local proof/population pins the RAILGUN proxy, zero ETH value, exact recipient/memo/token/amount and pre-transaction PPOI data before encrypted submission | A compromised payer dependency can execute inside the secret-bearing process |
 | Scan starts too late and misses funds | Explicit creation block at or before first relevant note | Incorrect operator input can produce an incomplete balance |
 | Concurrent payer processes | Owner-only runtime lock spans wallet load, sync, proof generation and submission | A stale lock whose PID was reused can require operator cleanup |
-| RPC outage or wrong chain | Two distinct configured RPC origins for SDK fallback; self-signer verifies chain ID and fee data | RAILGUN SDK fallback behavior and correlated providers remain dependencies |
+| RPC outage, wrong chain or gas-price outlier | At least two distinct configured origins; 15-second local deadlines; strict healthy majority; upper-median gas selection; explicit fee ceilings; strict identical-receipt quorum | RAILGUN SDK fallback behavior, a high outlier in a two-provider profile and correlated providers remain dependencies |
 | PPOI delay/block | Balance buckets are reported; `finalize-poi` binds proof generation to an exact `MINED` journal record and requires node acknowledgement; PPOps requires receiver `Spendable` | External list policy and node availability are outside the harness; chain mining does not imply PPOI completion |
 | Transaction response lost after submission | The raw transaction is signed locally; its hash and nonce are persisted before broadcast, reuse is blocked, and receipt state advances through `SUBMITTED`, `MINED` or `REVERTED` | RPC/receipt failure still requires resolving the recorded public hash before any new intent is paid |
-| Broadcaster response lost after Waku submission | Intent, fee fingerprint and nullifiers are persisted before Waku; recovery resolves a public hash from the original full wallet; two RPCs must agree on receipts; the same intent remains blocked | A reservation can remain unresolved indefinitely; operator must not delete it to force a retry |
+| Broadcaster lies about or loses the hash after Waku submission | Intent, payer, complete quote fingerprint, bounded fee and nullifiers are persisted before Waku; the returned hash remains only a report; submission/receipt state uses the canonical hash rederived from those nullifiers; a strict RPC majority must agree on receipts; the same intent remains blocked | A reservation can remain unresolved indefinitely; a compromised full-wallet SDK could misderive identity; operator must not delete it to force a retry |
 | Public sender correlation | Explicit Gate A warning | Inherent to self-signing; Gate B Broadcaster is required for the final privacy claim |
 | Network metadata correlation | Broadcaster transaction content is encrypted, but RPC, PPOI, artifact, DNS/Waku and Broadcaster connections originate from the payer host | No Tor/mixnet guarantee; timing and IP-layer analysis remain possible |
 | Supply-chain compromise | Exact dependency lockfile, build/tests, audit gate | Official RAILGUN tree retains low/moderate legacy transitive findings and downloaded proving artifacts remain trusted inputs |
@@ -83,3 +83,6 @@ available.
    payment merely because the receiver still reports `MissingExternalPOI`.
 7. Review Broadcaster signer rotation independently and preserve the local trust
    fingerprint. Never fetch mutable trust configuration inside a payment.
+8. Treat `reportedTransactionHash` as diagnostic metadata only. Continue
+   recovery until `canonicalTransactionHashResolved` is true; never inspect the
+   reported hash and infer that payment succeeded.

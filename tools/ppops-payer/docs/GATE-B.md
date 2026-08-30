@@ -85,9 +85,13 @@ For native USDC, `10000` is `0.01 USDC` and `50000` is a maximum of
 `0.05 USDC`. They are independent ceilings, not recommendations or quoted
 costs. Choose both values independently.
 
-Preparation requires two configured RPCs to return Arbitrum gas data, uses the
-more conservative gas price; with more providers it requires a strict majority.
-It obtains an authorized quote, calculates the exact token fee, checks
+Preparation requires a strict majority of configured RPCs to return Arbitrum
+gas data within a 15-second per-provider deadline. It selects the upper median
+of the healthy gas-price readings: with two configured providers both must
+respond and the higher value wins; with three or more healthy readings one
+extreme high outlier cannot set the price. The explicit token-fee ceiling
+remains the final financial bound. The payer obtains an authorized quote,
+calculates the exact token fee, checks
 `payment + fee` against spendable balance, generates the proof and validates the
 populated RAILGUN proxy call. It then reloads and re-verifies the live merchant
 request and quote. It returns `paymentSubmitted: false`, does not create a
@@ -111,10 +115,15 @@ node dist/cli.js pay-broadcaster \
 ```
 
 Immediately before Waku submission, the payer durably reserves the intent,
-quoted-fee fingerprint, bounded fee and transaction nullifiers in its owner-only
-journal. The nullifiers are not printed. When Waku returns a hash, the journal
-moves to `SUBMITTED`; a configured-provider majority must agree on block hash,
-block number and receipt status before it moves to `MINED` or `REVERTED`.
+full quote fingerprint, bounded fee, payer identity and transaction nullifiers
+in its owner-only journal. The nullifiers are not printed. A hash returned by
+Waku is stored separately as `reportedTransactionHash`; it is not trusted as
+the submitted transaction. The journal remains `SUBMITTING` until the full
+payer wallet synchronizes and derives the canonical public transaction hash
+from the reserved nullifiers. Only that canonical hash can move the journal to
+`SUBMITTED`. A strict configured-provider majority must then agree on hash,
+block hash, block number and receipt status before it moves to `MINED` or
+`REVERTED`. Each provider receipt request has a 15-second deadline.
 
 The upstream Waku client can retransmit the same encrypted transaction while it
 waits and can identify a mined transaction from those same nullifiers. PPOps
@@ -132,10 +141,12 @@ node dist/cli.js recover-broadcaster \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS
 ```
 
-For a missing hash, recovery synchronizes the original full payer wallet and
-looks up the public transaction from the reserved nullifiers. For a known hash,
-it requires the same two-provider receipt agreement. A result that remains
-unresolved is explicitly `paymentRetryPermitted: false`.
+For every non-terminal record, recovery synchronizes the original full payer
+wallet and rederives the public transaction from the reserved nullifiers. It
+rejects a conflict with any previously derived canonical hash and never treats
+the Waku-reported hash as receipt authority. Once canonical identity exists, it
+requires the same strict receipt quorum. A result that remains unresolved is
+explicitly `paymentRetryPermitted: false`.
 
 After `MINED`, run the existing `finalize-poi` command for that exact intent.
 PPOps may fulfill only after receiver state reaches:

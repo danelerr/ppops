@@ -57,6 +57,10 @@ RAILGUN Broadcaster and never loads the optional EVM self-signing key.
   configuration and an independent maximum atomic USDC fee. It requires
   `payment + fee` to be spendable, rechecks the quote/request after proof
   generation and journals nullifiers before Waku submission.
+- A hash returned by Waku is recorded only as an untrusted report. The journal
+  advances to `SUBMITTED` only after the full payer wallet derives the canonical
+  public transaction hash from the reserved nullifiers. Receipt lookup never
+  uses the reported hash by itself.
 - An ambiguous Broadcaster result is recoverable from the private journal but
   never authorizes an automatic payment retry.
 - Verify the merchant signer through a trusted channel independent of the
@@ -226,8 +230,10 @@ For a fresh request, `prepare-broadcaster` performs sync, quote selection, fee
 calculation, proof generation, population and final request/quote validation
 without sending. `pay-broadcaster` requires exact intent, payer, amount and
 USDC-fee bounds. It writes a recoverable nullifier reservation before Waku and
-requires a configured-provider majority to agree on the receipt before marking
-the transaction mined. Use
+keeps a Waku-returned hash separate until nullifier recovery establishes the
+canonical transaction hash. Gas reads have a per-provider timeout and use the
+upper median from a healthy configured-provider majority; receipt state
+requires a strict majority of identical hash/block/status observations. Use
 `recover-broadcaster`, never a blind retry, after an ambiguous result.
 
 The controlled 2026-08-30 preflight found at least five LightPush and at least

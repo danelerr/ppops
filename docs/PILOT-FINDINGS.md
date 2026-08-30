@@ -336,6 +336,17 @@ before Waku submission. An ambiguous response is a recovery state, not a retry
 signal. The value-bearing path remains unproven until one fresh payment reaches
 PPOps `PAID` and its payer-owned PPOI is finalized.
 
+An adversarial review exposed another necessary distinction before that value
+gate: a transaction hash returned by the Broadcaster is not proof that the
+reserved RAILGUN spend mined. The payer now journals it only as a reported hash,
+resynchronizes the original full wallet and derives the canonical public hash
+from the reserved nullifiers. Only that canonical hash can reach `SUBMITTED`,
+receipt quorum or `MINED`; a conflicting reported hash is retained for diagnosis
+but cannot drive state. Gas and receipt RPC calls also have local deadlines.
+Gas selection uses the upper median from a healthy strict majority so one high
+outlier cannot set the value when at least three healthy readings exist, while
+the explicit token-fee ceiling remains the financial stop.
+
 ## Claim discipline
 
 After the controlled mainnet gate but before external adoption, PPOps may claim:

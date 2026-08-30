@@ -237,10 +237,12 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 14 test files and 48 tests,
+- Automated reference-payer suite on 2026-08-30: 14 test files and 56 tests,
   including request freshness, self-signed/Broadcaster transaction bounds,
-  pre-Waku nullifier journaling, ambiguous-submission recovery, RPC receipt
-  agreement, no-broadcast preparation and clean CLI-process termination.
+  pre-Waku nullifier journaling, reported-versus-canonical hash separation,
+  adversarial hash mismatch, ambiguous-submission recovery, bounded RPC reads,
+  gas outlier handling, receipt agreement, no-broadcast preparation and clean
+  CLI-process termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
