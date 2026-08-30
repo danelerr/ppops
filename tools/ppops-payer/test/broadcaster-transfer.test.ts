@@ -278,6 +278,44 @@ describe("Broadcaster transfer lifecycle", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("rejects a prepare-only proof whose nullifiers belong to another unresolved intent", async () => {
+    const { config, engine, request } = await testContext();
+    const session = fakeSession();
+    const journal = new SubmissionJournal(
+      submissionJournalPath(config.storage.walletStatePath),
+    );
+    const priorRequest = {
+      ...paymentRequest(),
+      id: `pi_${"34".repeat(16)}`,
+    };
+    await journal.reserveBroadcaster(priorRequest, {
+      payerRailgunAddress: engine.railgunAddress,
+      broadcasterRailgunAddress: BROADCASTER_ADDRESS,
+      broadcasterQuoteFingerprint: "cc".repeat(32),
+      broadcasterFeesID: "prior-fee-id",
+      broadcasterFeeAmountAtomic: 400n,
+      nullifiers: [NULLIFIER],
+    });
+
+    await expect(
+      sendBroadcasterTransfer({
+        config,
+        engine,
+        session,
+        request,
+        dbEncryptionKey: "11".repeat(32),
+        maxBroadcasterFeeAtomic: "1000",
+        requestSource: "http://127.0.0.1/request.json",
+        expectedMerchantSigner: request.expectedMerchantSigner,
+        submit: false,
+      }),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+    expect(rpcMocks.simulateFinal).not.toHaveBeenCalled();
+    expect(session.prepareSubmission).not.toHaveBeenCalled();
+    expect(session.submitPrepared).not.toHaveBeenCalled();
+    await expect(journal.get(request.id)).resolves.toBeUndefined();
+  });
+
   it("durably reserves nullifiers before Waku submission", async () => {
     const { config, engine, request } = await testContext();
     const journal = new SubmissionJournal(

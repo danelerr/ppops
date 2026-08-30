@@ -246,12 +246,34 @@ describe("payer submission journal", () => {
 
     await journal.reserveBroadcaster(first, reservation);
     await expect(
+      journal.assertBroadcasterNullifiersAvailable(second.id, reservation.nullifiers),
+    ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
+    await expect(
+      journal.assertBroadcasterNullifiersAvailable(second.id, [
+        `0x${"88".repeat(32)}`,
+      ]),
+    ).resolves.toBeUndefined();
+    await expect(
+      journal.assertBroadcasterNullifiersAvailable(first.id, reservation.nullifiers),
+    ).resolves.toBeUndefined();
+    await expect(
       journal.reserveBroadcaster(second, {
         ...reservation,
         broadcasterQuoteFingerprint: "bb".repeat(32),
       }),
     ).rejects.toMatchObject({ code: "SUBMISSION_ALREADY_RECORDED" });
     await expect(journal.get(second.id)).resolves.toBeUndefined();
+
+    await journal.markRejected(first.id, "BAD_TOKEN_FEE");
+    await expect(
+      journal.assertBroadcasterNullifiersAvailable(second.id, reservation.nullifiers),
+    ).resolves.toBeUndefined();
+    await expect(
+      journal.reserveBroadcaster(second, {
+        ...reservation,
+        broadcasterQuoteFingerprint: "bb".repeat(32),
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("allows only bounded same-request retries with the exact reserved nullifiers", async () => {

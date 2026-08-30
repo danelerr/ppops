@@ -274,6 +274,24 @@ const fingerprintFeesID = (feesID: string): string =>
 const normalizedNullifiers = (nullifiers: string[]): string[] =>
   nullifiers.map((value) => value.toLowerCase()).sort();
 
+const hasActiveBroadcasterNullifierConflict = (
+  records: SubmissionRecord[],
+  intentId: string,
+  nullifiers: string[],
+): boolean => {
+  const normalized = normalizedNullifiers(nullifiers);
+  return records.some(
+    (record) =>
+      record.intentId !== intentId &&
+      record.submissionMode === "BROADCASTER" &&
+      record.status !== "REJECTED" &&
+      record.status !== "REVERTED" &&
+      record.nullifiers?.some((value) =>
+        normalized.includes(value.toLowerCase()),
+      ),
+  );
+};
+
 const sameNullifierSet = (left: string[], right: string[]): boolean => {
   const normalizedLeft = normalizedNullifiers(left);
   const normalizedRight = normalizedNullifiers(right);
@@ -331,6 +349,25 @@ export class SubmissionJournal {
     return current;
   }
 
+  async assertBroadcasterNullifiersAvailable(
+    intentId: string,
+    nullifiers: string[],
+  ): Promise<void> {
+    const journal = await this.read();
+    if (
+      hasActiveBroadcasterNullifierConflict(
+        journal.records,
+        intentId,
+        nullifiers,
+      )
+    ) {
+      throw new SafeFailure(
+        "SUBMISSION_ALREADY_RECORDED",
+        "A nullifier is already reserved by another local submission",
+      );
+    }
+  }
+
   async reserve(
     request: PaymentRequest,
     selfSigner: string,
@@ -379,14 +416,13 @@ export class SubmissionJournal {
       );
     }
     const normalized = normalizedNullifiers(input.nullifiers);
-    const conflicting = journal.records.find(
-      (record) =>
-        record.submissionMode === "BROADCASTER" &&
-        record.status !== "REJECTED" &&
-        record.status !== "REVERTED" &&
-        record.nullifiers?.some((value) => normalized.includes(value.toLowerCase())),
-    );
-    if (conflicting) {
+    if (
+      hasActiveBroadcasterNullifierConflict(
+        journal.records,
+        request.id,
+        input.nullifiers,
+      )
+    ) {
       throw new SafeFailure(
         "SUBMISSION_ALREADY_RECORDED",
         "A nullifier is already reserved by another local submission",

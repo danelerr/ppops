@@ -299,6 +299,10 @@ export const sendBroadcasterTransfer = async (input: {
     engine.network.proxyContract,
   );
   const nullifiers = assertPopulatedNullifiers(populated.nullifiers);
+  await submissionJournal.assertBroadcasterNullifiersAvailable(
+    request.id,
+    nullifiers,
+  );
   const finalSimulation = await simulatePopulatedTransferQuorum(
     config,
     transaction,
