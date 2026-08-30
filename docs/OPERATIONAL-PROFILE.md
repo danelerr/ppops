@@ -216,6 +216,7 @@ Pinned dependencies:
 @railgun-community/wallet        10.9.0
 @railgun-community/engine         9.6.0
 @railgun-community/shared-models  8.0.1
+@railgun-community/waku-broadcaster-client-node 9.1.1 # payer only
 ethers                            6.14.3
 ```
 
@@ -236,9 +237,10 @@ Verification evidence:
   core database,
   reconciliation, descriptor and webhook paths are substantially higher than
   the RAILGUN engine wrapper that requires the live gate.
-- Automated reference-payer suite on 2026-08-30: 9 test files and 28 tests,
-  including request freshness, transaction bounds, submission-journal recovery,
-  no-broadcast preparation and clean CLI-process termination.
+- Automated reference-payer suite on 2026-08-30: 14 test files and 48 tests,
+  including request freshness, self-signed/Broadcaster transaction bounds,
+  pre-Waku nullifier journaling, ambiguous-submission recovery, RPC receipt
+  agreement, no-broadcast preparation and clean CLI-process termination.
 - Dry-run npm tarballs contained no secret/config/data paths; the merchant
   tarball contained no payer runtime and was limited to `dist`, package metadata,
   README and license files.
@@ -279,6 +281,12 @@ Verification evidence:
   `CONFIRMED + PENDING + MATCHED`, then `FINALIZED + SPENDABLE + MATCHED ->
   PAID` after the payer submitted its output PPOI. Exact-once webhook replay,
   restart and an isolated restore all passed.
+- Non-financial Gate B preflight: the pinned Waku client became ready in about
+  twelve seconds, found at least five LightPush and at least five Filter peers, and selected a
+  native-USDC quote with observed reliability between `0.84` and `1` and roughly
+  five to nine minutes remaining. The
+  command loaded no wallet or EVM key, generated no proof and submitted no
+  payment. The value-bearing Gate B remains pending.
 - After moving to one explicit scan owner, the merchant reached readiness in
   approximately 6 seconds and, after the final observability correction,
   completed five subsequent scheduled scans at roughly 34-second cadence.
@@ -305,13 +313,15 @@ Machine-readable reports:
 ## Dependencies and residual operational risk
 
 The pinned RAILGUN packages are a large security-sensitive dependency. As of
-this snapshot, compatible transitive overrides reduce `npm audit --omit=dev` to
-36 findings: zero critical, zero high, 6 moderate and 30 low. Overrides cover
+this snapshot, compatible transitive overrides reduce the merchant
+`npm audit --omit=dev` to 36 findings (6 moderate, 30 low) and the separate
+Waku-enabled payer to 40 findings (10 moderate, 30 low); both have zero
+critical/high findings. Overrides cover
 Axios, WebSocket, form-data, tar, cookie/query parsers and YAML/object setters.
 The runtime, privacy gate and test suite pass with the override set. Legacy
-`web3 -> web3-bzz -> swarm-js` and wallet GraphQL/React-Native packages remain
-present even where PPOps does not exercise their features, so package presence
-is still a supply-chain and future-reachability risk. CI rejects high/critical
+`web3 -> web3-bzz -> swarm-js`, wallet GraphQL/React-Native packages and the
+Waku transport tree remain present, so package presence is still a supply-chain
+and future-reachability risk. CI rejects high/critical
 production findings and exports a CycloneDX SBOM. Blind `npm audit fix --force`
 would still propose incompatible RAILGUN changes and is not applied.
 

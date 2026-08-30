@@ -14,9 +14,10 @@ processor. Its lifecycle is intentionally familiar to developers who use
 payment-intent APIs, while custody and infrastructure remain with the merchant.
 
 This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and a controlled
-Arbitrum mainnet self-pilot pass, but this is not a production-readiness or
-external-adoption claim. Review the known risks before using real financial
-data.
+Arbitrum mainnet self-pilot pass. Direct Waku/Broadcaster connectivity also
+passes, but the value-bearing Broadcaster gate and external adoption remain
+open. This is not a production-readiness claim. Review the known risks before
+using real financial data.
 
 ## Product model
 
@@ -42,7 +43,8 @@ Available now:
 - view-only RAILGUN reconciliation;
 - finality/PPOI-aware payment state;
 - idempotent event IDs and HMAC-authenticated webhook delivery;
-- reference payer and reproducible privacy/security evidence.
+- reference payer with self-signed and Waku/Broadcaster submission modes;
+- reproducible privacy/security evidence.
 
 Possible after the remaining adoption gate, but **not implemented today**:
 
@@ -229,8 +231,10 @@ merchant cannot claim general consumer usability until its chosen payer wallet
 adapter has passed the mainnet gate. The reference pilot payer is the separate,
 minimal `ppops-payer` harness built directly on the official RAILGUN Wallet SDK.
 It verifies `request.json`, imports a full payer only on the payer host and sends
-the exact private ERC-20 transfer with `memoText`. Railway Wallet remains an
-optional manual compatibility client, not a critical PPOps dependency. See
+the exact private ERC-20 transfer with `memoText`. Its Broadcaster mode pins fee
+signers locally, bounds the token fee, journals nullifiers before Waku and does
+not load an EVM self-signing key. Railway Wallet remains an optional manual
+compatibility client, not a critical PPOps dependency. See
 [`docs/PILOT-GUIDE.md`](docs/PILOT-GUIDE.md) for the evidence procedure.
 
 ## Settlement semantics
@@ -375,6 +379,11 @@ webhook replay, restart and isolated restore passed. The signed, redacted result
 is `artifacts/mainnet-gate-report.json`; this is still self-pilot evidence, not
 external adoption.
 
+The payer's separate
+[`Gate B runbook`](tools/ppops-payer/docs/GATE-B.md) distinguishes the passing
+non-financial Waku preflight from the still-pending value-bearing Broadcaster
+payment. Preflight is not sender-unlinkability evidence.
+
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect
 cache activity without opening or reading the wallet database:
@@ -417,9 +426,10 @@ with `mainnet-gate-report-verify` against the independently distributed signer.
   material and can forge descriptors with the merchant identity key.
 - RAILGUN SDK `10.9.0` / engine `9.6.0` are pinned because the gate relies on a
   direct TXO surface. Compatible transitive overrides reduce the current
-  production audit to 36 moderate/low findings and zero high/critical findings.
-  The legacy Web3/BZZ and GraphQL tree remains large and is still supply-chain
-  sensitive.
+  merchant audit to 30 low and 6 moderate findings. The separate Waku-enabled
+  payer has 30 low and 10 moderate findings. Both have zero high/critical
+  findings. The legacy Web3/BZZ, GraphQL and Waku trees remain large and
+  supply-chain sensitive.
 - The pinned SDK can leave prover workers referenced after graceful cleanup.
   The daemon drains a non-cancellable active scan (with a 30-minute Compose
   grace window); the finite payer bounds provider/engine cleanup, flushes

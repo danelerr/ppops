@@ -1,7 +1,7 @@
 # Gate A: direct SDK self-signed payment
 
-Status: **PASS** on Arbitrum mainnet, 2026-08-30. External adoption and the
-Broadcaster-based Gate B remain pending.
+Status: **PASS** on Arbitrum mainnet, 2026-08-30. Gate B connectivity passed;
+its value-bearing Broadcaster payment and external adoption remain pending.
 
 ## Objective
 
@@ -185,8 +185,8 @@ three-phase signed report is `artifacts/mainnet-gate-report.json`.
 
 ## Decision
 
-- Success: keep RAILGUN, remove Railway from the critical path, then implement
-  Gate B with a Waku Broadcaster.
+- Success: keep RAILGUN, remove Railway from the critical path, then complete
+  the implemented Waku/Broadcaster path in [Gate B](GATE-B.md).
 - Proof/reconciliation succeeds but self-submission has RPC problems: keep the
   rail and harden provider selection separately.
 - Direct SDK import/sync/proof/memo repeatedly fails with reproducible evidence:

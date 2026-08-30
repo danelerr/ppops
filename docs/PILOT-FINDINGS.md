@@ -3,7 +3,8 @@
 First recorded: 2026-08-23. Updated: 2026-08-30.
 
 Status: living pilot record. The controlled mainnet payment gate passed on
-2026-08-30; Gate B and external adoption remain open. This document
+2026-08-30; Gate B connectivity passed, while its value-bearing payment and
+external adoption remain open. This document
 distinguishes observations from upstream guarantees and future proposals. It
 must not be cited as evidence of an independent merchant deployment.
 
@@ -67,6 +68,11 @@ a cryptographically private payment inaccessible or operationally unsafe.
 - A controlled duplicate confirmation delivery remained one stored event;
   restart and isolated restore preserved the same projection. The signed,
   identifier-redacted report is `artifacts/mainnet-gate-report.json`.
+- The direct Waku client found at least five LightPush and at least five Filter peers without
+  Railway Wallet, and selected a ready native-USDC Broadcaster quote with
+  observed reliability between `0.84` and `1` and roughly five to nine minutes of
+  validity. This preflight opened no wallet,
+  generated no proof and moved no funds.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -91,8 +97,9 @@ reference or invoice identifier belongs in the public version of this record.
 
 - No independent merchant or payer has completed the full flow. The project
   therefore does not yet have verifiable external traction.
-- Gate B has not submitted through a Waku Broadcaster, so the self-pilot does
-  not demonstrate sender unlinkability from the public gas signer.
+- Gate B has not submitted through a Waku Broadcaster. Its connectivity test
+  therefore does not demonstrate removal of the payer public gas signer from a
+  real payment.
 - One successful controlled payment does not establish an availability SLO,
   general wallet usability or production readiness.
 
@@ -312,6 +319,23 @@ detection, PPOI propagation and merchant fulfillment are separate milestones.
 A future wallet integration must own all four; PPOps should continue to fail
 closed while any assurance step is missing.
 
+### F-12: Broadcaster connectivity is feasible, but trust and recovery are product surfaces
+
+The direct Waku preflight passed concrete peer and quote readiness checks and discovered a usable
+native-USDC quote in about twelve seconds, so Railway Wallet is not required for
+Broadcaster discovery either. The result does not make the path trustless. Fee
+authorization depends on a signer list, discovery depends on DNS/Waku peers,
+submission depends on a selected Broadcaster, and receipt resolution still
+depends on RPC providers.
+
+The reference payer therefore pins the reviewed fee-signer list locally instead
+of downloading mutable configuration during payment. It fingerprints that
+trust input, imposes quote reliability/lifetime and atomic-USDC fee limits,
+requires enough private balance for payment plus fee, and persists nullifiers
+before Waku submission. An ambiguous response is a recovery state, not a retry
+signal. The value-bearing path remains unproven until one fresh payment reaches
+PPOps `PAID` and its payer-owned PPOI is finalized.
+
 ## Claim discipline
 
 After the controlled mainnet gate but before external adoption, PPOps may claim:
@@ -339,8 +363,9 @@ PPOps must not yet claim:
    `tools/ppops-payer` package as the reproducible payer.
 2. Preserve the Gate A operator records and signed public report with the beta
    release.
-3. Complete Gate B through a Waku Broadcaster and retain
-   Railway only as an optional compatibility client.
+3. Complete the now-connected Gate B with one separately approved, bounded
+   Broadcaster payment and retain Railway only as an optional compatibility
+   client.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside
    the existing settlement evidence.

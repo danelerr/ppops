@@ -19,6 +19,17 @@ Gate A transfer, `FINALIZED + SPENDABLE + MATCHED -> PAID`, restart/restore
 evidence for that settlement, Gate B Broadcaster path and external users remain
 open.
 
+### Post-review status
+
+Later on 2026-08-30, Gate A passed: one bounded `0.01 USDC` Arbitrum payment
+reached PPOps `FINALIZED + SPENDABLE + MATCHED -> PAID`, and restart, restore
+and webhook replay evidence passed. The subsequent Waku/Broadcaster
+implementation and non-financial connectivity preflight also passed; no
+value-bearing Gate B payment has been made. The post-review payer suite now has
+14 test files and 48 tests; its Waku-enabled dependency graph has 10 Moderate
+and 30 Low findings, with zero Critical/High findings. This paragraph records
+later state and does not retroactively expand the review scope below.
+
 ## Reviewed changes
 
 ### SEC-010 — Historical refresh waited on an event it may defer
@@ -192,7 +203,7 @@ TXID `Complete` at ratio `1` after the same scan finished.
   their generated npm links; the merchant regression was repeated after its
   direct-execution fix.
 
-## Remaining release blockers
+## Remaining release blockers at review time
 
 1. Explicit operator approval and one bounded value-bearing Gate A transfer.
 2. Merchant reconciliation through `FINALIZED + SPENDABLE + MATCHED -> PAID`.

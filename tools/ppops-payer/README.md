@@ -15,13 +15,17 @@ does not interrupt an active scan, proof, database write, or submission.
 
 ```text
 PPOps request.json -> verify pinned merchant signer -> RAILGUN proof + memo
-                  -> self-signed Arbitrum submission -> PPOps reconciliation
+                  -> Gate A: self-signed Arbitrum submission
+                  -> Gate B: Waku Broadcaster submission
+                  -> PPOps reconciliation
 ```
 
 Current status: Gate A passed on Arbitrum mainnet on 2026-08-30. A bounded
 `0.01 USDC` transfer was mined, its output PPOI was submitted by this payer,
 and PPOps recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. This remains a
 controlled self-pilot, not external adoption or a production-readiness claim.
+Gate B's non-financial Waku preflight also passed on 2026-08-30. Its
+value-bearing payment remains pending and must not be inferred from preflight.
 
 ## Scope
 
@@ -35,8 +39,8 @@ The harness is pinned to:
 
 It does not expose an HTTP server, UI, account system, swap, custody service or
 merchant key path. Gate A submits with a caller-controlled public EVM signer.
-That signer is publicly associated with the private transaction. Gate B will
-use a RAILGUN Broadcaster only after Gate A succeeds.
+That signer is publicly associated with the private transaction. Gate B uses a
+RAILGUN Broadcaster and never loads the optional EVM self-signing key.
 
 ## Safety boundary
 
@@ -49,6 +53,12 @@ use a RAILGUN Broadcaster only after Gate A succeeds.
 - `pay-self-signed` requires the exact intent ID and a separate maximum atomic
   amount before it can submit anything. It accepts only a live HTTP(S) request
   and revalidates it after proof generation, immediately before signing.
+- `pay-broadcaster` additionally requires an owner-pinned fee-signer trust
+  configuration and an independent maximum atomic USDC fee. It requires
+  `payment + fee` to be spendable, rechecks the quote/request after proof
+  generation and journals nullifiers before Waku submission.
+- An ambiguous Broadcaster result is recoverable from the private journal but
+  never authorizes an automatic payment retry.
 - Verify the merchant signer through a trusted channel independent of the
   checkout URL.
 
@@ -63,9 +73,10 @@ npm ci
 npm run verify
 ```
 
-The pinned RAILGUN dependency tree currently contains low/moderate transitive
-audit findings. `npm run verify` fails on high or critical findings. Do not run
-`npm audit fix --force`: its proposed package downgrades are breaking changes.
+The pinned RAILGUN/Waku dependency tree currently contains 30 low and 10
+moderate transitive audit findings. `npm run verify` fails on high or critical
+findings. Do not run `npm audit fix --force`: its proposed package downgrades
+are breaking changes.
 
 ## Initialize
 
@@ -94,14 +105,20 @@ secrets/payer.mnemonic
 
 ```bash
 chmod 600 ./secrets/payer.mnemonic
+node dist/cli.js config-validate --config ./payer.config.json
+node dist/cli.js secrets-check --config ./payer.config.json
+node dist/cli.js sync --config ./payer.config.json
+```
 
+The EVM key is optional and is not used by `sync`, Broadcaster preflight,
+`prepare-broadcaster`, `pay-broadcaster` or recovery. Derive it only for the
+diagnostic Gate A path:
+
+```bash
 node dist/cli.js derive-self-signing-key \
   --config ./payer.config.json \
   --expected-address PINNED_PAYER_EVM_ADDRESS \
   --derivation-index 0
-
-node dist/cli.js config-validate --config ./payer.config.json
-node dist/cli.js secrets-check --config ./payer.config.json
 ```
 
 `derive-self-signing-key` uses the same Railway-compatible path
@@ -193,6 +210,30 @@ transaction hash plus PPOps state to resolve the result. A two-minute receipt
 timeout returns `PENDING`; it is not permission to retry. Never delete or alter
 the journal merely to make a retry pass.
 
+## Gate B runbook
+
+Follow [docs/GATE-B.md](docs/GATE-B.md). Gate B first creates an ignored,
+owner-only trust file whose fee signers were verified out of band. Connectivity
+can then be tested without opening the wallet:
+
+```bash
+node dist/cli.js broadcaster-preflight \
+  --config ./payer.config.json \
+  --broadcaster-config ./broadcaster.config.json
+```
+
+For a fresh request, `prepare-broadcaster` performs sync, quote selection, fee
+calculation, proof generation, population and final request/quote validation
+without sending. `pay-broadcaster` requires exact intent, payer, amount and
+USDC-fee bounds. It writes a recoverable nullifier reservation before Waku and
+requires a configured-provider majority to agree on the receipt before marking
+the transaction mined. Use
+`recover-broadcaster`, never a blind retry, after an ambiguous result.
+
+The controlled 2026-08-30 preflight found at least five LightPush and at least
+five Filter peers and a ready quote with observed reliability between `0.84`
+and `1`. No proof or payment was created.
+
 ## Evidence interpretation
 
 Gate A proves that Railway Wallet is not required for proof generation,
@@ -205,9 +246,10 @@ maximum was `54267840000000` wei, the transaction mined once, PPOI moved from
 metadata-minimal mainnet report passed restart, restore and webhook-deduplication
 checks. Direct identifiers remain in private operator evidence only.
 
-Only after Gate A reaches `PAID` should the same transaction flow be adapted to
-Waku/Broadcaster submission for Gate B. Railway Wallet then remains an optional
-manual compatibility client, not an operational dependency.
+Gate B is now implemented behind separate amount/fee/intent confirmation and a
+write-ahead recovery journal. Only its connectivity preflight has run; a real
+Broadcaster payment and reconciliation are still required. Railway Wallet
+remains an optional manual compatibility client, not an operational dependency.
 
 ## Development
 
@@ -221,6 +263,7 @@ npm run build
 Runtime data, wallet databases, configurations, secrets and local evidence are
 ignored by Git.
 
-`sync`, `pay-self-signed` and `finalize-poi` hold an owner-only runtime lock for
-the full wallet state. Two payer processes therefore cannot scan, submit or
-generate PPOI concurrently from the same local wallet cache.
+Every command that opens the full wallet—including `sync`, both preparation and
+payment modes, Broadcaster recovery and `finalize-poi`—holds an owner-only
+runtime lock. Two payer processes therefore cannot scan, submit or generate
+PPOI concurrently from the same local wallet cache.

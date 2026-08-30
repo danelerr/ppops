@@ -105,7 +105,9 @@ with spending authority, used to prove that a wallet can:
 1. verify the independently pinned merchant signer;
 2. enforce the signed chain, token, amount, receiver, expiry and memo;
 3. create the private RAILGUN transfer;
-4. let PPOps reconcile it without learning the payer's spending credential.
+4. submit diagnostically through a public self-signer or privately through a
+   bounded Waku Broadcaster path;
+5. let PPOps reconcile it without learning the payer's spending credential.
 
 In a mature ecosystem, a compatible wallet would consume the same payer request
 and the reference payer would remain development and conformance tooling.
@@ -120,7 +122,7 @@ and the reference payer would remain development and conformance tooling.
 | View-only RAILGUN reconciliation | Implemented |
 | Finality, PPOI and matching semantics | Implemented |
 | HMAC webhook outbox | Implemented |
-| Reference payer | Implemented; Gate A passed 2026-08-30 |
+| Reference payer | Implemented; Gate A passed and Gate B connectivity passed; value-bearing Gate B pending |
 | Mainnet end-to-end evidence | Self-pilot passed; external pilot pending |
 | Merchant TypeScript SDK | Not implemented; optional |
 | QR/consumer checkout UI | Not implemented |

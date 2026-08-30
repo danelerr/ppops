@@ -119,22 +119,33 @@ exact-once webhook, isolated restore and signed report requirements pass.
 Independent operator evidence is the remaining Gate 0 item; the self-pilot must
 not be counted as adoption.
 
+The non-financial Waku/Broadcaster preflight also passes. Its value-bearing
+payment is a separate privacy subgate: until that payment reaches PPOps `PAID`,
+the project must not claim that a real payer avoided the public self-signer.
+
 Failure to complete the private-transfer primitive remains a stop condition.
 
 ### Gate 1 — payer readiness and provider resilience
 
-Candidate v0.2 work:
+Current groundwork:
+
+- the reference payer reports PPOI-aware spendable balance, enforces exact
+  amount and Broadcaster-fee ceilings, and checks payment-plus-fee affordability;
+- direct Waku preflight reports aggregate peer/quote health without loading the
+  wallet, while payer gas/receipt reads require two provider responses;
+- Railway Wallet is no longer on the critical path.
+
+Candidate v0.2 work beyond that groundwork:
 
 - a local-only payer readiness check for chain, native token, spendable balance,
   estimated Broadcaster fee and memo support;
 - explicit separation between **onboarding** and **checkout-ready** states;
 - expiry recommendations based on payer readiness rather than a fixed example;
-- RPC health, fallback and dependency reporting for a future payer component;
+- richer RPC/provider independence and dependency reporting for the payer;
 - structured onboarding measurements without exporting addresses, balances or
   wallet identifiers to the merchant;
 - wallet compatibility tests that can be reproduced by maintainers;
-- a minimal reference payer harness that exercises the official Wallet SDK
-  directly, so wallet-UI availability is not confused with rail viability;
+- wallet-adapter compatibility beyond the existing SDK reference payer;
 - scan-progress correctness tests and metadata-only stall diagnostics for payer
   wallets; the controlled pilot found a reproducible stale-50% display bug in
   Railway Wallet `v5.24.21` and published a minimal upstream-applicable patch.

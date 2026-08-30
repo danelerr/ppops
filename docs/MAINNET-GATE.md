@@ -2,7 +2,9 @@
 
 Controlled self-pilot status: **PASS** on 2026-08-30. The signed public report
 is `artifacts/mainnet-gate-report.json`; external adoption remains a separate
-gate.
+gate. This report used diagnostic Gate A self-signing. Gate B's Waku
+connectivity passes, but its separate value-bearing sender-submission evidence
+is still pending.
 
 PPOps is publishable as beta only after every item below has evidence attached
 to a release. This gate deliberately requires a fresh private transfer; the
@@ -35,8 +37,9 @@ public Sepolia fixture is not sufficient.
    spending material on the PPOps host. The reference path is the independently
    executed `tools/ppops-payer` SDK harness documented in `PILOT-GUIDE.md`;
    Railway Wallet is optional compatibility evidence only.
-   The harness must revalidate the live request immediately before signing and
-   persist the locally computed transaction hash before broadcast. After the
+   Gate A must revalidate the live request immediately before signing and
+   persist the locally computed transaction hash before broadcast. Gate B must
+   bound the token fee and persist nullifiers before Waku submission. After the
    receipt is mined, the payer must generate the output PPOI and obtain node
    acknowledgement; receiver-side `MissingExternalPOI` is observation, not
    payment eligibility.

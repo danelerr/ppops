@@ -228,9 +228,39 @@ operational payer host if desired. Do not remove the encrypted database key or
 self-signing key needed by this diagnostic path.
 
 After Gate A reaches `PAID`, Gate B replaces the public self-signer with a Waku
-Broadcaster. Only Gate B supports the final sender-unlinkability claim. The payer
+Broadcaster. The implemented path does not load the optional EVM key. The payer
 mnemonic, spending key and wallet database remain off the PPOps host in both
 modes.
+
+### Gate B: Broadcaster path
+
+First pin the reviewed fee-signer list in an ignored owner-only file and run the
+non-financial preflight documented in
+[`tools/ppops-payer/docs/GATE-B.md`](../tools/ppops-payer/docs/GATE-B.md):
+
+```bash
+node dist/cli.js broadcaster-preflight \
+  --config ./payer.config.json \
+  --broadcaster-config ./broadcaster.config.json
+```
+
+The controlled 2026-08-30 preflight found at least five LightPush and at least
+five Filter peers and a ready native-USDC quote with observed reliability
+between `0.84` and `1`. It did not open the payer wallet, create a proof or
+submit a transaction.
+
+For a new, independently approved intent, run `prepare-broadcaster` with exact
+amount and atomic-USDC fee ceilings. Only after reviewing that no-send result may
+the operator run `pay-broadcaster` with `--confirm-intent`. The payer journals
+the quote fingerprint, bounded fee and nullifiers before Waku; `PENDING` or an
+error must be resolved with `recover-broadcaster`, never by deleting the journal
+or blindly retrying. A configured-provider majority must agree on a receipt
+before `MINED`.
+
+A future passing Gate B will prove only that the payment was submitted by a
+Broadcaster instead of the payer's public EVM self-signer. It will not prove
+IP-layer anonymity, general wallet usability, production availability or
+independent adoption.
 
 ## 5. Accept the payment
 
