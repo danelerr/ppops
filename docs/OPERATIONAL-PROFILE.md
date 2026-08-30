@@ -360,3 +360,9 @@ SBOMs and requires their expected root component plus a nonempty CycloneDX
 component inventory, even when the generator tolerates known overridden
 transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
 production runbook defines readiness, metrics, alert and egress policy.
+
+Public GitHub Actions
+[run `33330362629`](https://github.com/danelerr/ppops/actions/runs/33330362629)
+passed both the full verify job and the Docker build job for implementation
+commit `767960e` on 2026-08-30. This proves that commit's CI build, not the
+still-pending tag-triggered GHCR publication.

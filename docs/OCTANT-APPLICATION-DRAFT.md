@@ -109,13 +109,13 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS locally; refreshed public CI/release pending push |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed at `767960e` |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
 | Broadcaster path without payer EVM self-signer | Waku preflight and complete no-send proof preparation | PARTIAL; value-bearing Gate B pending |
 | Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
-| Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — local branch is not a release** |
+| Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — public main is not yet a tagged release** |
 
 Evidence links:
 
@@ -196,7 +196,8 @@ standard in the v0.1 funding scope.
 
 ## Submission checklist
 
-- [ ] Push the reviewed commits and obtain green public CI.
+- [x] Push the reviewed implementation and obtain green public verify + Docker
+      CI at `767960e`.
 - [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
 - [ ] Complete one separately authorized value-bearing Gate B payment, or remove
       every sender-unlinkability implication from the application.
