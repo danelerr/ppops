@@ -445,7 +445,9 @@ PPOps must not yet claim:
 3. Preserve the failed Gate B journal and stop value-bearing retries. Diagnose
    the official client/Broadcaster response path, including the passing final
    calldata simulation, with upstream maintainers or a non-financial
-   reproducible fixture before authorizing another funded trial.
+   reproducible fixture before authorizing another funded trial. Use the
+   metadata-minimal [upstream report](../tools/ppops-payer/docs/UPSTREAM-BROADCASTER-REPORT.md)
+   rather than raw wallet/request artifacts.
 4. Repeat with an independently operated merchant or payer.
 5. Capture onboarding time, provider failures, fees and support steps alongside
    the existing settlement evidence.

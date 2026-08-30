@@ -260,6 +260,11 @@ worked, but the current public Broadcaster path did not complete a payment. Gate
 B is therefore **not passed**, and sender-unlinkability from a completed
 Broadcaster payment must not be claimed.
 
+A metadata-minimal, maintainer-ready account of the failure and concrete
+questions is available in the [upstream interoperability
+report](UPSTREAM-BROADCASTER-REPORT.md). Do not attach local wallet state, raw
+journal data, nullifiers or requests when escalating it.
+
 ## Claim boundary
 
 A passing value-bearing Gate B would show that this payment did not use the
