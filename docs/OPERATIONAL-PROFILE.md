@@ -378,7 +378,7 @@ transitive-tree warnings. Compose bounds memory, CPU and PID usage; the
 production runbook defines readiness, metrics, alert and egress policy.
 
 Public GitHub Actions
-[run `33330362629`](https://github.com/danelerr/ppops/actions/runs/33330362629)
+[run `33333725083`](https://github.com/danelerr/ppops/actions/runs/33333725083)
 passed both the full verify job and the Docker build job for implementation
-commit `767960e` on 2026-08-30. This proves that commit's CI build, not the
+commit `5d5752b` on 2026-08-30. This proves that commit's CI build, not the
 still-pending tag-triggered GHCR publication.

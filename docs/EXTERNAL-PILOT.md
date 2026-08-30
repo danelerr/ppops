@@ -3,7 +3,7 @@
 Status: **OPEN — no independent operator has completed this gate yet.**
 
 Project release status on 2026-08-30: public `main` and its verify/Docker CI
-pass at `767960e`; the versioned beta tag and release assets remain pending.
+pass at `5d5752b`; the versioned beta tag and release assets remain pending.
 
 This runbook turns the remaining adoption requirement into a reproducible,
 privacy-preserving test. It does not ask an operator to disclose a mnemonic,
