@@ -370,7 +370,8 @@ alerts are documented in `docs/PRODUCTION-RUNBOOK.md`.
 The controlled mainnet pilot's observed onboarding/RPC limitations and current
 evidence boundary are recorded in `docs/PILOT-FINDINGS.md`. The evidence-gated
 public-good direction, proposed impact metrics and explicit Octant go/no-go are
-in `docs/IMPACT-ROADMAP.md`. A third party can use
+in `docs/IMPACT-ROADMAP.md`; the current evidence-backed answer bank is
+[`docs/OCTANT-APPLICATION-DRAFT.md`](docs/OCTANT-APPLICATION-DRAFT.md). A third party can use
 [`docs/EXTERNAL-PILOT.md`](docs/EXTERNAL-PILOT.md) to produce independently
 verifiable evidence without publishing payment identifiers. None of these
 documents expands the v0.1 product scope or converts a self-pilot into external

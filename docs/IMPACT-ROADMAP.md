@@ -252,6 +252,9 @@ Apply to Epoch 13 only if, before submission:
 If external traction is still absent, the honest outcome is not to relabel the
 self-pilot as adoption. Continue the work and target a later funding round.
 
+The evidence-backed, explicitly blocked answer bank is maintained in
+[the Octant application draft](OCTANT-APPLICATION-DRAFT.md).
+
 ## Sources
 
 - [Octant Epoch 13 application and eligibility criteria](https://octant.fillout.com/epoch-13)
