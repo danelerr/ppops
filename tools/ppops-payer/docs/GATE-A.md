@@ -95,7 +95,7 @@ node dist/cli.js prepare-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000
 ```
 
@@ -115,8 +115,8 @@ These live values demonstrate the bound; they are not future fee estimates.
 
 ## 5. Submit with explicit bounds
 
-For the prepared `0.01 USDC` pilot, with an independently accepted ceiling of
-`0.10 USDC`:
+For the prepared `0.01 USDC` pilot, set the independently accepted amount
+ceiling to the same `0.01 USDC`:
 
 ```bash
 node dist/cli.js pay-self-signed \
@@ -125,7 +125,7 @@ node dist/cli.js pay-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000 \
   --confirm-intent INTENT_ID
 ```

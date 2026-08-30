@@ -117,7 +117,8 @@ No new product scope before all of the following exist:
 Status on 2026-08-30: the controlled mainnet payment, finality/PPOI/matching,
 exact-once webhook, isolated restore and signed report requirements pass.
 Independent operator evidence is the remaining Gate 0 item; the self-pilot must
-not be counted as adoption.
+not be counted as adoption. The minimal privacy-preserving handoff is documented
+in [the independent operator pilot](EXTERNAL-PILOT.md).
 
 The non-financial Waku/Broadcaster preflight and a complete no-send proof
 preparation also pass. Its value-bearing payment is a separate privacy subgate:

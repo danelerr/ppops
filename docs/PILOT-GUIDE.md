@@ -117,14 +117,14 @@ Content-Type: application/json
 
 {
   "externalReference": "PILOT-ORDER-0001",
-  "amountAtomic": "100000",
+  "amountAtomic": "10000",
   "expiresAt": <current Unix time + 3600>
 }
 ```
 
 Replace the angle-bracket expression with an integer immediately before sending
 the request; it deliberately makes the displayed body illustrative rather than
-copy-paste JSON. `100000` atomic units is `0.10 USDC`. Retry the identical
+copy-paste JSON. `10000` atomic units is `0.01 USDC`. Retry the identical
 request and verify that PPOps returns the same intent. Keep the returned
 checkout path, recipient, memo and descriptor together.
 
@@ -169,7 +169,7 @@ node dist/cli.js prepare-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000
 
 node dist/cli.js pay-self-signed \
@@ -178,7 +178,7 @@ node dist/cli.js pay-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000 \
   --confirm-intent INTENT_ID
 
@@ -249,10 +249,21 @@ five Filter peers and a ready native-USDC quote with observed reliability
 between `0.84` and `1`. It did not open the payer wallet, create a proof or
 submit a transaction.
 
+The later complete no-send preparation did open the existing payer wallet and
+generate the private-transfer proof. It observed a `70373`-atomic (`0.070373
+USDC`) Broadcaster fee for the `10000`-atomic payment and a `1226761` gas
+estimate with three-provider agreement. It returned `paymentSubmitted: false`,
+wrote no journal and left the merchant intent open with zero received. The
+observed fee is not a later quote or spending authorization.
+
 For a new, independently approved intent, run `prepare-broadcaster` with exact
 amount and atomic-USDC fee ceilings. Only after reviewing that no-send result may
 the operator run `pay-broadcaster` with `--confirm-intent`. The payer journals
-the quote fingerprint, bounded fee, payer identity and nullifiers before Waku.
+the exact encrypted-submission quote fingerprint, bounded fee, payer identity
+and nullifiers before Waku. It tolerates fee-ID/expiry rotation only when the
+Broadcaster address, token and fee rate remain identical; otherwise it requires
+a new proof.
+
 A Waku-returned hash is only an untrusted report: the payer must recover the
 canonical transaction hash from those nullifiers before receipt lookup or
 `SUBMITTED`. Gas reads use a bounded upper-median policy, while a strict

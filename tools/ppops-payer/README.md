@@ -161,7 +161,7 @@ node dist/cli.js prepare-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000
 
 node dist/cli.js pay-self-signed \
@@ -170,7 +170,7 @@ node dist/cli.js pay-self-signed \
   --expected-signer PINNED_MERCHANT_SIGNER \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS \
   --expected-self-signer PINNED_PAYER_EVM_ADDRESS \
-  --max-amount-atomic 100000 \
+  --max-amount-atomic 10000 \
   --max-gas-cost-wei 1000000000000000 \
   --confirm-intent INTENT_ID
 
@@ -180,10 +180,11 @@ node dist/cli.js finalize-poi \
   --expected-payer PINNED_PAYER_0ZK_ADDRESS
 ```
 
-For native USDC, `100000` atomic units is `0.10 USDC`. Do not reuse an expired
+For native USDC, `10000` atomic units is `0.01 USDC`. The example deliberately
+sets the amount ceiling equal to the intended payment. Do not reuse an expired
 request. `1000000000000000` wei is a maximum of `0.001 ETH`, not an estimate or
-target. Choose a bound you independently accept. Compare the locally returned
-RAILGUN address with the payer address before approving Gate A.
+target. Choose each bound independently. Compare the locally returned RAILGUN
+address with the payer address before approving Gate A.
 
 `prepare-self-signed` runs sync, gas estimation, proof generation, transaction
 population, all bounds and the final live-request recheck, but does not sign,

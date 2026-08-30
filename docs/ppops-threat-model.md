@@ -133,9 +133,9 @@ and abuse monitoring before exposure.
   records a precomputed signed transaction hash; Gate B records the bounded fee
   identity, payer, exact encrypted-submission quote fingerprint and nullifiers
   before Waku submission. After proof generation, a quote may rotate only when
-  Broadcaster, token and fee rate remain identical. A Waku-returned hash remains untrusted metadata until the
-  full payer wallet derives the canonical transaction hash from those
-  nullifiers. Evidence:
+  Broadcaster, token and fee rate remain identical. A Waku-returned hash remains
+  untrusted metadata until the full payer wallet derives the canonical
+  transaction hash from those nullifiers. Evidence:
   `src/security/descriptor.ts`, `tools/ppops-payer/src/request.ts`,
   `tools/ppops-payer/src/security/runtime-lock.ts` and
   `tools/ppops-payer/src/security/submission-journal.ts`.

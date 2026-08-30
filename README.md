@@ -370,8 +370,11 @@ alerts are documented in `docs/PRODUCTION-RUNBOOK.md`.
 The controlled mainnet pilot's observed onboarding/RPC limitations and current
 evidence boundary are recorded in `docs/PILOT-FINDINGS.md`. The evidence-gated
 public-good direction, proposed impact metrics and explicit Octant go/no-go are
-in `docs/IMPACT-ROADMAP.md`. Neither document expands the v0.1 product scope or
-converts an incomplete self-pilot into external traction.
+in `docs/IMPACT-ROADMAP.md`. A third party can use
+[`docs/EXTERNAL-PILOT.md`](docs/EXTERNAL-PILOT.md) to produce independently
+verifiable evidence without publishing payment identifiers. None of these
+documents expands the v0.1 product scope or converts a self-pilot into external
+traction.
 
 On 2026-08-30 the direct SDK payer first completed bounded no-broadcast runs,
 then submitted one approved `0.01 USDC` private transfer under a `0.001 ETH`

@@ -146,7 +146,7 @@ report provider dependencies without sending payer wallet data to the merchant.
 A first-time payer needs a public EVM address, the correct chain, the correct
 native token variant, gas for shielding, a shield transaction and a private
 balance large enough for both the payment and Broadcaster fee. This is a much
-larger onboarding surface than “send 0.10 USDC privately.”
+larger onboarding surface than “send 0.01 USDC privately.”
 
 The privacy claim must therefore cover the complete journey. PPOps should not
 describe the public funding and shield steps as private. It should state exactly

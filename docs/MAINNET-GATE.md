@@ -39,10 +39,11 @@ public Sepolia fixture is not sufficient.
    Railway Wallet is optional compatibility evidence only.
    Gate A must revalidate the live request immediately before signing and
    persist the locally computed transaction hash before broadcast. Gate B must
-   bound the token fee and persist payer identity, quote fingerprint and
-   nullifiers before Waku submission. A Waku-returned hash is only a report;
-   Gate B must derive the canonical public hash from those nullifiers before it
-   accepts receipt state. After the receipt is mined, the payer must generate
+   bound the token fee and persist payer identity, the exact
+   encrypted-submission quote fingerprint and nullifiers before Waku
+   submission. A Waku-returned hash is only a report; Gate B must derive the
+   canonical public hash from those nullifiers before it accepts receipt state.
+   After the receipt is mined, the payer must generate
    the output PPOI and obtain node acknowledgement; receiver-side
    `MissingExternalPOI` is observation, not payment eligibility.
 5. Record the normalized settlement identifier `(chain, TXID version,
