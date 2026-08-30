@@ -27,7 +27,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm test && npm run build && npm run privacy:check && npm audit --omit=dev --audit-level=high",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run typecheck && npm run test:coverage && npm run build && npm run privacy:check && npm audit --omit=dev --audit-level=high",
     "privacy:check": "tsx scripts/privacy-check.ts"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.11",
     "@types/leveldown": "4.0.6",
     "@types/node": "24.10.1",
     "@types/snarkjs": "0.7.9",
