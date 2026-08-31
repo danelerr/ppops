@@ -13,7 +13,7 @@ payment on the merchant's behalf and never becomes a third-party payment
 processor. Its lifecycle is intentionally familiar to developers who use
 payment-intent APIs, while custody and infrastructure remain with the merchant.
 
-This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and controlled
+This repository is **v0.1.0-beta.1**. The RAILGUN primitive gate and controlled
 Arbitrum mainnet Gate A and Gate B self-pilots pass. On 2026-08-30 an isolated
 payer submitted a `0.01 USDC` private transfer through a Waku Broadcaster. The
 payer recovered the same canonical transaction from its reserved nullifiers,
@@ -24,9 +24,9 @@ remains safely reserved as negative evidence. External adoption remains open;
 this is not a production-readiness claim. Review the known risks before using
 real financial data.
 
-Published beta: [`v0.1.0-beta.0`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.0).
-The immutable merchant image is
-`ghcr.io/danelerr/ppops@sha256:ff7a73a0d5015c9d36f912faa26ba78f0abf5e10727d205718d7e0959156955a`.
+Published beta: [`v0.1.0-beta.1`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.1).
+Use the immutable GHCR digest attached to that release rather than a mutable
+image tag.
 
 ## Product model
 

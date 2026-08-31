@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { isDirectExecution, main } from "../src/cli.js";
 import { loadConfig } from "../src/config.js";
 import { readSecret } from "../src/security/secrets.js";
+import { PPOPS_VERSION } from "../src/version.js";
 
 const roots: string[] = [];
 
@@ -54,6 +55,7 @@ describe("CLI initialization", () => {
     const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     await main(["help"]);
     const help = output.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(help).toContain(`PPOps v${PPOPS_VERSION}`);
     expect(help).toContain("mainnet-gate-replay");
     expect(help).toContain("mainnet-gate-snapshot");
     expect(help).toContain("mainnet-gate-verify");

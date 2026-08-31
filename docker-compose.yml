@@ -2,7 +2,7 @@ services:
   ppops:
     build:
       context: .
-    image: ppops:0.1.0-beta.0
+    image: ppops:0.1.0-beta.1
     init: true
     restart: unless-stopped
     user: "${PPOPS_UID:-1000}:${PPOPS_GID:-1000}"

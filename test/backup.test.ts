@@ -17,6 +17,7 @@ import type { PPOpsConfig } from "../src/config.js";
 import { PPOpsDatabase } from "../src/db/database.js";
 import { IntentService } from "../src/intents/service.js";
 import { RuntimeLock, runtimeLockPath } from "../src/security/runtime-lock.js";
+import { PPOPS_VERSION } from "../src/version.js";
 
 const roots: string[] = [];
 
@@ -123,6 +124,19 @@ describe("backup and restore", () => {
       includeSecrets: true,
     });
     expect(backup.manifest.containsSecrets).toBe(true);
+    expect(backup.manifest.ppopsVersion).toBe(PPOPS_VERSION);
+
+    // A beta.1 operator must still be able to recover a beta.0 schema-v1
+    // backup. The manifest itself is deliberately outside its file inventory.
+    const manifestPath = join(backupPath, "manifest.json");
+    const legacyManifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    legacyManifest.ppopsVersion = "0.1.0-beta.0";
+    writeFileSync(manifestPath, `${JSON.stringify(legacyManifest, null, 2)}\n`, {
+      mode: 0o600,
+    });
 
     const restoreRoot = rootForTest();
     const restore = configAt(restoreRoot);

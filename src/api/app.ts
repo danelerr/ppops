@@ -16,6 +16,7 @@ import {
 import { bearerTokenMatches } from "../security/auth.js";
 import { SignedPaymentDescriptorSchema } from "../security/descriptor.js";
 import { FixedWindowRateLimiter } from "../security/rate-limit.js";
+import { PPOPS_VERSION } from "../version.js";
 
 const CreateIntentSchema = z.object({
   externalReference: z.string().min(1).max(512),
@@ -221,7 +222,7 @@ export const createApiApp = (dependencies: {
     const health = dependencies.health();
     return context.json({
       status: health.railgunReady ? "ready" : "starting",
-      version: "0.1.0-beta.0",
+      version: PPOPS_VERSION,
       railgunReady: health.railgunReady,
       scanInProgress: health.scanInProgress,
       consecutiveFailures: health.consecutiveFailures,
@@ -233,7 +234,7 @@ export const createApiApp = (dependencies: {
   });
 
   app.get("/v1/live", (context) =>
-    context.json({ status: "alive", version: "0.1.0-beta.0" }),
+    context.json({ status: "alive", version: PPOPS_VERSION }),
   );
 
   app.get("/v1/ready", (context) => {
@@ -241,7 +242,7 @@ export const createApiApp = (dependencies: {
     return context.json(
       {
         status: health.railgunReady ? "ready" : "not_ready",
-        version: "0.1.0-beta.0",
+        version: PPOPS_VERSION,
         scanInProgress: health.scanInProgress,
         scanStalled: health.scanStalled ?? false,
         ...(health.syncProgress ? { syncProgress: health.syncProgress } : {}),

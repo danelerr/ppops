@@ -21,6 +21,7 @@ import { loadConfig, type PPOpsConfig } from "./config.js";
 import { PPOpsDatabase } from "./db/database.js";
 import { readSecret } from "./security/secrets.js";
 import { RuntimeLock, runtimeLockPath } from "./security/runtime-lock.js";
+import { PPOPS_VERSION, SUPPORTED_BACKUP_VERSIONS } from "./version.js";
 
 const FileEntrySchema = z.object({
   path: z
@@ -36,7 +37,7 @@ const FileEntrySchema = z.object({
 
 const BackupManifestSchema = z.object({
   schemaVersion: z.literal(1),
-  ppopsVersion: z.literal("0.1.0-beta.0"),
+  ppopsVersion: z.enum(SUPPORTED_BACKUP_VERSIONS),
   createdAt: z.string(),
   containsSecrets: z.boolean(),
   network: z.object({
@@ -190,7 +191,7 @@ export const createBackup = async (args: {
   );
   const manifest: BackupManifest = {
     schemaVersion: 1,
-    ppopsVersion: "0.1.0-beta.0",
+    ppopsVersion: PPOPS_VERSION,
     createdAt: new Date().toISOString(),
     containsSecrets: args.includeSecrets === true,
     network: {

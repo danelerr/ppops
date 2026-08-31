@@ -34,8 +34,9 @@ import {
   writeNewSecret,
 } from "./security/secrets.js";
 import { safeCliFailureResult } from "./security/failures.js";
+import { PPOPS_VERSION } from "./version.js";
 
-const HELP = `PPOps v0.1.0-beta.0
+const HELP = `PPOps v${PPOPS_VERSION}
 
 Usage:
   ppops init --viewing-key-file PATH --token-address ADDRESS --token-symbol SYMBOL \\

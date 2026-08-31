@@ -1,7 +1,7 @@
 # PPOps threat model
 
 Date: 2026-08-29
-Version modeled: `0.1.0-beta.0`
+Version modeled: `0.1.0-beta.1`
 
 ## Executive summary
 
