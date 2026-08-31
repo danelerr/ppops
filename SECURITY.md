@@ -77,4 +77,5 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
   pilot evidence and broader availability evidence remain required before any
   production-readiness claim.
 
-See `docs/OPERATIONAL-PROFILE.md` and `docs/THREAT-MODEL.md` for detail.
+See `docs/OPERATIONAL-PROFILE.md`, `docs/THREAT-MODEL.md` and the dated
+`docs/security/MATURITY-ASSESSMENT-2026-08-30.md` self-assessment for detail.
