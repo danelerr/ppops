@@ -1,5 +1,8 @@
 node_modules/
 .DS_Store
+.env
+.env.*
+!.env.example
 dist/
 coverage/
 data/
@@ -16,3 +19,11 @@ ppops.config.json
 *.sqlite-shm
 *.sqlite-wal
 *.viewing-key
+*.key
+*.mnemonic
+*.seed
+*.backup
+*.pem
+*.p12
+*.pfx
+*.tgz
