@@ -113,13 +113,13 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33341528491`](https://github.com/danelerr/ppops/actions/runs/33341528491) at `39673fe` before the final Gate B evidence update |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33344569836`](https://github.com/danelerr/ppops/actions/runs/33344569836) at release commit `99d7721` |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
 | Working mainnet settlement | Gate A and isolated Gate B `0.01 USDC` Arbitrum payments reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilots |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
 | Broadcaster path without payer EVM self-signer | Waku preflight, proof, RPC-quorum final-call simulation, canonical nullifier recovery and bounded value-bearing trial | PASS, controlled isolated self-pilot; first submission mined, PPOI/finality/reconciliation completed |
 | Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
-| Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — public main is not yet a tagged release** |
+| Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | PASS — [`v0.1.0-beta.0`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.0), release workflow [`33344672634`](https://github.com/danelerr/ppops/actions/runs/33344672634) |
 
 Evidence links:
 
@@ -230,8 +230,9 @@ reviewed manually before copying this answer bank.
 ## Submission checklist
 
 - [x] Push the reviewed implementation and obtain green public verify + Docker
-      CI at `207837c` (including Broadcaster and shield-key remediations).
-- [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
+      CI at release commit `99d7721`.
+- [x] Publish `v0.1.0-beta.0` and verify the GHCR digest, two SBOMs and three
+      gate-report attachments.
 - [x] Preserve the failed Gate B lineage and record the later isolated passing
       value-bearing Gate B without expanding its privacy claim.
 - [ ] Complete at least one independent operator pilot.
@@ -239,7 +240,8 @@ reviewed manually before copying this answer bank.
 - [ ] Insert real team/contact/legal/funding fields from the applicant.
 - [ ] Reopen the live Fillout form and map these answers to its actual current
       questions.
-- [ ] Re-run all report/signature/link/privacy checks from the public release.
+- [x] Re-run report signature, link, privacy, verify and Docker checks from the
+      public release.
 
 Until the external-user checkbox is complete, the honest recommendation is
 **do not submit**.

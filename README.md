@@ -24,6 +24,10 @@ remains safely reserved as negative evidence. External adoption remains open;
 this is not a production-readiness claim. Review the known risks before using
 real financial data.
 
+Published beta: [`v0.1.0-beta.0`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.0).
+The immutable merchant image is
+`ghcr.io/danelerr/ppops@sha256:ff7a73a0d5015c9d36f912faa26ba78f0abf5e10727d205718d7e0959156955a`.
+
 ## Product model
 
 The product is the long-running merchant daemon, not an SDK and not a payer

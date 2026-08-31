@@ -74,7 +74,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PPOPS_VERSION: ${{ github.ref_name }}
         run: |
-          gh release create "$PPOPS_VERSION" --verify-tag --generate-notes \
+          gh release create "$PPOPS_VERSION" --verify-tag --generate-notes --prerelease \
             "$RUNNER_TEMP/ppops-sbom.cdx.json#Merchant CycloneDX SBOM" \
             "$RUNNER_TEMP/ppops-payer-sbom.cdx.json#Payer CycloneDX SBOM" \
             "$RUNNER_TEMP/ppops-container-digest.txt#Immutable container digest" \

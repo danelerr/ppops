@@ -3,8 +3,9 @@
 Status: **OPEN — no independent operator has completed this gate yet.**
 
 Project release status on 2026-08-30: public `main` and its verify/Docker CI
-pass; the versioned beta tag and release assets remain pending while the final
-Gate B evidence update is verified.
+pass. [`v0.1.0-beta.0`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.0)
+is published with an immutable GHCR digest, merchant/payer SBOMs and all three
+public gate reports.
 
 This runbook turns the remaining adoption requirement into a reproducible,
 privacy-preserving test. It does not ask an operator to disclose a mnemonic,
