@@ -20,15 +20,14 @@ PPOps request.json -> verify pinned merchant signer -> RAILGUN proof + memo
                   -> PPOps reconciliation
 ```
 
-Current status: Gate A passed on Arbitrum mainnet on 2026-08-30. A bounded
-`0.01 USDC` transfer was mined, its output PPOI was submitted by this payer,
-and PPOps recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. This remains a
-controlled self-pilot, not external adoption or a production-readiness claim.
-Gate B's non-financial Waku preflight and complete no-send proof preparation
-also passed on 2026-08-30. A bounded value-bearing trial later used two selected
-Broadcaster identities but neither returned a usable hash; nullifier recovery
-found no transaction and the payer balance remained unchanged. Gate B is not
-passed and must not be inferred from preparation or attempted submission.
+Current status: Gate A and Gate B passed on Arbitrum mainnet on 2026-08-30.
+Gate A mined a bounded `0.01 USDC` self-signed transfer. A later isolated Gate B
+lineage mined a `0.01 USDC` Broadcaster transfer on its first submission, matched
+the reported hash to canonical nullifier recovery, used no payer EVM
+self-signer, completed PPOI and reached PPOps
+`FINALIZED + SPENDABLE + MATCHED -> PAID`. An earlier ambiguous Gate B lineage
+remains reserved as negative evidence. These are controlled self-pilots, not
+external adoption or production-readiness claims.
 
 ## Scope
 
@@ -283,8 +282,10 @@ metadata-minimal mainnet report passed restart, restore and webhook-deduplicatio
 checks. Direct identifiers remain in private operator evidence only.
 
 Gate B is now implemented behind separate amount/fee/intent confirmation and a
-write-ahead recovery journal. Its connectivity and complete no-send proof path
-have run; a real Broadcaster payment and reconciliation are still required.
+write-ahead recovery journal. Its connectivity, no-send proof path, real
+Broadcaster payment, PPOI and PPOps reconciliation have run successfully once
+with isolated fresh inputs. That does not establish relay availability or
+network-layer anonymity.
 Railway Wallet remains an optional manual compatibility client, not an
 operational dependency.
 

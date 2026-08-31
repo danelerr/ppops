@@ -1,8 +1,10 @@
 # Gate B: Waku Broadcaster payment
 
-Status: **PREFLIGHT + NO-SEND PREPARATION PASS; VALUE-BEARING GATE ATTEMPTED
-BUT NOT PASSED** on Arbitrum mainnet, 2026-08-30. The live attempts failed
-closed without a reported/canonical transaction hash or a payer balance change.
+Status: **PASS** on Arbitrum mainnet, 2026-08-30. An isolated payer completed a
+value-bearing Broadcaster payment on its first submission, independently
+resolved the canonical transaction from reserved nullifiers, completed PPOI and
+reached PPOps `FINALIZED + SPENDABLE + MATCHED -> PAID`. The earlier ambiguous
+lineage remains reserved and is preserved below as negative evidence.
 
 Gate B replaces Gate A's public payer EVM signer with a RAILGUN Broadcaster. It
 does not change PPOps, the signed payment request, private ERC-20 proof, memo,
@@ -250,7 +252,9 @@ PPOps may fulfill only after receiver state reaches:
 FINALIZED + SPENDABLE + MATCHED -> PAID
 ```
 
-## 6. Controlled value-bearing result
+## 6. Controlled value-bearing results
+
+### 6.1 First lineage: safe unresolved failure
 
 The controlled `0.01 USDC` attempt used a `0.08 USDC` maximum Broadcaster fee.
 The initial request and three bounded same-nullifier retries produced fee quotes
@@ -266,22 +270,58 @@ nullifiers; the private balance remained `0.1895 USDC` and the merchant intent
 remained `OPEN` with zero received/pending value. The retry cap is exhausted and
 PPOps will not send another variant. No Broadcaster fee was observed as charged.
 
-This is useful negative evidence: direct Waku discovery, fee calculation,
+This remains useful negative evidence: direct Waku discovery, fee calculation,
 proof generation, exact-nullifier regeneration and alternate-identity selection
-worked, but the current public Broadcaster path did not complete a payment. Gate
-B is therefore **not passed**, and sender-unlinkability from a completed
-Broadcaster payment must not be claimed.
+worked, but those two selected Broadcaster identities did not complete the
+payment. The original nullifiers remain reserved and must never be reused for a
+different intent.
 
 A metadata-minimal, maintainer-ready account of the failure and concrete
 questions is available in the [upstream interoperability
 report](UPSTREAM-BROADCASTER-REPORT.md). Do not attach local wallet state, raw
 journal data, nullifiers or requests when escalating it.
 
+### 6.2 Isolated lineage: passing first submission
+
+A later trial used independently fresh inputs in a newly generated payer
+lineage. The payer waited until the protocol-fee-adjusted shield output moved
+from `ShieldPending` to `Spendable`, then created a new six-hour merchant intent
+for `10000` atomic native USDC (`0.01 USDC`).
+
+The no-send preparation completed with:
+
+- `149625` atomic available as `Spendable`;
+- a `100000`-atomic operator fee ceiling;
+- `1195972` pre-proof gas and `1191953` exact final-calldata gas;
+- strict majority agreement from two of three configured RPC origins;
+- a `67110`-atomic (`0.067110 USDC`) quote;
+- proof generated, no journal record and no payment submitted.
+
+The separately authorized value-bearing command then repeated every guard and:
+
+- obtained a `66912`-atomic (`0.066912 USDC`) fee below the ceiling;
+- simulated the exact populated calldata through RPC quorum;
+- durably reserved fresh nullifiers before Waku;
+- received one reported hash from the selected Broadcaster;
+- independently derived the same canonical hash from those nullifiers;
+- obtained a successful quorum receipt and `MINED` state on the first attempt;
+- used zero retries and did not load an EVM self-signing key.
+
+The payer requested output PPOI, observed all three relevant statuses reach
+`Valid`, and recovered its `72713`-atomic change entirely as `Spendable`.
+Separately, PPOps decrypted the memo through view-only state, first held exactly
+`10000` atomic pending, then reached
+`FINALIZED + SPENDABLE + MATCHED -> PAID`. A clean receiver stored exactly one
+`payment.confirmed` event and rejected an authenticated replay as a duplicate.
+Same-state restart, isolated secret-bearing backup/restore and the signed public
+Mainnet Gate report all passed. Public evidence intentionally omits the payer,
+intent, memo, nullifiers and transaction identifiers.
+
 ## Claim boundary
 
-A passing value-bearing Gate B would show that this payment did not use the
-payer's public EVM address to submit the RAILGUN proxy transaction. It would not
-prove network-layer anonymity, universal wallet usability, freedom from timing
-analysis, independent adoption or production availability. RPC, PPOI, artifact,
-DNS/Waku and Broadcaster operators remain external metadata and availability
-dependencies.
+The passing value-bearing Gate B shows that this controlled payment did not use
+the payer's public EVM address to submit the RAILGUN proxy transaction. It does
+not prove network-layer anonymity, universal wallet usability, freedom from
+timing analysis, independent adoption or production availability. RPC, PPOI,
+artifact, DNS/Waku and Broadcaster operators remain external metadata and
+availability dependencies.

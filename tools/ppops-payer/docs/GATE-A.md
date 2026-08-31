@@ -1,8 +1,8 @@
 # Gate A: direct SDK self-signed payment
 
-Status: **PASS** on Arbitrum mainnet, 2026-08-30. Gate B connectivity and
-no-send proof preparation passed; its value-bearing Broadcaster payment and
-external adoption remain pending.
+Status: **PASS** on Arbitrum mainnet, 2026-08-30. A later isolated Gate B
+value-bearing Broadcaster payment also passed; external adoption remains
+pending.
 
 ## Objective
 

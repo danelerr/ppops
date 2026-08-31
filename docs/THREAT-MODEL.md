@@ -153,9 +153,10 @@ and abuse monitoring before exposure.
   `tools/ppops-payer/src/railgun/broadcaster-transfer.ts`. Broadcaster mode also
   crosses operator-pinned fee-signer, DNS/Waku and selected-Broadcaster trust
   boundaries; it does not claim network-layer anonymity or relay availability.
-  The controlled value-bearing trial reached two selected Broadcaster identities
-  without obtaining a usable response or canonical transaction and therefore
-  did not pass Gate B.
+  An earlier value-bearing lineage reached two selected identities without a
+  usable response and remains reserved. A later isolated lineage resolved a
+  canonical transaction and completed Gate B on its first submission; that
+  success does not remove these metadata or availability dependencies.
 - **RAILGUN runtime ↔ RPC/PPOI:** encrypted chain history, receipts, block tags,
   PPOI statuses and timing cross outbound HTTPS/JSON-RPC and SDK-specific
   protocols. PPOps validates configured chain/deployment identity and fails

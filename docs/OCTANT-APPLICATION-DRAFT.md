@@ -113,11 +113,11 @@ v0.1.
 
 | Requirement | Evidence | Status |
 | --- | --- | --- |
-| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33337865296`](https://github.com/danelerr/ppops/actions/runs/33337865296) at `207837c` |
+| Open-source and independently buildable | Apache-2.0 repository, pinned lockfiles, CI, Dockerfile, SBOM workflow | PASS; public verify and Docker jobs passed in [run `33341528491`](https://github.com/danelerr/ppops/actions/runs/33341528491) at `39673fe` before the final Gate B evidence update |
 | View-only merchant boundary | Runtime rejection, package-boundary check and privacy tests | PASS |
-| Working mainnet settlement | One `0.01 USDC` Arbitrum payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilot |
+| Working mainnet settlement | Gate A and isolated Gate B `0.01 USDC` Arbitrum payments reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilots |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
-| Broadcaster path without payer EVM self-signer | Waku preflight, proof, three-RPC final-calldata simulation and bounded value-bearing trial | FAIL-CLOSED; exact calldata simulated successfully, but two selected identities returned no hash, so no completed-payment claim |
+| Broadcaster path without payer EVM self-signer | Waku preflight, proof, RPC-quorum final-call simulation, canonical nullifier recovery and bounded value-bearing trial | PASS, controlled isolated self-pilot; first submission mined, PPOI/finality/reconciliation completed |
 | Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
 | Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | **PENDING — public main is not yet a tagged release** |
 
@@ -206,19 +206,21 @@ reviewed manually before copying this answer bank.
 - The controlled Gate B preparation observed a `0.070373 USDC` Broadcaster fee
   for a `0.01 USDC` payment. This was point-in-time and shows that small payments
   may be economically poor.
-- The subsequent funded Gate B trial used two selected Broadcaster identities
-  and exact-same-nullifier variants but returned no reported or recoverable
-  transaction hash. The balance remained unchanged and no fee was observed as
-  charged. PPOps cannot claim a completed Broadcaster payment or sender
-  unlinkability from this result.
+- An earlier funded Gate B lineage used two selected Broadcaster identities and
+  exact-same-nullifier variants but returned no reported or recoverable
+  transaction hash. It remains reserved and cannot fund another intent.
 - A later no-send proof passed exact final-calldata simulation on all three
   configured RPCs (`1123239` gas estimate). This narrows the failure to remote
   Broadcaster processing or its sanitized response boundary, but does not turn
   preparation into a successful payment.
 - A subsequent fresh-intent preparation selected an input reserved by the
-  unresolved trial and failed before Waku. PPOps therefore prevents the wallet's
-  apparently spendable balance from becoming an accidental competing payment;
-  another funded Gate B attempt requires independently fresh inputs.
+  unresolved trial and failed before Waku. The passing trial therefore used a
+  separately funded, isolated payer lineage after its shield became spendable.
+- The isolated Gate B submission paid `0.01 USDC` with a `0.066912 USDC`
+  Broadcaster fee, resolved the reported hash independently from nullifiers,
+  mined on its first attempt and reached PPOps `PAID` without loading a payer
+  EVM self-signing key. This is self-pilot transaction-path evidence, not proof
+  of IP anonymity or external adoption.
 - Public RPC/PPOI/Waku services remain availability and metadata dependencies.
 - The pinned RAILGUN/Waku dependency graphs retain Moderate/Low advisories but
   no known High/Critical advisory under the current audit gate.
@@ -230,8 +232,8 @@ reviewed manually before copying this answer bank.
 - [x] Push the reviewed implementation and obtain green public verify + Docker
       CI at `207837c` (including Broadcaster and shield-key remediations).
 - [ ] Publish `v0.1.0-beta.0` and verify the GHCR digest/release attachments.
-- [x] Record the failed value-bearing Gate B honestly and remove every
-      sender-unlinkability implication from the application.
+- [x] Preserve the failed Gate B lineage and record the later isolated passing
+      value-bearing Gate B without expanding its privacy claim.
 - [ ] Complete at least one independent operator pilot.
 - [ ] Obtain permission for any operator quote or public identity reference.
 - [ ] Insert real team/contact/legal/funding fields from the applicant.

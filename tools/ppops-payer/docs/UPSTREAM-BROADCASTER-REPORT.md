@@ -1,8 +1,10 @@
 # RAILGUN Broadcaster interoperability report
 
-Status: maintainer-ready, metadata-minimal diagnostic. This is not a successful
-payment report and contains no wallet address, nullifier, memo, intent ID,
-signature, fee-signer value, RPC credential or raw encrypted payload.
+Status: historical, metadata-minimal diagnostic for the first unresolved payer
+lineage. A later isolated lineage completed Gate B successfully on its first
+Broadcaster submission. This report remains useful for the earlier failure and
+contains no wallet address, nullifier, memo, intent ID, signature, fee-signer
+value, RPC credential or raw encrypted payload.
 
 ## Summary
 
@@ -16,8 +18,26 @@ failure could not be classified. Nullifier-based recovery found no canonical
 transaction and the payer balance did not change.
 
 The local payer correctly keeps those outcomes ambiguous and will not issue a
-fresh spend. Assistance is needed at the Broadcaster's private validation/send
-boundary; additional blind value-bearing retries are not useful.
+fresh spend from that lineage. The subsequent success shows that the public
+Broadcaster path was not categorically unavailable; it does not explain the two
+earlier operator responses. Additional blind retries of the original nullifiers
+remain unsafe and unnecessary.
+
+## Subsequent isolated result
+
+After the original retry cap, a separate payer lineage was funded and allowed
+to become fully `Spendable`. With the same pinned SDK/Waku versions, trust
+configuration, token and bounded command path, a new `0.01 USDC` payment:
+
+- passed no-send proof generation and final-calldata quorum simulation;
+- used a `0.066912 USDC` Broadcaster fee below its explicit ceiling;
+- returned a hash that matched nullifier-derived canonical recovery;
+- mined on the first submission with no payer EVM self-signer;
+- completed output PPOI and PPOps reconciliation to `PAID`.
+
+This changes the project Gate B result to `PASS`, but it does not retroactively
+classify the first lineage's sanitized failures or permit those nullifiers to be
+released.
 
 ## Versions and profile
 

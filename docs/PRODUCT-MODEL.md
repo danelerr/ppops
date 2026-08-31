@@ -122,7 +122,7 @@ and the reference payer would remain development and conformance tooling.
 | View-only RAILGUN reconciliation | Implemented |
 | Finality, PPOI and matching semantics | Implemented |
 | HMAC webhook outbox | Implemented |
-| Reference payer | Implemented; Gate A passed; Gate B connectivity/proof/final-call simulation passed, while a bounded funded trial failed closed without a transaction hash |
+| Reference payer | Implemented; Gate A passed; an earlier Gate B lineage failed closed, and a later isolated Gate B payment passed without a payer EVM self-signer |
 | Mainnet end-to-end evidence | Self-pilot passed; external pilot pending |
 | Merchant TypeScript SDK | Not implemented; optional |
 | QR/consumer checkout UI | Not implemented |

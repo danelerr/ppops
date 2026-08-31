@@ -120,12 +120,13 @@ Independent operator evidence is the remaining Gate 0 item; the self-pilot must
 not be counted as adoption. The minimal privacy-preserving handoff is documented
 in [the independent operator pilot](EXTERNAL-PILOT.md).
 
-The non-financial Waku/Broadcaster preflight and a complete no-send proof
-preparation also pass. Its value-bearing payment is a separate privacy subgate:
-until that payment reaches PPOps `PAID`, the project must not claim that a real
-payer avoided the public self-signer. The preparation observed a `0.070373
-USDC` Broadcaster fee for a `0.01 USDC` test payment, illustrating why explicit
-fee visibility and ceilings are impact-relevant usability controls rather than
+The Waku/Broadcaster privacy subgate now also passes for one controlled isolated
+payment. After a no-send preparation quoted `0.067110 USDC`, the value-bearing
+command paid `0.01 USDC` with a `0.066912 USDC` Broadcaster fee, independently
+resolved the canonical hash from reserved nullifiers, mined on its first
+submission and reached PPOps `PAID` without loading the payer EVM self-signer.
+The fee being more than six times the payment illustrates why explicit fee
+visibility and ceilings are impact-relevant usability controls rather than
 implementation detail.
 
 A later no-send diagnostic also passed a strict three-RPC simulation of the
@@ -134,17 +135,17 @@ final estimates were `1128365` and `1123239`, respectively. This removes an
 obvious malformed-final-call explanation and makes the remaining Broadcaster
 failure more actionable, while still providing no sender-unlinkability claim.
 
-The later funded trial also remains a failure, not evidence of sender
-unlinkability. Four same-nullifier variants reached two selected Broadcaster
-identities without a usable response or canonical transaction; a final recovery
-found the payer balance unchanged and the merchant intent still open. PPOps now
-preserves that ambiguity, prevents cross-intent nullifier reuse, excludes prior
-Broadcaster identities on bounded retries and stops for manual review after the
-retry cap. This protects funds but does not solve Broadcaster liveness.
+The earlier funded lineage remains an unresolved failure, not evidence of
+sender unlinkability. Four same-nullifier variants reached two selected
+Broadcaster identities without a usable response or canonical transaction.
+PPOps preserves that ambiguity, prevents cross-intent nullifier reuse, excludes
+prior identities on bounded retries and stops for manual review after the retry
+cap. The later success proves feasibility, not Broadcaster liveness or an SLO.
 
-The same reservation policy now runs in prepare-only mode. A live follow-up
-proof selected an input from the unresolved lineage and failed before final
-simulation or Waku, demonstrating that a wallet-level `Spendable` label cannot
+The same reservation policy runs in prepare-only mode. A live follow-up proof
+selected an input from the unresolved lineage and failed before final simulation
+or Waku. The successful trial therefore used independently fresh inputs after
+their shield became `Spendable`, demonstrating that a wallet-level label cannot
 override payment-level ambiguity safety.
 
 Failure to complete the private-transfer primitive remains a stop condition.

@@ -305,13 +305,13 @@ Verification evidence:
   had already rejected the quote safely before proof. The passing preparation
   submitted no payment, wrote no journal record and left the intent open at
   zero received. The fee is point-in-time evidence, not a later quote. The
-  value-bearing Gate B remained unproven at this stage.
+  value-bearing Gate B remained unproven at that stage.
 - Post-trial no-send diagnosis: the pre-proof SDK estimate was `1128365`, and
   all three configured RPCs accepted the exact final populated calldata at an
   upper-median `1123239` estimate. The point-in-time fee was `64892` atomic
   (`0.064892 USDC`). The run submitted no payment and wrote no journal. This
   narrows the failed value-bearing path to off-chain Broadcaster processing or
-  its sanitized response boundary; it does not pass Gate B.
+  its sanitized response boundary; by itself it did not pass Gate B.
 - Prepare-time reservation diagnosis: a later fresh-intent proof selected at
   least one nullifier from the unresolved lineage. The read-only journal check
   returned `SUBMISSION_ALREADY_RECORDED` before final simulation, Waku or a new
@@ -330,7 +330,16 @@ Verification evidence:
   private balance remained `0.1895 USDC` and the merchant intent remained open
   with zero received/pending value.
   The retry cap is exhausted, the nullifiers remain reserved, no fee was
-  observed as charged and Gate B is **not passed**.
+  observed as charged and that original lineage remains unresolved.
+- Subsequent isolated Gate B pass: a fresh payer waited for `149625` atomic to
+  become fully `Spendable`. No-send preparation quoted `67110` atomic and
+  quorum-simulated `1191953` gas for the exact final calldata. The authorized
+  value-bearing command paid a `66912`-atomic fee, resolved the
+  Broadcaster-reported hash independently from fresh reserved nullifiers, mined
+  on its first attempt and used no public EVM self-signer. PPOI returned all
+  relevant statuses to `Valid`; PPOps reached
+  `FINALIZED + SPENDABLE + MATCHED -> PAID`; webhook replay, restart and
+  isolated restore passed. This is one controlled success, not a relay SLO.
 - After moving to one explicit scan owner, the merchant reached readiness in
   approximately 6 seconds and, after the final observability correction,
   completed five subsequent scheduled scans at roughly 34-second cadence.

@@ -2,6 +2,15 @@
 
 Review date: 2026-08-30
 
+Post-review addendum: after this review, the operator followed its fresh-input
+recommendation with a separately funded isolated payer lineage. One bounded
+Broadcaster submission returned a hash that matched canonical nullifier
+recovery, mined through receipt quorum, completed output PPOI and reached PPOps
+`PAID` without loading an EVM self-signer. The original ambiguous lineage and
+all findings below remain preserved; the later success changes Gate B to a
+controlled `PASS`, not the historical disposition of that lineage and not the
+production-readiness conclusion.
+
 Reviewed baseline: `716b54d` (`docs: record passing Arbitrum mainnet gate`)
 
 Initial Broadcaster implementation: `25f3afb`

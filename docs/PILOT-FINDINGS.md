@@ -3,9 +3,9 @@
 First recorded: 2026-08-23. Updated: 2026-08-30.
 
 Status: living pilot record. The controlled mainnet payment gate passed on
-2026-08-30; Gate B connectivity and no-send proof preparation passed, while
-its bounded value-bearing trial failed closed and external adoption remains
-open. This document
+2026-08-30. An initial Gate B lineage failed closed; a later isolated Gate B
+lineage completed a value-bearing Broadcaster payment and the full PPOps gate.
+External adoption remains open. This document
 distinguishes observations from upstream guarantees and future proposals. It
 must not be cited as evidence of an independent merchant deployment.
 
@@ -90,6 +90,22 @@ a cryptographically private payment inaccessible or operationally unsafe.
   more than 15 minutes after the last attempt found no canonical transaction
   for the reserved nullifiers; the private balance remained `0.1895 USDC`, the
   merchant intent remained open at zero and no fee was observed as charged.
+- A later isolated payer waited until a fresh shield yielded `149625` atomic
+  `Spendable`, then prepared a new `10000`-atomic payment under a
+  `100000`-atomic fee ceiling. Preparation generated the proof, obtained
+  `1195972`/`1191953` pre-proof/final gas estimates with quorum and quoted
+  `67110` atomic without submitting.
+- The separately confirmed Gate B command then paid a `66912`-atomic
+  (`0.066912 USDC`) Broadcaster fee, mined on its first submission and used no
+  payer EVM self-signer. The reported hash matched the canonical hash derived
+  from reserved nullifiers; no retry was used.
+- The payer's three relevant output PPOI statuses reached `Valid` and its
+  `72713`-atomic change returned to `Spendable`. PPOps independently decrypted
+  and matched the receiver output, held it pending until finality, then reached
+  `FINALIZED + SPENDABLE + MATCHED -> PAID`.
+- A fresh webhook evidence store accepted exactly one confirmation and rejected
+  one authenticated replay as a duplicate. Same-state restart, isolated
+  backup/restore and the merchant-signed redacted report passed for Gate B.
 
 No wallet address, transaction hash, viewing credential, opaque payment
 reference or invoice identifier belongs in the public version of this record.
@@ -114,11 +130,7 @@ reference or invoice identifier belongs in the public version of this record.
 
 - No independent merchant or payer has completed the full flow. The project
   therefore does not yet have verifiable external traction.
-- Gate B submitted encrypted requests through two selected Waku Broadcaster
-  identities but did not obtain or recover a mined transaction. It therefore
-  does not demonstrate removal of the payer public gas signer from a completed
-  payment.
-- One successful controlled payment does not establish an availability SLO,
+- One successful controlled Gate B payment does not establish an availability SLO,
   general wallet usability or production readiness.
 
 ## Findings and product implications
@@ -484,6 +496,30 @@ does not bypass RAILGUN's standby policy. A reference payer must therefore keep
 the new lineage isolated, wait for spendability and refuse to construct a
 checkout payment from pending funds.
 
+### F-14: a Broadcaster payment can pass, but relay success is not an availability guarantee
+
+Once the isolated shield moved entirely to `Spendable`, the same bounded payer
+path that had failed safely on the earlier lineage succeeded on its first Waku
+submission. The Broadcaster-reported hash matched canonical nullifier recovery,
+RPC quorum confirmed the receipt, and no optional EVM self-signing key was
+loaded. This establishes the narrow Gate B property for one controlled payment.
+
+It does not invalidate F-12. Broadcaster selection remains externally operated,
+fees were more than six times the `0.01 USDC` payment, and the first lineage's
+sanitized failures remain unexplained. The correct product state is therefore:
+
+```text
+Broadcaster path demonstrated once
+!=
+Broadcaster availability guaranteed
+```
+
+The successful run also exposed asynchronous output behavior: the merchant
+receiver became `SPENDABLE` before the payer's change did. A later idempotent
+PPOI refresh showed every relevant status as `Valid` and returned the change to
+`Spendable`. Merchant fulfillment and payer change recovery must remain separate
+operational checks.
+
 ## Claim discipline
 
 After the controlled mainnet gate but before external adoption, PPOps may claim:
@@ -492,8 +528,9 @@ After the controlled mainnet gate but before external adoption, PPOps may claim:
 - a working local intent, descriptor, reconciliation and evidence pipeline;
 - reproducible primitive/privacy tests;
 - a completed, signed and redacted Arbitrum mainnet self-pilot;
-- one exact private native-USDC payment reconciled only after finality, PPOI and
-  matching agreed;
+- exact private native-USDC payments through diagnostic self-signing and a Waku
+  Broadcaster, reconciled only after finality, PPOI and matching agreed;
+- one controlled Broadcaster submission without a payer EVM self-signer;
 - restart, restore and webhook-deduplication evidence for that self-pilot.
 
 PPOps must not yet claim:
@@ -501,7 +538,8 @@ PPOps must not yet claim:
 - production readiness or general consumer usability;
 - reliable Railway or public-RPC availability;
 - external adoption;
-- sender unlinkability until Broadcaster-based Gate B passes;
+- network-layer anonymity or general sender unlinkability from a single Gate B
+  payment;
 - removal of RAILGUN's one-hour first-funding delay;
 - privacy against voluntary credential, screenshot or support-channel leaks.
 
@@ -509,14 +547,11 @@ PPOps must not yet claim:
 
 1. Keep Railway Wallet out of the critical path and retain the independent
    `tools/ppops-payer` package as the reproducible payer.
-2. Preserve the Gate A operator records and signed public report with the beta
-   release.
+2. Preserve the Gate A and Gate B operator records and the refreshed signed
+   public report with the beta release.
 3. Preserve the failed Gate B journal and never retry its reserved nullifiers.
-   Diagnose the official client/Broadcaster response path, including the passing
-   final calldata simulation, with upstream maintainers or a non-financial
-   reproducible fixture. Any separately authorized funded trial must use a new
-   isolated payer lineage, wait until its shield is `Spendable`, and retain the
-   same one-payment fee and submission bounds. Use the metadata-minimal
+   Retain the later isolated success as a separate lineage; it demonstrates the
+   path but does not explain the first failure. Use the metadata-minimal
    [upstream report](../tools/ppops-payer/docs/UPSTREAM-BROADCASTER-REPORT.md)
    rather than raw wallet/request artifacts.
 4. Repeat with an independently operated merchant or payer.

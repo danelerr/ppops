@@ -59,8 +59,9 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
 - Backup SHA-256 inventories detect corruption but do not authenticate an
   attacker-controlled bundle.
 - Gate A self-signing links the payer's public EVM address to the RAILGUN
-  transaction. It is diagnostic evidence, not the final sender-privacy path;
-  Gate B still requires a successful Broadcaster-submitted settlement.
+  transaction. It is diagnostic evidence, not the final sender-privacy path.
+  Gate B removes that self-signer from the tested submission path, but does not
+  prove IP-layer anonymity or hide timing from RPC/PPOI/Waku operators.
 - The payer's write-ahead journal blocks automatic reuse of an intent. Gate A
   resolves ambiguity through its precomputed hash and nonce. Gate B stores a
   Waku-reported hash separately and accepts only the canonical hash recovered
@@ -68,11 +69,12 @@ Run `npm run verify:all` when changing the repository boundary or payer harness.
   nullifier set, excludes attempted Broadcaster identities and is capped; any
   unresolved record otherwise remains intentionally fail-closed. Deleting or
   bypassing the journal can double-pay.
-- The controlled Gate A payment and signed Mainnet Gate artifact pass. A fresh
-  Gate B no-send proof preparation also passes. The bounded funded Gate B trial
-  returned no reported/recoverable hash across two selected identities and did
-  not pass. A completed Broadcaster payment and independently operated pilot
-  evidence are still required before any sender-unlinkability or
+- The controlled Gate A payment passes. An earlier bounded Gate B lineage
+  returned no reported/recoverable hash across two selected identities and
+  remains permanently reserved. A later isolated Gate B payment mined on its
+  first submission, resolved its canonical hash from nullifiers, completed PPOI
+  and reached PPOps `PAID` without an EVM self-signer. Independently operated
+  pilot evidence and broader availability evidence remain required before any
   production-readiness claim.
 
 See `docs/OPERATIONAL-PROFILE.md` and `docs/THREAT-MODEL.md` for detail.

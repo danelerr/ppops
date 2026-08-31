@@ -13,16 +13,15 @@ payment on the merchant's behalf and never becomes a third-party payment
 processor. Its lifecycle is intentionally familiar to developers who use
 payment-intent APIs, while custody and infrastructure remain with the merchant.
 
-This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and a controlled
-Arbitrum mainnet self-pilot pass. Direct Waku/Broadcaster connectivity and a
-complete no-send proof preparation also pass. A bounded value-bearing
-Broadcaster trial failed closed across two selected Broadcaster identities:
-neither returned a usable hash, nullifier recovery found no transaction and the
-payer balance remained unchanged. A later no-send diagnostic also simulated the
-final populated proof/calldata successfully through a three-RPC quorum, which
-narrows the unresolved failure to the Broadcaster's off-chain path but does not
-turn Gate B into a pass. Gate B and external adoption therefore remain open.
-This is not a production-readiness claim. Review the known risks before using
+This repository is **v0.1.0-beta.0**. The RAILGUN primitive gate and controlled
+Arbitrum mainnet Gate A and Gate B self-pilots pass. On 2026-08-30 an isolated
+payer submitted a `0.01 USDC` private transfer through a Waku Broadcaster. The
+payer recovered the same canonical transaction from its reserved nullifiers,
+used no public EVM self-signer, completed output PPOI, and PPOps reached
+`FINALIZED + SPENDABLE + MATCHED -> PAID`. Signed restart, restore and webhook
+deduplication evidence also pass. An earlier ambiguous Broadcaster lineage
+remains safely reserved as negative evidence. External adoption remains open;
+this is not a production-readiness claim. Review the known risks before using
 real financial data.
 
 ## Product model
@@ -394,18 +393,19 @@ gas ceiling. The transaction mined once; PPOps held the matched amount pending
 until payer-side PPOI moved the receiver output from `MissingExternalPOI` to
 `Valid`, then recorded `FINALIZED + SPENDABLE + MATCHED -> PAID`. Exact-once
 webhook replay, restart and isolated restore passed. The signed, redacted result
-is `artifacts/mainnet-gate-report.json`; this is still self-pilot evidence, not
-external adoption.
+was the first Mainnet Gate report and remains in Git history. The current
+`artifacts/mainnet-gate-report.json` was regenerated from the later Gate B
+payment; both are self-pilot evidence, not external adoption.
 
 The payer's separate
-[`Gate B runbook`](tools/ppops-payer/docs/GATE-B.md) distinguishes the passing
-non-financial Waku preflight and no-send proof preparation from the
-attempted-but-failed value-bearing Broadcaster payment. The payer failed closed:
-no canonical transaction was found and its balance did not change. A subsequent
-no-send run passed final populated-calldata simulation on all three configured
-RPCs, so invalid calldata is no longer the leading explanation; remote
-Broadcaster processing remains unresolved. Preparation and failed submission
-are not sender-unlinkability evidence.
+[`Gate B runbook`](tools/ppops-payer/docs/GATE-B.md) preserves both the first
+ambiguous, safely failed Broadcaster lineage and the later isolated passing
+trial. In the passing run, prepare-only simulation quoted a `0.067110 USDC` fee;
+the submitted transaction used `0.066912 USDC`, mined on the first attempt, and
+the payer independently matched the Broadcaster-reported hash to the canonical
+hash recovered from its nullifiers. No optional EVM self-signing key was loaded.
+This supports only the narrow transaction-submission claim; it does not prove
+IP-layer anonymity, production availability or external adoption.
 
 The controlled pilot originally used Railway Wallet and retained its diagnostic
 tooling as compatibility evidence. If testing that optional client, inspect

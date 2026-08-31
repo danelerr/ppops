@@ -287,13 +287,11 @@ nullifier set, excludes previously attempted Broadcaster identities and stops
 after three retry reservations. A different intent cannot claim those
 unresolved nullifiers. Never delete or edit the journal to force a fresh spend.
 
-The controlled funded trial did not pass Gate B. One initial submission and
-three bounded same-nullifier variants used two selected Broadcaster identities;
-none returned a usable hash, and recovery more than 15 minutes after the final
-attempt found no canonical transaction. The payer balance remained unchanged
-and the merchant intent remained `OPEN` with zero received. The retry cap is
-exhausted, so that lineage remains in manual review and no more funded variants
-should be sent.
+The first controlled funded lineage did not pass Gate B. One initial submission
+and three bounded same-nullifier variants used two selected Broadcaster
+identities; none returned a usable hash, and recovery more than 15 minutes after
+the final attempt found no canonical transaction. Its retry cap is exhausted,
+so that lineage remains in manual review and no more variants may be sent.
 
 A follow-up prepare-only proof selected at least one input from that unresolved
 lineage and was rejected with `SUBMISSION_ALREADY_RECORDED` before final
@@ -301,8 +299,17 @@ simulation or Waku. The Wallet SDK's `Spendable` balance is therefore not, by
 itself, authority to create a fresh local intent while a prior nullifier remains
 reserved.
 
-A future passing Gate B will prove only that the payment was submitted by a
-Broadcaster instead of the payer's public EVM self-signer. It will not prove
+A later independently funded payer lineage passed Gate B on 2026-08-30. After
+the fresh shield became `Spendable`, prepare-only mode observed a `0.067110
+USDC` fee and passed final-calldata quorum simulation. The value-bearing command
+paid `0.01 USDC` with a `0.066912 USDC` Broadcaster fee, resolved the reported
+hash independently from reserved nullifiers, mined on the first attempt, used
+no EVM self-signer, completed all output PPOI and reached PPOps
+`FINALIZED + SPENDABLE + MATCHED -> PAID`. The signed restart/restore report was
+regenerated from that payment.
+
+That passing Gate B proves only that this payment was submitted by a
+Broadcaster instead of the payer's public EVM self-signer. It does not prove
 IP-layer anonymity, general wallet usability, production availability or
 independent adoption.
 
