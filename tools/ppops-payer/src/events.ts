@@ -19,6 +19,7 @@ export const writeEvent = (
 };
 
 export type SafeFailureCode =
+  | "INVALID_ARGUMENT"
   | "CONFIG_INVALID"
   | "SECRET_INVALID"
   | "REQUEST_INVALID"
@@ -58,9 +59,16 @@ export class SafeFailure extends Error {
   }
 }
 
-export const safeFailureResult = (error: unknown): { ok: false; error: { code: SafeFailureCode } } => ({
+export class PayerUsageError extends SafeFailure {
+  constructor(readonly hint: string, readonly field?: string) {
+    super("INVALID_ARGUMENT", hint);
+  }
+}
+
+export const safeFailureResult = (error: unknown) => ({
   ok: false,
   error: {
     code: error instanceof SafeFailure ? error.code : "INTERNAL_ERROR",
+    ...(error instanceof PayerUsageError ? { hint: error.hint, ...(error.field ? { field: error.field } : {}) } : {}),
   },
 });

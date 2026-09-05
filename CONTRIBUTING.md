@@ -1,8 +1,13 @@
 # Contributing
 
-Keep v0.1 narrowly scoped to view-only RAILGUN reconciliation. Proposals for a
-UI, another rail, Request Network, hosted relays, HPKE, new Solidity or new
-cryptography should be discussed separately and must not expand the beta core.
+Keep v0.1 scoped to view-only RAILGUN reconciliation. Checkout clarity, developer
+tools and documentation belong in that scope. New spending authority, rails,
+hosted relays or cryptography need a separate design discussion.
+
+Start with `npm ci`, `npm run demo` and the documentation index. Merchant-only
+work does not require installing the payer. Before submitting merchant changes,
+run `npm run verify` and `npm run test:package`. For the full independent payer
+and release suites:
 
 Before submitting a change:
 
@@ -11,6 +16,12 @@ npm ci
 npm run payer:install
 npm run verify:all
 ```
+
+API changes must update the shared schemas and `npm run docs:generate`.
+Examples must preserve idempotency across retries and execute without fixed
+past timestamps. CLI changes require per-command help and safe diagnostic hints.
+Run `npm run test:package -- --install` to check a clean packaged dependency install.
+Do not describe local demo output as real-payment or external-adoption evidence.
 
 Never commit real viewing keys, API tokens, merchant signing keys, webhook keys,
 commercial references or generated merchant databases. Tests must use public or

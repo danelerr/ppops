@@ -91,11 +91,13 @@ describe("CLI initialization", () => {
         "--spending-key",
         "must-never-be-accepted",
       ]),
-    ).rejects.toThrow(/Unsupported option --spending-key/);
+    ).rejects.toThrow(/Unsupported option/);
     expect(readFileSync(viewingKeyFile, "utf8")).not.toContain("must-never-be-accepted");
 
     await main([
       "init",
+      "--network",
+      "Ethereum_Sepolia",
       "--config",
       configPath,
       "--viewing-key-file",

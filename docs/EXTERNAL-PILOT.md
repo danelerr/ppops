@@ -2,7 +2,7 @@
 
 Status: **OPEN — no independent operator has completed this gate yet.**
 
-Project release status on 2026-08-30: public `main` and its verify/Docker CI
+The new beta.2 onboarding is unreleased; use a matching source revision for any new pilot. Historical release status on 2026-08-30: public `main` and its verify/Docker CI
 pass. [`v0.1.0-beta.1`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.1)
 is published with an immutable GHCR digest, merchant/payer SBOMs and all three
 public gate reports.
@@ -11,6 +11,13 @@ This runbook turns the remaining adoption requirement into a reproducible,
 privacy-preserving test. It does not ask an operator to disclose a mnemonic,
 viewing key, wallet database, payer address, transaction hash, memo/reference or
 invoice identifier.
+
+First-time operators should complete
+[QUICKSTART.md](QUICKSTART.md), run the non-destructive
+`doctor` and `status` commands, and read
+[SECURITY.md](SECURITY.md) before this evidence procedure. The quickstart
+separates merchant installation time from the payer's potentially longer
+shield/PPOI onboarding time.
 
 The strongest pilot is an independently controlled merchant installation. A
 separately controlled payer is also useful, but must be described as payer

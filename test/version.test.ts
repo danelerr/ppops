@@ -19,6 +19,6 @@ describe("release version consistency", () => {
     expect(packageLock.version).toBe(PPOPS_VERSION);
     expect(packageLock.packages[""]?.version).toBe(PPOPS_VERSION);
     expect(rootFile("Dockerfile")).toContain(`ARG VERSION="${PPOPS_VERSION}"`);
-    expect(rootFile("docker-compose.yml")).toContain(`image: ppops:${PPOPS_VERSION}`);
+    expect(rootFile("docker-compose.yml")).toContain(`PPOPS_IMAGE:-ppops:${PPOPS_VERSION}`);
   });
 });

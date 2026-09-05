@@ -17,6 +17,14 @@ afterEach(async () => {
 });
 
 describe("CLI process lifecycle", () => {
+  it("supports per-command help and version before reading configuration", async () => {
+    for (const args of [["init", "--help"], ["help", "prepare-broadcaster"], ["recover-broadcaster", "-h"], ["--version"]]) {
+      const result = await execFileAsync(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], { cwd: process.cwd(), timeout: 5000 });
+      expect(result.stderr).toBe("");
+      expect(result.stdout).not.toContain('"ok":false');
+      expect(result.stdout.trim().length).toBeGreaterThan(0);
+    }
+  });
   it("flushes help output and exits cleanly", async () => {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
@@ -77,7 +85,7 @@ describe("CLI process lifecycle", () => {
       ),
     ).rejects.toMatchObject({
       code: 1,
-      stdout: '{"ok":false,"error":{"code":"INTERNAL_ERROR"}}\n',
+      stdout: '{"ok":false,"error":{"code":"INVALID_ARGUMENT","hint":"Unknown command. Run ppops-payer --help."}}\n',
       stderr: "",
     });
   });

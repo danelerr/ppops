@@ -87,10 +87,11 @@ npm ci
 npm run verify
 ```
 
-The pinned RAILGUN/Waku dependency tree currently contains 30 low and 10
-moderate transitive audit findings. `npm run verify` fails on high or critical
-findings. Do not run `npm audit fix --force`: its proposed package downgrades
-are breaking changes.
+Run `npm audit --omit=dev` from this package for the current advisory results.
+The pinned RAILGUN/Waku tree has known transitive advisories; recorded pilot
+counts are historical, not a guarantee about today's registry data.
+`npm run verify` fails on high or critical findings. Do not run
+`npm audit fix --force`: proposed package downgrades can be breaking changes.
 
 ## Funding boundary
 

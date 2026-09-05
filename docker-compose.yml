@@ -2,7 +2,7 @@ services:
   ppops:
     build:
       context: .
-    image: ppops:0.1.0-beta.1
+    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.2}
     init: true
     restart: unless-stopped
     user: "${PPOPS_UID:-1000}:${PPOPS_GID:-1000}"
@@ -30,3 +30,20 @@ services:
     # The RAILGUN scan is not cancellable. Give the daemon time to drain it
     # before the orchestrator escalates from SIGTERM to SIGKILL.
     stop_grace_period: 30m
+
+  ppops-init:
+    profiles: [setup]
+    build:
+      context: .
+    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.2}
+    user: "${PPOPS_UID:-1000}:${PPOPS_GID:-1000}"
+    volumes:
+      - ./instance:/app/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command: ["init", "--help"]

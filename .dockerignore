@@ -10,6 +10,11 @@ node_modules
 patches
 scripts
 test
+images
+skills
+examples
+coverage
+.DS_Store
 tools/ppops-payer/data
 tools/ppops-payer/artifacts
 tools/ppops-payer/dist

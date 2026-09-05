@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { constants, writeSync } from "node:fs";
+import { constants, readFileSync, writeSync } from "node:fs";
 import {
   access,
   chmod,
@@ -27,7 +27,7 @@ import {
   PAYER_TOKEN_DECIMALS,
   PAYER_TOKEN_SYMBOL,
 } from "./constants.js";
-import { SafeFailure, safeFailureResult } from "./events.js";
+import { PayerUsageError, SafeFailure, safeFailureResult } from "./events.js";
 import {
   assertExpectedPayerAddress,
   assertExpectedSelfSigner,
@@ -113,10 +113,16 @@ const parseOptions = (args: string[]): ParsedOptions => {
   const options: ParsedOptions = new Map();
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (!argument?.startsWith("--")) throw new Error(`Unexpected argument: ${argument ?? ""}`);
+    if (!argument?.startsWith("--")) throw new PayerUsageError("Use --name value. Run ppops-payer <command> --help.");
+    const equals = argument.indexOf("=");
+    if (equals > 2) {
+      const key = argument.slice(2, equals);
+      options.set(key, [...(options.get(key) ?? []), argument.slice(equals + 1)]);
+      continue;
+    }
     const key = argument.slice(2);
     const value = args[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`--${key} requires a value`);
+    if (!value || value.startsWith("--")) throw new PayerUsageError("An option requires a value. Run ppops-payer <command> --help.");
     options.set(key, [...(options.get(key) ?? []), value]);
     index += 1;
   }
@@ -125,7 +131,7 @@ const parseOptions = (args: string[]): ParsedOptions => {
 
 const assertAllowed = (options: ParsedOptions, allowed: string[]): void => {
   for (const key of options.keys()) {
-    if (!allowed.includes(key)) throw new Error(`Unsupported option: --${key}`);
+    if (!allowed.includes(key)) throw new PayerUsageError("Unsupported option. Run ppops-payer <command> --help.");
   }
 };
 
@@ -135,9 +141,9 @@ const one = (
   settings: { required?: boolean; defaultValue?: string } = {},
 ): string => {
   const values = options.get(name) ?? [];
-  if (values.length > 1) throw new Error(`--${name} may be supplied only once`);
+  if (values.length > 1) throw new PayerUsageError(`--${name} may be supplied only once.`, name);
   const value = values[0] ?? settings.defaultValue;
-  if (settings.required && !value) throw new Error(`--${name} is required`);
+  if (settings.required && !value) throw new PayerUsageError(`--${name} is required.`, name);
   return value ?? "";
 };
 
@@ -1052,7 +1058,22 @@ const recoverBroadcaster = async (options: ParsedOptions): Promise<void> => {
 
 const main = async (): Promise<void> => {
   const [command, ...args] = process.argv.slice(2);
-  if (!command || command === "help" || command === "--help") {
+  if (["--version", "-V", "version"].includes(command ?? "")) {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    writeSync(process.stdout.fd, `${pkg.version}\n`);
+    return;
+  }
+  const topic = command === "help" ? args[0] : args.includes("--help") || args.includes("-h") ? command : undefined;
+  if (topic) {
+    const lines = USAGE.split("\n");
+    const index = lines.findIndex((line) => line.startsWith(`  ppops-payer ${topic} `));
+    if (index < 0) throw new PayerUsageError("Unknown command. Run ppops-payer --help.");
+    const help = [lines[index]];
+    for (let i = index + 1; lines[i]?.startsWith("    "); i++) help.push(lines[i]);
+    writeSync(process.stdout.fd, `ppops-payer\n\n${help.join("\n")}\n\nRun on the payer-controlled host. Amounts and fee limits use atomic units (1 USDC = 1000000).\nPrepare commands never submit. Payment commands require explicit amount, fee and intent confirmation.\nFor pending or ambiguous submissions, use submission-status and recover-broadcaster before another send.\nGuide: docs/PAYER-INTEGRATION.md in the repository; reference: tools/ppops-payer/README.md.\n`);
+    return;
+  }
+  if (!command || command === "help" || command === "--help" || command === "-h") {
     writeSync(process.stdout.fd, USAGE);
     return;
   }
@@ -1107,7 +1128,7 @@ const main = async (): Promise<void> => {
       await recoverBroadcaster(options);
       return;
     default:
-      throw new Error(`Unknown command: ${command}`);
+      throw new PayerUsageError("Unknown command. Run ppops-payer --help.");
   }
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "ppops",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Self-hosted, view-only RAILGUN payment reconciler",
   "private": true,
   "repository": {
@@ -22,8 +22,24 @@
   "type": "module",
   "license": "Apache-2.0",
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "config",
+    "examples",
+    "CONTRIBUTING.md",
+    "README.es.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "artifacts/*.json",
+    "tools/ppops-payer/README.md",
+    "tools/ppops-payer/docs"
   ],
+  "exports": {
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    }
+  },
   "bin": {
     "ppops": "./dist/cli.js"
   },
@@ -32,13 +48,20 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build && npm run docs:check",
     "dev": "tsx src/cli.ts serve",
     "start": "node dist/cli.js serve",
+    "demo": "tsx src/cli.ts demo",
+    "doctor": "tsx src/cli.ts doctor",
+    "example:merchant": "node examples/merchant-app.mjs",
+    "docs:generate": "tsx scripts/generate-api-reference.ts",
+    "docs:check": "tsx scripts/generate-api-reference.ts --check && tsx scripts/check-docs.ts",
+    "test:package": "tsx scripts/package-smoke.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run test:coverage && npm run build && npm run privacy:check && vitest run test/privacy.test.ts && npm run trust-boundary:check && npm run audit:production",
+    "verify": "npm run typecheck && npm run build && npm run docs:check && npm run test:coverage && npm run privacy:check && vitest run test/privacy.test.ts && npm run trust-boundary:check && npm run audit:production",
     "verify:all": "npm run verify && npm run payer:verify",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "payer:install": "npm ci --prefix tools/ppops-payer",

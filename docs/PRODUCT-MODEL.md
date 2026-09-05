@@ -1,146 +1,60 @@
-# PPOps product model
+# Product model
 
-Status: v0.1 product boundary and future direction
+PPOps is a self-hosted merchant service for private native USDC on Arbitrum.
+It creates signed payment requests, observes a receiver through view-only
+access and emits payment events after reconciling private settlements.
 
-## One-sentence description
+## Responsibilities
 
-PPOps is a self-hosted merchant backend that creates signed private-USDC
-payment intents, reconciles RAILGUN settlements through view-only access and
-notifies the merchant only after finality, PPOI and reference matching agree.
-
-## The useful analogy
-
-PPOps uses a BTCPay Server-style deployment model and a payment-intent lifecycle
-familiar from hosted processors:
-
-- like BTCPay Server, the merchant runs the payment infrastructure and keeps
-  control of its funds and operational data;
-- like a payment-intent API, the merchant creates a bounded payment request,
-  waits for a state transition and fulfills from an authenticated webhook;
-- unlike a hosted processor, PPOps neither receives the funds nor holds the
-  credential required to spend them.
-
-This analogy explains the category. It is not a claim of feature parity with
-BTCPay Server or Stripe.
-
-## What the merchant installs
-
-The product is the long-running `ppops` process:
-
-```text
-PPOps daemon
-├── authenticated REST API
-├── signed payment-intent service
-├── local SQLite reconciliation state
-├── RAILGUN view-only scanner
-├── finality and PPOI eligibility checks
-└── transactional HMAC webhook outbox
-```
-
-The merchant application stays responsible for its product, orders and
-fulfillment. PPOps stores the private mapping between the merchant's commercial
-reference and an opaque payment reference, but it never publishes the
-commercial reference in the payer request or RAILGUN memo.
-
-## Merchant integration
-
-The merchant backend creates an intent through the existing HTTP API:
-
-```http
-POST /v1/intents
-Authorization: Bearer <local API token>
-Idempotency-Key: order-9281
-Content-Type: application/json
-
-{
-  "externalReference": "ORDER-9281",
-  "amountAtomic": "25000000",
-  "expiresAt": 1788000000
-}
-```
-
-For six-decimal native USDC, `25000000` is `25 USDC`. PPOps returns an
-unguessable checkout path plus a signed descriptor containing the exact chain,
-token, amount, receiver, expiry and opaque memo reference.
-The timestamp above is illustrative; every real request must use a fresh future
-Unix timestamp appropriate for the payer's readiness.
-
-After the payer submits the private transfer, PPOps derives payment state from
-three independent dimensions:
-
-```text
-chainStatus = FINALIZED
-poiStatus   = SPENDABLE
-matchStatus = MATCHED
-```
-
-Only the eligible combination can produce intent state `PAID` or `PAID_LATE`
-and the existing webhook event:
-
-```json
-{
-  "schemaVersion": 1,
-  "eventId": "evt_...",
-  "type": "payment.confirmed",
-  "occurredAt": 1788000123,
-  "intentId": "pi_...",
-  "settlementId": "redacted",
-  "intentStatus": "PAID",
-  "receivedAmountAtomic": "25000000",
-  "expectedAmountAtomic": "25000000",
-  "overpaymentAmountAtomic": "0"
-}
-```
-
-An SDK is optional convenience. A future TypeScript client could wrap
-`POST /v1/intents` and the status routes, but it would not add trust or payment
-authority and is not needed for v0.1.
-
-## Payer boundary
-
-`tools/ppops-payer` is not the merchant product and is never included in the
-merchant build or Docker image. It is a separately executed reference client
-with spending authority, used to prove that a wallet can:
-
-1. verify the independently pinned merchant signer;
-2. enforce the signed chain, token, amount, receiver, expiry and memo;
-3. create the private RAILGUN transfer;
-4. submit diagnostically through a public self-signer or privately through a
-   bounded Waku Broadcaster path;
-5. let PPOps reconcile it without learning the payer's spending credential.
-
-In a mature ecosystem, a compatible wallet would consume the same payer request
-and the reference payer would remain development and conformance tooling.
-
-## Current product versus future integrations
-
-| Capability | v0.1 status |
+| Component | Owns |
 | --- | --- |
-| Self-hosted merchant daemon | Implemented |
-| Payment-intent REST API | Implemented |
-| Signed EIP-712 payer descriptor | Implemented |
-| View-only RAILGUN reconciliation | Implemented |
-| Finality, PPOI and matching semantics | Implemented |
-| HMAC webhook outbox | Implemented |
-| Reference payer | Implemented; Gate A passed; an earlier Gate B lineage failed closed, and a later isolated Gate B payment passed without a payer EVM self-signer |
-| Mainnet end-to-end evidence | Self-pilot passed; external pilot pending |
-| Merchant TypeScript SDK | Not implemented; optional |
-| QR/consumer checkout UI | Not implemented |
-| WooCommerce/plugin integrations | Not implemented |
-| Wallet-native descriptor support | Not implemented |
-| Multi-network or multi-rail support | Out of v0.1 scope |
+| Merchant application | Products, prices, orders, fulfillment and customer policy |
+| PPOps daemon | Intent identity, signed requests, viewing/scanning, payment projection and event outbox |
+| Separate payer wallet | Private liquidity, descriptor verification, proof generation, fees, submission and recovery |
+| External infrastructure | RAILGUN, Arbitrum finality, operator-selected RPC and PPOI availability |
 
-## Claim boundary
+One daemon instance serves one receiver, network and token. The merchant's
+spending wallet can remain on a separate device; its viewing capability alone is
+imported into PPOps. Invoice/customer identifiers remain in the merchant's local
+data, outside the public request and encrypted opaque payment reference.
 
-Until an external pilot passes, the defensible claim is:
+The service uses a familiar payment-intent lifecycle. A backend creates a
+request and waits for an authenticated event before delivering an order.
+Self-hosting leaves operation and data with the merchant; it also leaves the
+merchant responsible for backups and dependency availability.
 
-> PPOps implements and has completed a controlled Arbitrum mainnet self-pilot
-> for a self-hosted, view-only reconciliation backend for private RAILGUN
-> payment intents.
+## Implemented in the current source
 
-The project must not yet claim production readiness, general wallet usability,
-feature parity with established payment servers or verified external adoption.
+- View-only merchant daemon with authenticated REST API.
+- Signed EIP-712 payment descriptor and public request.
+- Finality, PPOI and reference-aware reconciliation.
+- Transactional outbox with authenticated, retried webhook delivery.
+- Checkout with periodic status updates, expiry and payer guidance.
+- Isolated demo and runnable merchant integration example.
+- Optional TypeScript HTTP and webhook helpers.
+- Configuration diagnostics, runtime status and offline backup/restore.
+- Separate reference payer with controlled historical Gate A/B evidence.
 
-Self-hosted also does not mean dependency-free. PPOps still depends on the
-RAILGUN protocol and Wallet SDK plus operator-selected RPC and PPOI services;
-their availability and metadata exposure remain part of the operational model.
+The demo, diagnostics, HTTP helpers and refreshed checkout are additions in
+unreleased beta.2. The published beta.1 tag has the earlier product surface.
+
+## Not included
+
+PPOps does not provide spending custody, wallet funding, refunds, swaps, fiat
+conversion, commerce plugins or additional rails. General consumer-wallet
+descriptor support and QR/deep-link integrations remain unvalidated.
+
+The reference payer shares the repository for reproducibility, but has its own
+dependencies, database, process and secrets. Merchant code must never import
+that spending runtime. Documentation packaged with the merchant may describe
+the payer; that does not include its executable code.
+
+## Evidence and adoption
+
+Historical controlled Arbitrum pilots support the narrow behavior recorded at
+their commits. They do not establish independent adoption, general wallet
+usability or production readiness for a later revision.
+
+Use [Merchant integration](MERCHANT-INTEGRATION.md) for application code,
+[Payment states](PAYMENT-STATES.md) for exact semantics, and
+[the documentation index](README.md) for architecture and dated evidence.

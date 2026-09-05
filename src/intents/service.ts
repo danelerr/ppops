@@ -27,6 +27,13 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
+export class IntentInputError extends Error {
+  constructor(readonly field: keyof CreateIntentInput, message: string) {
+    super(message);
+    this.name = "IntentInputError";
+  }
+}
+
 const fingerprintFor = (input: CreateIntentInput): string =>
   createHash("sha256")
     .update(
@@ -92,16 +99,16 @@ export class IntentService {
   ): Promise<PaymentIntentView | string> {
     const externalReference = input.externalReference.trim();
     if (externalReference.length === 0 || externalReference.length > 512) {
-      throw new Error("externalReference must contain between 1 and 512 characters");
+      throw new IntentInputError("externalReference", "Use between 1 and 512 non-blank characters.");
     }
     if (!isPositiveAtomicAmount(input.amountAtomic)) {
-      throw new Error("amountAtomic must be a positive base-10 integer");
+      throw new IntentInputError("amountAtomic", "Use a positive integer string in token atomic units.");
     }
     if (BigInt(input.amountAtomic) > MaxUint256) {
-      throw new Error("amountAtomic exceeds uint256");
+      throw new IntentInputError("amountAtomic", "The amount must fit in uint256.");
     }
     if (!Number.isSafeInteger(input.expiresAt) || input.expiresAt <= now) {
-      throw new Error("expiresAt must be a future Unix timestamp in seconds");
+      throw new IntentInputError("expiresAt", "Use a future Unix timestamp in seconds, not milliseconds.");
     }
 
     const reference = `0x${randomBytes(32).toString("hex")}`;

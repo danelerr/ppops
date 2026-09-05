@@ -1,5 +1,7 @@
 # PPOps impact thesis and evidence-gated roadmap
 
+> Archived planning material. This is not an installation guide or a current release claim.
+
 Date: 2026-08-23
 
 Status: product and public-good direction, not a v0.1 feature commitment.
@@ -118,7 +120,7 @@ Status on 2026-08-30: the controlled mainnet payment, finality/PPOI/matching,
 exact-once webhook, isolated restore and signed report requirements pass.
 Independent operator evidence is the remaining Gate 0 item; the self-pilot must
 not be counted as adoption. The minimal privacy-preserving handoff is documented
-in [the independent operator pilot](EXTERNAL-PILOT.md).
+in [the independent operator pilot](../EXTERNAL-PILOT.md).
 
 The Waku/Broadcaster privacy subgate now also passes for one controlled isolated
 payment. After a no-send preparation quoted `0.067110 USDC`, the value-bearing
@@ -326,4 +328,4 @@ The evidence-backed, explicitly blocked answer bank is maintained in
 - [RAILGUN balance and sync callbacks](https://docs.railgun.org/developer-guide/wallet/private-balances/balance-and-sync-callbacks)
 - [RAILGUN Broadcasters](https://docs.railgun.org/developer-guide/wallet/broadcasters)
 - [Ethlabs Hegota view](https://ethlabs.org/writings/hegota-view.html)
-- [Controlled pilot findings](PILOT-FINDINGS.md)
+- [Controlled pilot findings](../PILOT-FINDINGS.md)

@@ -7,7 +7,8 @@ describe("operational failure redaction", () => {
   it("never serializes CLI exception messages", () => {
     const secretUrl = "https://rpc.example/private-api-key";
     const result = safeCliFailureResult(new Error(`provider failed at ${secretUrl}`));
-    expect(result).toEqual({ ok: false, error: { code: "PREFLIGHT_FAILED" } });
+    expect(result).toMatchObject({ ok: false, error: { code: "PREFLIGHT_FAILED" } });
+    expect(result.error.hint).toContain("preflight");
     expect(JSON.stringify(result)).not.toContain(secretUrl);
   });
 

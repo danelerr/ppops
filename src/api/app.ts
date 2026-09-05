@@ -11,18 +11,15 @@ import { memoForReference } from "../domain.js";
 import type { HealthState } from "../operations/health.js";
 import {
   IdempotencyConflictError,
+  IntentInputError,
   type IntentService,
 } from "../intents/service.js";
 import { bearerTokenMatches } from "../security/auth.js";
 import { SignedPaymentDescriptorSchema } from "../security/descriptor.js";
 import { FixedWindowRateLimiter } from "../security/rate-limit.js";
 import { PPOPS_VERSION } from "../version.js";
-
-const CreateIntentSchema = z.object({
-  externalReference: z.string().min(1).max(512),
-  amountAtomic: z.string().regex(/^[1-9][0-9]*$/),
-  expiresAt: z.number().int().positive(),
-}).strict();
+import { CreateIntentSchema, requestIssues } from "./contracts.js";
+import { openApiDocument } from "./openapi.js";
 
 const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(250).default(100),
@@ -82,44 +79,7 @@ const checkoutIntent = (intent: ReturnType<IntentService["requireView"]>) => ({
   expectedMerchantSigner: intent.descriptor.merchantSigner,
 });
 
-const CHECKOUT_HTML = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Private payment · PPOps</title>
-  <link rel="stylesheet" href="/assets/pay.css">
-</head>
-<body>
-  <main>
-    <p class="eyebrow">PPOps · RAILGUN</p>
-    <h1>Private payment request</h1>
-    <p id="state" role="status">Loading signed payment details…</p>
-    <section id="payment" hidden>
-      <dl>
-        <dt>Amount</dt><dd id="amount"></dd>
-        <dt>Status</dt><dd id="status"></dd>
-        <dt>Chain ID</dt><dd id="chain"></dd>
-        <dt>Token</dt><dd id="token"></dd>
-      </dl>
-      <h2>RAILGUN recipient</h2><pre id="recipient"></pre>
-      <button type="button" data-copy="recipient">Copy recipient</button>
-      <h2>Encrypted memo</h2><pre id="memo"></pre>
-      <button type="button" data-copy="memo">Copy memo</button>
-      <details><summary>Signed descriptor and merchant identity</summary>
-        <p>Verify the signer against a merchant identity obtained outside this page.</p>
-        <pre id="signer"></pre><pre id="descriptor"></pre>
-      </details>
-      <p class="warning">Send the exact token and amount through a RAILGUN private transfer. PPOps never asks for a seed phrase or spending key.</p>
-    </section>
-  </main>
-  <script src="/assets/pay.js" defer></script>
-</body>
-</html>`;
-
-const CHECKOUT_CSS = `:root{color-scheme:dark;font-family:ui-sans-serif,system-ui,sans-serif;background:#0b1020;color:#edf2ff}body{margin:0;padding:2rem}main{max-width:46rem;margin:4vh auto;background:#121a30;border:1px solid #293553;border-radius:1rem;padding:clamp(1.25rem,4vw,2.5rem);box-shadow:0 1rem 4rem #0006}.eyebrow{color:#88a7ff;letter-spacing:.12em;font-size:.8rem}h1{font-size:clamp(2rem,6vw,3.5rem);line-height:1;margin:.4rem 0 2rem}h2{font-size:1rem;margin-top:2rem;color:#b8c8f8}dl{display:grid;grid-template-columns:7rem 1fr;gap:.75rem}dt{color:#9da9c7}dd{margin:0;font-weight:650}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#090d18;padding:1rem;border-radius:.5rem;color:#bfcced}button{border:0;border-radius:.45rem;padding:.7rem 1rem;background:#6588f5;color:#071020;font-weight:700;cursor:pointer}.warning{margin-top:2rem;padding:1rem;border-left:3px solid #f5c865;background:#191a23}details{margin-top:2rem}summary{cursor:pointer}`;
-
-const CHECKOUT_JS = `"use strict";const byId=(id)=>document.getElementById(id);const fail=()=>{byId("state").textContent="Payment request unavailable."};const load=async()=>{try{const id=location.pathname.split("/").filter(Boolean).at(-1);const response=await fetch("/pay/"+encodeURIComponent(id)+"/request.json",{cache:"no-store",credentials:"omit"});if(!response.ok){fail();return}const data=await response.json();byId("amount").textContent=data.amountFormatted+" "+data.tokenSymbol;byId("status").textContent=data.status;byId("chain").textContent=String(data.chainId);byId("token").textContent=data.tokenAddress;byId("recipient").textContent=data.recipient;byId("memo").textContent=data.memo;byId("signer").textContent=data.expectedMerchantSigner;byId("descriptor").textContent=JSON.stringify(data.descriptor,null,2);byId("state").textContent="Signed request loaded.";byId("payment").hidden=false;document.querySelectorAll("[data-copy]").forEach((button)=>button.addEventListener("click",async()=>{const target=button.getAttribute("data-copy");const text=byId(target).textContent;await navigator.clipboard.writeText(text);button.textContent="Copied"}))}catch{fail()}};void load();`;
+import { CHECKOUT_HTML, CHECKOUT_CSS, CHECKOUT_JS, PAYER_GUIDE_HTML } from "./checkout.js";
 
 type RateLimitConfig = {
   apiPerMinute: number;
@@ -147,6 +107,7 @@ const requestSource = (context: Context): string => {
 };
 
 export const createApiApp = (dependencies: {
+  demo?: boolean;
   intents: IntentService;
   database: PPOpsDatabase;
   apiToken: string;
@@ -207,8 +168,10 @@ export const createApiApp = (dependencies: {
   app.get("/pay/:id/request.json", (context) => {
     const intent = dependencies.intents.get(context.req.param("id"));
     if (!intent) return context.json({ error: { code: "NOT_FOUND" } }, 404);
-    return context.json(checkoutIntent(intent));
+    return context.json({ ...checkoutIntent(intent), reconciliationReady: dependencies.health().railgunReady, ...(dependencies.demo ? { simulated: true } : {}) });
   });
+
+  app.get("/payer-guide", (context) => context.html(PAYER_GUIDE_HTML));
 
   app.onError((error, context) => {
     const status = error.message.includes("not found") ? 404 : 500;
@@ -221,11 +184,12 @@ export const createApiApp = (dependencies: {
   app.get("/v1/health", (context) => {
     const health = dependencies.health();
     return context.json({
-      status: health.railgunReady ? "ready" : "starting",
+      status: health.railgunReady ? "ready" : health.lastScanError || health.scanStalled || health.lastScanAt ? "degraded" : "starting",
       version: PPOPS_VERSION,
       railgunReady: health.railgunReady,
       scanInProgress: health.scanInProgress,
       consecutiveFailures: health.consecutiveFailures,
+      ...(health.lastScanError ? { lastScanError: health.lastScanError } : {}),
       scanStalled: health.scanStalled ?? false,
       ...(health.lastScanAt ? { lastScanAt: health.lastScanAt } : {}),
       ...(health.syncProgress ? { syncProgress: health.syncProgress } : {}),
@@ -292,6 +256,8 @@ export const createApiApp = (dependencies: {
     });
   });
 
+  app.get("/v1/openapi.json", (context) => context.json(openApiDocument));
+
   app.post("/v1/intents", async (context) => {
     if (!hasJsonContentType(context)) {
       return context.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE" } }, 415);
@@ -300,11 +266,11 @@ export const createApiApp = (dependencies: {
       context.req.header("idempotency-key"),
     );
     if (!idempotencyKey.success) {
-      return context.json({ error: { code: "IDEMPOTENCY_KEY_REQUIRED" } }, 400);
+      return context.json({ error: { code: "IDEMPOTENCY_KEY_REQUIRED", hint: "Set Idempotency-Key to 8–128 letters, digits, dots, underscores, colons or hyphens. Reuse the same key and body when retrying." } }, 400);
     }
     const parsed = CreateIntentSchema.safeParse(await context.req.json().catch(() => undefined));
     if (!parsed.success) {
-      return context.json({ error: { code: "INVALID_REQUEST" } }, 400);
+      return context.json({ error: { code: "INVALID_REQUEST", issues: requestIssues(parsed.error) } }, 400);
     }
     try {
       const result = await dependencies.intents.createIdempotent(
@@ -317,7 +283,10 @@ export const createApiApp = (dependencies: {
       if (error instanceof IdempotencyConflictError) {
         return context.json({ error: { code: "IDEMPOTENCY_CONFLICT" } }, 409);
       }
-      return context.json({ error: { code: "INVALID_INTENT" } }, 400);
+      if (error instanceof IntentInputError) {
+        return context.json({ error: { code: "INVALID_INTENT", field: error.field, hint: error.message } }, 400);
+      }
+      return context.json({ error: { code: "INTERNAL_ERROR", hint: "Retry the same idempotency key and body. If the error persists, check daemon health." } }, 500);
     }
   });
 

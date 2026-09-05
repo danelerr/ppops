@@ -2,7 +2,7 @@
 
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { constants, realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { NETWORK_CONFIG, NetworkName } from "@railgun-community/shared-models";
@@ -10,7 +10,7 @@ import { Wallet, getAddress } from "ethers";
 
 import { PPOpsDaemon } from "./api/server.js";
 import { createBackup, restoreBackup } from "./backup.js";
-import { PPOpsConfigSchema, loadConfig, type PPOpsConfig } from "./config.js";
+import { ARBITRUM_NATIVE_USDC, PPOpsConfigSchema, loadConfig, type PPOpsConfig } from "./config.js";
 import {
   captureMainnetGateSnapshot,
   replayConfirmedWebhookForGate,
@@ -33,12 +33,18 @@ import {
   readSecret,
   writeNewSecret,
 } from "./security/secrets.js";
-import { safeCliFailureResult } from "./security/failures.js";
+import { safeCliFailureResult, UsageError } from "./security/failures.js";
 import { PPOPS_VERSION } from "./version.js";
+import { diagnose, formatDiagnostics } from "./operations/doctor.js";
 
 const HELP = `PPOps v${PPOPS_VERSION}
 
 Usage:
+  ppops demo [--port N]                         Try a simulated order and webhook
+  ppops doctor [--config PATH] [--offline]      Diagnose setup and readiness
+  ppops status [--config PATH]                 Read daemon and scan status
+  ppops init --profile arbitrum-usdc --viewing-key-file PATH \\
+    --rpc-url URL --rpc-url URL --poi-node URL [--webhook-url URL]
   ppops init --viewing-key-file PATH --token-address ADDRESS --token-symbol SYMBOL \\
     --token-decimals N --rpc-url URL --rpc-url URL --poi-node URL [--config PATH]
   ppops serve [--config PATH]
@@ -59,7 +65,31 @@ Usage:
 Security:
   PPOps accepts a RAILGUN shareable viewing key, never a spending key or mnemonic.
   --include-secrets creates a sensitive recovery bundle; protect it like financial data.
+
+Help: ppops <command> --help | ppops help <command> | ppops --version
+Defaults: config ./ppops.config.json; HTTP 127.0.0.1:8787; init Arbitrum/native USDC.
+Start here: docs/QUICKSTART.md. Maintainer evidence commands: docs/MAINNET-GATE.md.
 `;
+
+const commandHelp = (command: string): string => {
+  const lines = HELP.split("\n");
+  const index = lines.findIndex((line) => line.startsWith(`  ppops ${command} `));
+  if (index < 0) throw new UsageError("Unknown command. Run ppops --help for available commands.");
+  const usage: string[] = [lines[index] ?? ""];
+  for (let i = index + 1; lines[i]?.startsWith("    "); i++) usage.push(lines[i] ?? "");
+  const details: Record<string, string> = {
+    init: `\nDefault profile: arbitrum-usdc (chain 42161, native USDC, 6 decimals, finalized).\nRequired: --viewing-key-file PATH, repeated --rpc-url URL (2 independent origins; 3 recommended), --poi-node URL.\nOptional: --config PATH, --webhook-url URL, --port N (8787), --scan-interval-ms N (30000), --container.\nAdvanced: --network NAME, --token-address ADDRESS, --token-symbol SYMBOL, --token-decimals N,\n  --finality-mode finalized|confirmations, --confirmations N (12; test profiles only).\n--container binds 0.0.0.0 internally; publish only to host loopback.\ninit creates config and independent secrets; it never overwrites existing files.\nThen run: ppops doctor --offline; ppops preflight; ppops serve.`,
+    demo: "\nNo config, wallet, provider or funds required. Loopback only. Temporary state is removed on exit.\nOpen the printed shop URL, create an order and simulate a payment. This is not blockchain evidence.",
+    doctor: "\nChecks configuration and individual secret files. --offline skips all network checks.\nOnline mode also checks RPC/PPOI and daemon health. Prints no secret values or provider URLs.\nUse --json for machine-readable output; failures exit 1.",
+    status: "\nReads local /v1/health. Shows synchronization, freshness, failures and next action.\nUse --json for machine-readable output. Does not start the wallet or create an intent.",
+    serve: "\nRuns one merchant instance. Wait for readiness before accepting payments.\nStop with Ctrl-C or SIGTERM; an active historical scan must finish before shutdown.",
+    "config-validate": "\nValidates config schema and paths only. Use doctor --offline to check secret files too.",
+    preflight: "\nChecks configured RPC majority and PPOI health without reading wallet secrets.\nSuccess does not mean a wallet has finished syncing; check status after serve.",
+    backup: "\nOffline only. Stop the daemon first. Default backup excludes secret values.\n--include-secrets creates a sensitive recovery bundle. Store it separately and privately.",
+    restore: "\nOffline only. --force preserves existing targets as timestamped pre-restore files.\nAfter restore: preflight, serve, and wait for a complete scan before accepting payments.",
+  };
+  return `PPOps v${PPOPS_VERSION}\n\n${usage.join("\n")}\n${details[command] ?? "\nSee docs/CLI.md for this command and its prerequisites."}\n`;
+};
 
 type ParsedOptions = Map<string, string[]>;
 
@@ -67,7 +97,13 @@ const parseOptions = (args: string[]): ParsedOptions => {
   const options = new Map<string, string[]>();
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
-    if (!option?.startsWith("--")) throw new Error(`Unexpected argument: ${option}`);
+    if (!option?.startsWith("--")) throw new UsageError("Options must use --name value. Run ppops <command> --help.");
+    const equals = option.indexOf("=");
+    if (equals > 2) {
+      const name = option.slice(2, equals);
+      options.set(name, [...(options.get(name) ?? []), option.slice(equals + 1)]);
+      continue;
+    }
     const name = option.slice(2);
     const following = args[index + 1];
     const value = !following || following.startsWith("--") ? "true" : following;
@@ -83,15 +119,17 @@ const one = (
   settings: { required?: boolean; defaultValue?: string } = {},
 ): string | undefined => {
   const values = options.get(name);
-  if (values && values.length > 1) throw new Error(`--${name} may be specified only once`);
+  if (values && values.length > 1) throw new UsageError(`--${name} may be specified only once.`, name);
   const value = values?.[0] ?? settings.defaultValue;
-  if (settings.required && !value) throw new Error(`Missing required option --${name}`);
+  if (settings.required && !value) throw new UsageError(`Missing required option --${name}.`, name);
+  if (settings.required && value === "true") throw new UsageError(`--${name} requires a value.`, name);
   return value;
 };
 
 const many = (options: ParsedOptions, name: string, required = false): string[] => {
   const values = options.get(name) ?? [];
-  if (required && values.length === 0) throw new Error(`Missing required option --${name}`);
+  if (required && values.length === 0) throw new UsageError(`Missing required option --${name}.`, name);
+  if (values.some((value) => value === "true" || !value)) throw new UsageError(`--${name} requires a value.`, name);
   return values;
 };
 
@@ -105,7 +143,7 @@ const flag = (options: ParsedOptions, name: string): boolean => {
 const assertAllowed = (options: ParsedOptions, allowed: string[]): void => {
   const allowedSet = new Set(allowed);
   for (const name of options.keys()) {
-    if (!allowedSet.has(name)) throw new Error(`Unsupported option --${name}`);
+    if (!allowedSet.has(name)) throw new UsageError("Unsupported option. Run ppops <command> --help for accepted options.");
   }
 };
 
@@ -125,7 +163,7 @@ const integerOption = (
   });
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`--${name} must be a non-negative integer`);
+    throw new UsageError(`--${name} must be a non-negative integer.`, name);
   }
   return value;
 };
@@ -191,6 +229,8 @@ const preflightConfig = async (config: PPOpsConfig): Promise<{
 
 const init = async (options: ParsedOptions): Promise<void> => {
   assertAllowed(options, [
+    "profile",
+    "container",
     "config",
     "viewing-key-file",
     "network",
@@ -211,19 +251,20 @@ const init = async (options: ParsedOptions): Promise<void> => {
     one(options, "viewing-key-file", { required: true }) ?? "",
   );
   await readSecret(viewingKeyFile, "viewing-key");
-  const networkNameValue = one(options, "network", {
-    defaultValue: NetworkName.EthereumSepolia,
-  });
+  const profile = one(options, "profile");
+  if (profile && profile !== "arbitrum-usdc") throw new UsageError("Supported profile: arbitrum-usdc. Use --network for an explicit test profile.", "profile");
+  const networkNameValue = one(options, "network", { defaultValue: NetworkName.Arbitrum });
+  if (profile && networkNameValue !== NetworkName.Arbitrum) throw new UsageError("The arbitrum-usdc profile requires --network Arbitrum.", "network");
   if (!Object.values(NetworkName).includes(networkNameValue as NetworkName)) {
-    throw new Error(`Unsupported RAILGUN network: ${networkNameValue}`);
+    throw new UsageError("Unsupported RAILGUN network. Use Arbitrum for the supported native-USDC profile.", "network");
   }
   const networkName = networkNameValue as NetworkName;
   const network = NETWORK_CONFIG[networkName];
   const tokenAddress = getAddress(
-    one(options, "token-address", { required: true }) ?? "",
+    one(options, "token-address", networkName === NetworkName.Arbitrum ? { defaultValue: ARBITRUM_NATIVE_USDC } : { required: true }) ?? "",
   );
-  const tokenSymbol = one(options, "token-symbol", { required: true }) ?? "";
-  const tokenDecimals = integerOption(options, "token-decimals", { required: true });
+  const tokenSymbol = one(options, "token-symbol", networkName === NetworkName.Arbitrum ? { defaultValue: "USDC" } : { required: true }) ?? "";
+  const tokenDecimals = integerOption(options, "token-decimals", networkName === NetworkName.Arbitrum ? { defaultValue: 6 } : { required: true });
   const rpcUrls = many(options, "rpc-url", true);
   const poiNodeUrls = many(options, "poi-node", true);
   const confirmations = integerOption(options, "confirmations", { defaultValue: 12 });
@@ -245,9 +286,9 @@ const init = async (options: ParsedOptions): Promise<void> => {
   const config: PPOpsConfig = PPOpsConfigSchema.parse({
     schemaVersion: 1,
     server: {
-      host: "127.0.0.1",
+      host: flag(options, "container") ? "0.0.0.0" : "127.0.0.1",
       port: integerOption(options, "port", { defaultValue: 8787 }),
-      allowRemote: false,
+      allowRemote: flag(options, "container"),
     },
     network: {
       railgunNetworkName: networkName,
@@ -272,7 +313,7 @@ const init = async (options: ParsedOptions): Promise<void> => {
       apiTokenFile: "./secrets/api-token",
       merchantSigningKeyFile: "./secrets/merchant-signing-key",
       railgunDbEncryptionKeyFile: "./secrets/railgun-db-encryption-key",
-      viewingKeyFile,
+      viewingKeyFile: relative(configRoot, viewingKeyFile),
       ...(webhookUrl ? { webhookHmacKeyFile: "./secrets/webhook-hmac-key" } : {}),
     },
     scanner: {
@@ -323,7 +364,7 @@ const init = async (options: ParsedOptions): Promise<void> => {
       apiTokenFile,
       viewingKeyFile,
       spendingMaterialAccepted: false,
-      next: `ppops serve --config ${configPath}`,
+      next: ["doctor --offline", "preflight", "serve"].map((command) => `node dist/cli.js ${command} --config ${JSON.stringify(configPath)}`),
     })}\n`,
   );
 };
@@ -375,12 +416,40 @@ const descriptorVerify = async (options: ParsedOptions): Promise<void> => {
 
 export const main = async (argv = process.argv.slice(2)): Promise<void> => {
   const command = argv[0];
+  if (command === "--version" || command === "-V" || command === "version") {
+    process.stdout.write(`${PPOPS_VERSION}\n`);
+    return;
+  }
+  if (command === "help" && argv[1]) {
+    process.stdout.write(commandHelp(argv[1]));
+    return;
+  }
   if (!command || command === "help" || command === "--help" || command === "-h") {
     process.stdout.write(HELP);
     return;
   }
+  if (argv.slice(1).some((value) => value === "--help" || value === "-h")) {
+    process.stdout.write(commandHelp(command));
+    return;
+  }
   const options = parseOptions(argv.slice(1));
   switch (command) {
+    case "demo": {
+      assertAllowed(options, ["port"]);
+      const port = integerOption(options, "port", { defaultValue: 8788 });
+      if (port > 65535) throw new UsageError("Use a port between 0 and 65535.", "port");
+      const { startDemo } = await import("./demo.js");
+      await startDemo(port);
+      break;
+    }
+    case "doctor":
+    case "status": {
+      assertAllowed(options, command === "doctor" ? ["config", "offline", "json"] : ["config", "json"]);
+      const result = await diagnose({ configPath: configPathFor(options), offline: flag(options, "offline"), statusOnly: command === "status", preflight: preflightConfig });
+      process.stdout.write(flag(options, "json") ? `${JSON.stringify(result)}\n` : formatDiagnostics(result));
+      if (!result.ok) process.exitCode = 1;
+      break;
+    }
     case "init":
       await init(options);
       break;
@@ -586,7 +655,7 @@ export const main = async (argv = process.argv.slice(2)): Promise<void> => {
       break;
     }
     default:
-      throw new Error(`Unknown command: ${command}`);
+      throw new UsageError("Unknown command. Run ppops --help for available commands.");
   }
 };
 

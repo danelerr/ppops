@@ -8,6 +8,7 @@ import { RailgunScanner } from "./railgun/scanner.js";
 import { ReconciliationService } from "./reconciliation/service.js";
 import { readSecret } from "./security/secrets.js";
 import { RuntimeLock, runtimeLockPath } from "./security/runtime-lock.js";
+import { logInfo } from "./logging.js";
 
 export type ScanResult = {
   discovered: number;
@@ -39,6 +40,7 @@ export class PPOpsRuntime {
   }
 
   static async create(configPath: string): Promise<PPOpsRuntime> {
+    logInfo("startup.config_loading");
     const config = await loadConfig(configPath);
     const [apiToken, merchantPrivateKey, dbEncryptionKey, viewingKey] =
       await Promise.all([
@@ -51,11 +53,14 @@ export class PPOpsRuntime {
         readSecret(config.secrets.viewingKeyFile, "viewing-key"),
       ]);
     const engine = new RailgunViewOnlyEngine(config, dbEncryptionKey, viewingKey);
+    logInfo("startup.secrets_validated");
     const lock = await RuntimeLock.acquire(runtimeLockPath(config.storage.sqlitePath));
     let database: PPOpsDatabase | undefined;
     let scanner: RailgunScanner | undefined;
     try {
+      logInfo("startup.wallet_initializing");
       await engine.start();
+      logInfo("startup.wallet_initialized");
       database = new PPOpsDatabase(config.storage.sqlitePath);
       scanner = new RailgunScanner(engine, config);
       const intents = new IntentService(

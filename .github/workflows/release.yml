@@ -36,6 +36,7 @@ jobs:
           npm ci
           npm run payer:install
           npm run verify:all
+          npm run test:package -- --install
           node -e "const primitive=require('./artifacts/primitive-gate-report.json'); const privacy=require('./artifacts/privacy-report.json'); if (primitive.decision !== 'GO' || primitive.productionReady !== false || privacy.result !== 'PASS') process.exit(1)"
           PPOPS_REPORT_SIGNER="$(node -p 'require("./artifacts/mainnet-gate-report.json").merchantSigner')"
           node dist/cli.js mainnet-gate-report-verify \
@@ -58,6 +59,9 @@ jobs:
             --tag "$PPOPS_IMAGE:$PPOPS_VERSION" \
             --tag "$PPOPS_IMAGE:sha-$PPOPS_REVISION" \
             .
+          docker run --rm -i --network none --read-only --tmpfs /tmp:rw,size=64m,mode=1777 \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --entrypoint node "$PPOPS_IMAGE:$PPOPS_VERSION" --input-type=module < scripts/docker-smoke.mjs
           docker push "$PPOPS_IMAGE:$PPOPS_VERSION"
           docker push "$PPOPS_IMAGE:sha-$PPOPS_REVISION"
           PPOPS_REPO_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$PPOPS_IMAGE:$PPOPS_VERSION")"

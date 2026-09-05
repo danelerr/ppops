@@ -16,7 +16,7 @@ RUN npm run build \
 FROM node:24.13.0-bookworm-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f AS runtime
 
 ARG VCS_REF="unknown"
-ARG VERSION="0.1.0-beta.1"
+ARG VERSION="0.1.0-beta.2"
 
 LABEL org.opencontainers.image.title="PPOps" \
   org.opencontainers.image.description="Self-hosted, view-only RAILGUN payment reconciler" \

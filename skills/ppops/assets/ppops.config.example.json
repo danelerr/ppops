@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8787,
+    "allowRemote": false,
+    "rateLimit": {
+      "apiPerMinute": 120,
+      "authFailuresPerMinute": 10,
+      "checkoutPerMinute": 60
+    }
+  },
+  "network": {
+    "railgunNetworkName": "Arbitrum",
+    "chainId": 42161,
+    "tokenAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "tokenSymbol": "USDC",
+    "tokenDecimals": 6,
+    "rpcUrls": [
+      "https://REPLACE_WITH_RPC_PROVIDER_A",
+      "https://REPLACE_WITH_RPC_PROVIDER_B",
+      "https://REPLACE_WITH_RPC_PROVIDER_C"
+    ],
+    "deploymentBlock": 56109834,
+    "finality": {
+      "mode": "finalized"
+    }
+  },
+  "storage": {
+    "sqlitePath": "./data/ppops.sqlite",
+    "railgunDbPath": "./data/railgun-db",
+    "artifactsPath": "./data/artifacts",
+    "walletStatePath": "./data/railgun-wallet.json"
+  },
+  "secrets": {
+    "apiTokenFile": "./secrets/api-token",
+    "merchantSigningKeyFile": "./secrets/merchant-signing-key",
+    "railgunDbEncryptionKeyFile": "./secrets/railgun-db-encryption-key",
+    "viewingKeyFile": "./secrets/railgun-viewing-key",
+    "webhookHmacKeyFile": "./secrets/webhook-hmac-key"
+  },
+  "scanner": {
+    "intervalMs": 30000,
+    "poiNodeUrls": [
+      "https://REPLACE_WITH_YOUR_POI_NODE"
+    ],
+    "providerPollingIntervalMs": 10000,
+    "rpcTimeoutMs": 20000,
+    "maxRpcBlockLag": 5,
+    "finalizedRecheckSeconds": 604800,
+    "scanStallThresholdMs": 1200000,
+    "maxScanStalenessMs": 900000
+  },
+  "webhook": {
+    "url": "https://REPLACE_WITH_YOUR_MERCHANT_BACKEND/ppops",
+    "keyId": "v1",
+    "timeoutMs": 10000,
+    "maxAttempts": 12,
+    "baseRetryMs": 5000,
+    "maxRetryMs": 3600000
+  }
+}

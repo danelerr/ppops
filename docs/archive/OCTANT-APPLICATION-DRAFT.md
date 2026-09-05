@@ -1,5 +1,7 @@
 # Octant Epoch 13 application draft
 
+> Archived planning material. This is not an installation guide or a current release claim.
+
 Status: **NO-GO FOR SUBMISSION** until the blocking evidence below exists.
 
 This is an evidence-backed answer bank, not a copy of the dynamic Fillout form
@@ -123,20 +125,20 @@ v0.1.
 
 Evidence links:
 
-- [Mainnet Gate report](../artifacts/mainnet-gate-report.json)
-- [Privacy report](../artifacts/privacy-report.json)
-- [Primitive Gate report](../artifacts/primitive-gate-report.json)
-- [Operational profile](OPERATIONAL-PROFILE.md)
-- [Pilot findings](PILOT-FINDINGS.md)
-- [Threat model](THREAT-MODEL.md)
-- [Broadcaster differential review](security/DIFFERENTIAL-REVIEW-2026-08-30.md)
+- [Mainnet Gate report](../../artifacts/mainnet-gate-report.json)
+- [Privacy report](../../artifacts/privacy-report.json)
+- [Primitive Gate report](../../artifacts/primitive-gate-report.json)
+- [Operational profile](../OPERATIONAL-PROFILE.md)
+- [Pilot findings](../PILOT-FINDINGS.md)
+- [Threat model](../THREAT-MODEL.md)
+- [Broadcaster differential review](../security/DIFFERENTIAL-REVIEW-2026-08-30.md)
 
 ## Users and traction
 
 Do not submit the current self-pilot as user traction.
 
 Replace this section only after completing
-[the independent operator pilot](EXTERNAL-PILOT.md):
+[the independent operator pilot](../EXTERNAL-PILOT.md):
 
 ```text
 Independent operators: <count>

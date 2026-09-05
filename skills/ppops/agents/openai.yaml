@@ -1,0 +1,4 @@
+interface:
+  display_name: "PPOps"
+  short_description: "Set up and integrate private payment reconciliation"
+  default_prompt: "Use $ppops to set up and verify a secure PPOps merchant deployment."

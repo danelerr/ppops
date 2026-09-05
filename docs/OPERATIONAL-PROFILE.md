@@ -2,6 +2,10 @@
 
 Date: 2026-08-30
 
+> Historical beta.1 measurements and evidence. For current commands, demo,
+> checkout and client helpers, use the [documentation index](README.md) and
+> [changelog](../CHANGELOG.md). This record is not a new beta.2 verification.
+
 Status: beta implementation profile. This document describes behavior exercised
 by the repository; it is not a production-readiness or privacy-absoluteness
 claim.

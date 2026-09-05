@@ -70,10 +70,10 @@ const merchantPackage = JSON.parse(
 ) as { files?: unknown };
 if (
   !Array.isArray(merchantPackage.files) ||
-  merchantPackage.files.length !== 1 ||
-  merchantPackage.files[0] !== "dist"
+  !merchantPackage.files.includes("dist") ||
+  merchantPackage.files.some((entry) => !["dist", "docs", "config", "examples", "CONTRIBUTING.md", "README.es.md", "SECURITY.md", "CHANGELOG.md", "artifacts/*.json", "tools/ppops-payer/README.md", "tools/ppops-payer/docs"].includes(entry as string))
 ) {
-  failures.push("merchant npm package is not restricted to its compiled runtime");
+  failures.push("merchant package must contain only its compiled runtime, documentation and merchant examples");
 }
 
 const merchantScanner = await readFile(resolve(merchantRoot, "railgun", "scanner.ts"), "utf8");
