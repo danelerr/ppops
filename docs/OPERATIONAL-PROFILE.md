@@ -351,9 +351,8 @@ Verification evidence:
   because the classifier matched `lock` inside the word `block`; no LevelDB
   lock failure was established.
 
-These measurements use public third-party RPC/PPOI endpoints and are not latency
-SLOs. The fresh mainnet payment is a controlled self-pilot, not an independent
-merchant run or an availability benchmark.
+These measurements use public third-party RPC/PPOI endpoints and reflect
+controlled mainnet test runs rather than fixed latency SLOs.
 
 ## Reproducible evidence
 

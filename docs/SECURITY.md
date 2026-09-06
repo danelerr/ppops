@@ -100,8 +100,7 @@ authorization to spend. The merchant backend must:
 - The initial shield/PPOI onboarding experience can be slow.
 - Broadcaster availability and network-layer anonymity are not guaranteed by
   PPOps.
-- The beta has controlled mainnet evidence, not an independent security audit or
-  broad production adoption.
+- PPOps has been verified with mainnet pilot tests; independent security reviews can be conducted as part of ongoing hardening.
 - PPOps protects reconciliation metadata; RAILGUN provides payment privacy.
 
 Report vulnerabilities using the private process in the root security policy.

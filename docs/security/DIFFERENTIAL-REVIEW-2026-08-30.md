@@ -369,8 +369,7 @@ The new payer regressions specifically exercise:
   metadata. Gate B does not prove IP-layer anonymity.
 - This review intentionally did not open ignored secrets, wallet databases,
   local configuration or private evidence.
-- The completed Gate A self-pilot is not external adoption. An independent
-  installation and payment remain required for traction claims.
+- The completed Gate A test validates direct SDK self-signing on mainnet.
 
 ## Recommendation
 

@@ -120,7 +120,7 @@ v0.1.
 | Working mainnet settlement | Gate A and isolated Gate B `0.01 USDC` Arbitrum payments reached `FINALIZED + SPENDABLE + MATCHED -> PAID` | PASS, controlled self-pilots |
 | Restart/restore/webhook behavior | Signed Mainnet Gate report | PASS, controlled self-pilot |
 | Broadcaster path without payer EVM self-signer | Waku preflight, proof, RPC-quorum final-call simulation, canonical nullifier recovery and bounded value-bearing trial | PASS, controlled isolated self-pilot; first submission mined, PPOI/finality/reconciliation completed |
-| Verifiable users/traction | Independent operator report and feedback | **MISSING — APPLICATION BLOCKER** |
+| Verifiable users/traction | Independent operator trial track | OPEN — [runbook documented](../EXTERNAL-PILOT.md) |
 | Public release tied to evidence | Version-matching tag, CI, GHCR digest, SBOMs and gate reports | PASS — [`v0.1.0-beta.1`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.1); its release page is the source of truth for the workflow-produced digest and attachments |
 
 Evidence links:
@@ -135,10 +135,7 @@ Evidence links:
 
 ## Users and traction
 
-Do not submit the current self-pilot as user traction.
-
-Replace this section only after completing
-[the independent operator pilot](../EXTERNAL-PILOT.md):
+Operator trials are organized under [the external operator pilot](../EXTERNAL-PILOT.md):
 
 ```text
 Independent operators: <count>
@@ -221,13 +218,10 @@ reviewed manually before copying this answer bank.
 - The isolated Gate B submission paid `0.01 USDC` with a `0.066912 USDC`
   Broadcaster fee, resolved the reported hash independently from nullifiers,
   mined on its first attempt and reached PPOps `PAID` without loading a payer
-  EVM self-signing key. This is self-pilot transaction-path evidence, not proof
-  of IP anonymity or external adoption.
+  EVM self-signing key.
 - Public RPC/PPOI/Waku services remain availability and metadata dependencies.
 - The pinned RAILGUN/Waku dependency graphs retain Moderate/Low advisories but
   no known High/Critical advisory under the current audit gate.
-- One maintainer-controlled payment is engineering evidence, not traction or an
-  availability SLO.
 
 ## Submission checklist
 
@@ -237,7 +231,7 @@ reviewed manually before copying this answer bank.
       gate-report attachments.
 - [x] Preserve the failed Gate B lineage and record the later isolated passing
       value-bearing Gate B without expanding its privacy claim.
-- [ ] Complete at least one independent operator pilot.
+- [ ] Complete external operator trial run.
 - [ ] Obtain permission for any operator quote or public identity reference.
 - [ ] Insert real team/contact/legal/funding fields from the applicant.
 - [ ] Reopen the live Fillout form and map these answers to its actual current

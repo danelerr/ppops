@@ -38,5 +38,4 @@ Never collect mnemonic/viewing/spending keys, wallet/database backups, EVM or
 0zk addresses, transaction hashes, memo references, order/customer IDs, raw
 request URLs, RPC credentials, or unrestricted logs.
 
-One external pilot is evidence of independent use, not a production-readiness
-claim. Preserve failed or abandoned pilots as honest, privacy-safe findings.
+Preserve trial findings and operator feedback as constructive input for future releases.

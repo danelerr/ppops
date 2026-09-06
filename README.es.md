@@ -35,8 +35,5 @@ Todo este recorrido es una simulación local. No necesitas wallet, RPC ni dinero
 La wallet del pagador debe tener USDC privado disponible para gastar, además
 de la comisión. Una transferencia pública normal no completa el cobro.
 
-Estas mejoras están en el código fuente actual y todavía no se han publicado.
-El tag v0.1.0-beta.1 no contiene la nueva demo ni los comandos doctor y status.
-La documentación técnica canónica está en inglés y corresponde al mismo checkout.
-
-Consulta el [README principal](README.md) para conocer el alcance y estado de la beta.
+La versión actual es **v0.1.0-beta.2**, que incluye la demo local, el cliente TypeScript y las utilidades de diagnóstico.
+La documentación técnica completa está en inglés en el [README principal](README.md).

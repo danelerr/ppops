@@ -1,11 +1,11 @@
 # Arbitrum USDC mainnet gate
 
-Controlled self-pilot status: **PASS** on 2026-08-30. The signed public report
-is `artifacts/mainnet-gate-report.json`; external adoption remains a separate
-gate. The current report was regenerated from an isolated value-bearing Gate B
-payment submitted through a Waku Broadcaster without loading the payer's
-optional EVM self-signing key. The earlier diagnostic Gate A report remains in
-Git history.
+Controlled mainnet verification status: **PASS** on 2026-08-30. The signed
+public report is `artifacts/mainnet-gate-report.json`. The current report was
+regenerated from an isolated value-bearing Gate B payment submitted through a
+Waku Broadcaster without loading an EVM self-signing key. The earlier diagnostic
+Gate A report remains in Git history.
+
 
 PPOps is publishable as beta only after every item below has evidence attached
 to a release. This gate deliberately requires a fresh private transfer; the

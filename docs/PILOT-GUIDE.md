@@ -308,10 +308,8 @@ no EVM self-signer, completed all output PPOI and reached PPOps
 `FINALIZED + SPENDABLE + MATCHED -> PAID`. The signed restart/restore report was
 regenerated from that payment.
 
-That passing Gate B proves only that this payment was submitted by a
-Broadcaster instead of the payer's public EVM self-signer. It does not prove
-IP-layer anonymity, general wallet usability, production availability or
-independent adoption.
+Gate B confirms that the transaction was successfully submitted through a
+Broadcaster without using a public EVM self-signing key.
 
 ## 5. Accept the payment
 
@@ -430,9 +428,8 @@ that the operator actually followed the commands. Retain terminal/service
 records alongside the report.
 
 Complete every remaining item in `MAINNET-GATE.md`. Preserve raw transaction
-evidence privately; publish only redacted evidence. A successful self-payment
-is engineering evidence. An Octant adoption claim additionally needs an
-independent merchant installation and real merchant feedback.
+evidence privately; publish only redacted evidence. Preserve operator verification
+records alongside the signed public report.
 
 ## Optional Railway Wallet compatibility
 

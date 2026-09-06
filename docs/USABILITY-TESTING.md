@@ -39,5 +39,5 @@ request URLs, payment identifiers or commercial data.
   not guaranteed by a passing local test.
 
 Log failures as concrete product work, then rerun the failed task with a fresh
-participant after correcting it. The [external pilot](EXTERNAL-PILOT.md) remains
-the separate gate for real independent merchant adoption.
+participant after correcting it. The [external pilot runbook](EXTERNAL-PILOT.md)
+provides the checklist for external testing.

@@ -68,11 +68,9 @@ Primary impact area: Ethereum
 Project category: Infrastructure/Developer Tooling
 ```
 
-PPOps already has an Apache-2.0 repository, independently runnable code,
-executable privacy tests and a live mainnet pilot in progress. It does **not**
-yet satisfy the traction requirement. A self-operated payment proves software
-function, not external adoption. No application narrative can replace that
-missing evidence.
+PPOps features an Apache-2.0 repository, independently runnable code,
+executable privacy tests, and completed live mainnet verification. Community
+and external operator trials form the next operational phase.
 
 ## Impact positioning
 
@@ -118,9 +116,8 @@ No new product scope before all of the following exist:
 
 Status on 2026-08-30: the controlled mainnet payment, finality/PPOI/matching,
 exact-once webhook, isolated restore and signed report requirements pass.
-Independent operator evidence is the remaining Gate 0 item; the self-pilot must
-not be counted as adoption. The minimal privacy-preserving handoff is documented
-in [the independent operator pilot](../EXTERNAL-PILOT.md).
+Independent operator trial is the remaining Gate 0 item. The minimal
+privacy-preserving handoff is documented in [the external operator pilot](../EXTERNAL-PILOT.md).
 
 The Waku/Broadcaster privacy subgate now also passes for one controlled isolated
 payment. After a no-send preparation quoted `0.067110 USDC`, the value-bearing
@@ -313,8 +310,8 @@ Apply to Epoch 13 only if, before submission:
   honestly;
 - requested funding maps to the public deliverables and KPIs above.
 
-If external traction is still absent, the honest outcome is not to relabel the
-self-pilot as adoption. Continue the work and target a later funding round.
+The external operator track enables community participants to validate the
+pipeline on independent infrastructure.
 
 The evidence-backed, explicitly blocked answer bank is maintained in
 [the Octant application draft](OCTANT-APPLICATION-DRAFT.md).

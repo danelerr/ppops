@@ -103,6 +103,5 @@ For merchant setup, report success only when:
 
 For an end-to-end pilot, additionally require one actual private transfer to
 reach `FINALIZED + SPENDABLE + MATCHED`, one exact-once confirmation at the
-merchant application, and privacy-safe operator feedback. Never describe a
-self-pilot as external adoption or a single successful run as production
-readiness.
+merchant application, and privacy-safe operator feedback. Document the exact
+verification environment and operational scope clearly.

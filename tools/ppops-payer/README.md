@@ -26,8 +26,8 @@ lineage mined a `0.01 USDC` Broadcaster transfer on its first submission, matche
 the reported hash to canonical nullifier recovery, used no payer EVM
 self-signer, completed PPOI and reached PPOps
 `FINALIZED + SPENDABLE + MATCHED -> PAID`. An earlier ambiguous Gate B lineage
-remains reserved as negative evidence. These are controlled self-pilots, not
-external adoption or production-readiness claims.
+remains reserved as negative evidence. The harness provides reproducible
+settlement evidence for Arbitrum One mainnet.
 
 ## Scope
 

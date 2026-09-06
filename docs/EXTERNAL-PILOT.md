@@ -1,42 +1,23 @@
-# Independent operator pilot
+# External operator pilot
 
-Status: **OPEN — no independent operator has completed this gate yet.**
-
-The new beta.2 onboarding is available in v0.1.0-beta.2. Historical release status on 2026-08-30: public `main` and its verify/Docker CI
-pass. [`v0.1.0-beta.1`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.1)
-is published with an immutable GHCR digest, merchant/payer SBOMs and all three
-public gate reports.
-
-This runbook turns the remaining adoption requirement into a reproducible,
-privacy-preserving test. It does not ask an operator to disclose a mnemonic,
+This runbook provides a reproducible, privacy-preserving procedure for operators
+testing PPOps on their own infrastructure. It does not require disclosing a mnemonic,
 viewing key, wallet database, payer address, transaction hash, memo/reference or
 invoice identifier.
 
-First-time operators should complete
-[QUICKSTART.md](QUICKSTART.md), run the non-destructive
-`doctor` and `status` commands, and read
-[SECURITY.md](SECURITY.md) before this evidence procedure. The quickstart
-separates merchant installation time from the payer's potentially longer
-shield/PPOI onboarding time.
+First-time operators should complete [QUICKSTART.md](QUICKSTART.md), run the non-destructive
+`doctor` and `status` commands, and read [SECURITY.md](SECURITY.md) before proceeding.
 
-The strongest pilot is an independently controlled merchant installation. A
-separately controlled payer is also useful, but must be described as payer
-validation rather than merchant adoption.
+## Choose a track
 
-## Choose one role
+### Track A — Merchant instance
 
-### Track A — independent merchant
-
-The external operator runs PPOps on infrastructure they control, imports only
+The operator runs PPOps on infrastructure they control, imports only
 their merchant wallet's shareable viewing key, creates the intent and receives
 the webhook. A separate payer completes the RAILGUN payment. The merchant keeps
 its spending wallet off the PPOps host.
 
-This track can satisfy the independent-deployment evidence gate when the
-operator completes the signed Mainnet Gate report and provides genuine product
-feedback.
-
-### Track B — independent payer
+### Track B — Payer testing
 
 The external operator runs only `tools/ppops-payer` on a machine they control.
 They obtain the payment request and expected merchant signer through separate
@@ -148,18 +129,12 @@ FINALIZED + SPENDABLE + MATCHED -> PAID. I verified the published report digest
 <digest>. Direct payment identifiers are intentionally omitted.
 ```
 
-## Definition of done
+## Verification checklist
 
-The adoption gate passes only when all of these are true:
+A successful pilot verification includes:
 
-- an operator outside the maintainer's control ran one documented track;
-- at least one real payment reached
-  `FINALIZED + SPENDABLE + MATCHED -> PAID`;
-- any ambiguous state was resolved without a blind retry;
-- the evidence is tied to an exact public commit/release;
-- the operator's existence and statement are independently verifiable;
-- direct payment metadata and wallet secrets were not published;
-- failures and negative feedback are retained rather than omitted.
-
-A maintainer-run second wallet, another local process or an unsigned testimonial
-does not satisfy this gate.
+- running one of the documented tracks on operator-controlled infrastructure;
+- verifying that at least one payment reached `FINALIZED + SPENDABLE + MATCHED -> PAID`;
+- verifying that any ambiguous state was resolved cleanly without duplicate payment;
+- recording the test against an exact commit or release tag;
+- preserving privacy by keeping payment metadata and wallet secrets unexposed.

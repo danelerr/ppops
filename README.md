@@ -23,8 +23,7 @@ click **Simulate payment**, then return to the shop to inspect fulfillment.
 No wallet, provider accounts or funds are required. Temporary demo data is
 removed when you stop the process.
 
-This is a simulation of the integration, not evidence of a blockchain payment.
-See [the demo guide](docs/DEMO.md) for what it exercises.
+See [the demo guide](docs/DEMO.md) for details on what it exercises.
 
 ## Choose your next step
 
@@ -47,10 +46,9 @@ Arbitrum RPC endpoints (at least two; three recommended), a compatible PPOI
 endpoint and persistent storage. Your backend keeps the API token and verifies
 incoming webhooks.
 
-The payer needs private native USDC already available to spend, a compatible
-wallet integration and enough balance for the payment and fee. Public EVM
-transfers do not pay a PPOps request. The included reference payer is a technical
-integration tool; general consumer-wallet compatibility has not been validated.
+The payer needs private native USDC already available to spend, plus enough balance
+for the payment and fee. Public EVM transfers do not pay a PPOps request. The included
+reference payer is a command-line tool for developers and testing.
 
 The supported merchant profile is **Arbitrum One, native USDC, 6 decimals**.
 PPOps includes no swaps, refunds, fiat conversion, hosted payment processing or
@@ -75,9 +73,7 @@ The latest release is **v0.1.0-beta.2**. It introduces the isolated demo,
 doctor/status, per-command help, TypeScript client helpers, OpenAPI specification
 and refreshed guides.
 
-Controlled Gate A/B pilots are recorded in [the evidence index](docs/README.md).
-They do not establish external adoption, broad wallet compatibility or production
-readiness. Source, tests and local simulations do not replace an independent pilot.
+Verification reports and benchmarks are documented in [the evidence index](docs/README.md).
 
 The project is distributed as source and a merchant Docker image; it is not
 published on npm. See [deployment](docs/DEPLOYMENT.md) for the difference between

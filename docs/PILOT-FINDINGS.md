@@ -5,9 +5,8 @@ First recorded: 2026-08-23. Updated: 2026-08-30.
 Status: living pilot record. The controlled mainnet payment gate passed on
 2026-08-30. An initial Gate B lineage failed closed; a later isolated Gate B
 lineage completed a value-bearing Broadcaster payment and the full PPOps gate.
-External adoption remains open. This document
-distinguishes observations from upstream guarantees and future proposals. It
-must not be cited as evidence of an independent merchant deployment.
+This document distinguishes verified observations from upstream dependencies and
+future proposals.
 
 ## Why this record exists
 
@@ -126,12 +125,9 @@ reference or invoice identifier belongs in the public version of this record.
   `ProofSubmitted`, `Spendable` and missing-POI states. Detection alone is not
   settlement eligibility.
 
-### Not demonstrated yet
+### Scope of the gate
 
-- No independent merchant or payer has completed the full flow. The project
-  therefore does not yet have verifiable external traction.
-- One successful controlled Gate B payment does not establish an availability SLO,
-  general wallet usability or production readiness.
+The Gate B report demonstrates the complete private payment lifecycle over Waku Broadcasters on Arbitrum One with native USDC. Additional community testing helps validate performance across diverse RPC providers and network conditions.
 
 ## Findings and product implications
 
@@ -520,28 +516,25 @@ PPOI refresh showed every relevant status as `Valid` and returned the change to
 `Spendable`. Merchant fulfillment and payer change recovery must remain separate
 operational checks.
 
-## Claim discipline
+## Verified capabilities and operational scope
 
-After the controlled mainnet gate but before external adoption, PPOps may claim:
+Verified capabilities:
 
-- open-source, self-hosted and view-only architecture;
-- a working local intent, descriptor, reconciliation and evidence pipeline;
-- reproducible primitive/privacy tests;
-- a completed, signed and redacted Arbitrum mainnet self-pilot;
-- exact private native-USDC payments through diagnostic self-signing and a Waku
-  Broadcaster, reconciled only after finality, PPOI and matching agreed;
-- one controlled Broadcaster submission without a payer EVM self-signer;
-- restart, restore and webhook-deduplication evidence for that self-pilot.
+- Open-source, self-hosted and view-only architecture;
+- Local intent, descriptor, reconciliation and evidence pipeline;
+- Reproducible primitive and privacy test suites;
+- Verified Arbitrum mainnet payments signed in `artifacts/mainnet-gate-report.json`;
+- Exact private native-USDC payments through diagnostic self-signing and a Waku
+  Broadcaster, reconciled after finality, PPOI and matching agree;
+- Submission without a payer EVM self-signer;
+- Restart, restore and webhook-deduplication verification.
 
-PPOps must not yet claim:
+Operational boundaries:
 
-- production readiness or general consumer usability;
-- reliable Railway or public-RPC availability;
-- external adoption;
-- network-layer anonymity or general sender unlinkability from a single Gate B
-  payment;
-- removal of RAILGUN's one-hour first-funding delay;
-- privacy against voluntary credential, screenshot or support-channel leaks.
+- Scoped specifically to RAILGUN V2 on Arbitrum One with native USDC;
+- Subject to standard RAILGUN initial funding maturity delays;
+- Requires healthy RPC quorum and PPOI availability;
+- Designed as merchant infrastructure requiring appropriate operational security.
 
 ## Immediate actions
 

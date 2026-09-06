@@ -49,11 +49,11 @@ dependencies, database, process and secrets. Merchant code must never import
 that spending runtime. Documentation packaged with the merchant may describe
 the payer; that does not include its executable code.
 
-## Evidence and adoption
+## Verification and operational scope
 
-Historical controlled Arbitrum pilots support the narrow behavior recorded at
-their commits. They do not establish independent adoption, general wallet
-usability or production readiness for a later revision.
+Mainnet verification reports document the exact behavior tested on Arbitrum One.
+Deployments should validate environmental prerequisites and RPC quorum health
+before processing live payments.
 
 Use [Merchant integration](MERCHANT-INTEGRATION.md) for application code,
 [Payment states](PAYMENT-STATES.md) for exact semantics, and
