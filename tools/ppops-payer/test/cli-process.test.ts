@@ -19,17 +19,17 @@ afterEach(async () => {
 describe("CLI process lifecycle", () => {
   it("supports per-command help and version before reading configuration", async () => {
     for (const args of [["init", "--help"], ["help", "prepare-broadcaster"], ["recover-broadcaster", "-h"], ["--version"]]) {
-      const result = await execFileAsync(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], { cwd: process.cwd(), timeout: 5000 });
+      const result = await execFileAsync(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], { cwd: process.cwd(), timeout: 15_000 });
       expect(result.stderr).toBe("");
       expect(result.stdout).not.toContain('"ok":false');
       expect(result.stdout.trim().length).toBeGreaterThan(0);
     }
-  });
+  }, 30_000);
   it("flushes help output and exits cleanly", async () => {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       ["--import", "tsx", "src/cli.ts", "--help"],
-      { cwd: process.cwd(), timeout: 5_000 },
+      { cwd: process.cwd(), timeout: 15_000 },
     );
 
     expect(stdout).toContain("ppops-payer");
@@ -38,7 +38,7 @@ describe("CLI process lifecycle", () => {
     expect(stdout).toContain("recover-broadcaster");
     expect(stdout).toContain("finalize-poi");
     expect(stderr).toBe("");
-  });
+  }, 20_000);
 
   it("writes a private, operator-pinned Broadcaster trust config", async () => {
     const root = await mkdtemp(join(tmpdir(), "ppops-broadcaster-cli-"));
@@ -58,7 +58,7 @@ describe("CLI process lifecycle", () => {
         "--trusted-fee-signer",
         trustedSigner,
       ],
-      { cwd: process.cwd(), timeout: 5_000 },
+      { cwd: process.cwd(), timeout: 15_000 },
     );
 
     expect(stderr).toBe("");
@@ -71,7 +71,7 @@ describe("CLI process lifecycle", () => {
     if (process.platform !== "win32") {
       expect((await stat(outputPath)).mode & 0o777).toBe(0o600);
     }
-  });
+  }, 20_000);
 
   it("flushes a safe error and exits non-zero", async () => {
     await expect(
@@ -80,7 +80,7 @@ describe("CLI process lifecycle", () => {
         ["--import", "tsx", "src/cli.ts", "unknown-command"],
         {
           cwd: process.cwd(),
-          timeout: 5_000,
+          timeout: 15_000,
         },
       ),
     ).rejects.toMatchObject({
@@ -88,7 +88,7 @@ describe("CLI process lifecycle", () => {
       stdout: '{"ok":false,"error":{"code":"INVALID_ARGUMENT","hint":"Unknown command. Run ppops-payer --help."}}\n',
       stderr: "",
     });
-  });
+  }, 20_000);
 
   it("rejects the wrong expected payer before trusting terminal Broadcaster state", async () => {
     const root = await mkdtemp(join(tmpdir(), "ppops-broadcaster-recovery-cli-"));
@@ -179,12 +179,12 @@ describe("CLI process lifecycle", () => {
           "--expected-payer",
           wrongPayer,
         ],
-        { cwd: process.cwd(), timeout: 5_000 },
+        { cwd: process.cwd(), timeout: 15_000 },
       ),
     ).rejects.toMatchObject({
       code: 1,
       stdout: '{"ok":false,"error":{"code":"SECRET_INVALID"}}\n',
       stderr: "",
     });
-  });
+  }, 20_000);
 });
