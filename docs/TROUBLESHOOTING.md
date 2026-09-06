@@ -14,7 +14,7 @@ provider quorum and secret-file checks intact while resolving the cause.
 
 ## I checked out beta.1 and demo/doctor is missing
 
-These commands are new in the unreleased beta.2 source. Use the complete source
+These commands are new in beta.2. Use the complete source
 checkout that contains these guides. Do not combine documentation from one
 revision with a different release.
 

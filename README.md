@@ -71,11 +71,9 @@ are exported at ppops/client from the built source package.
 
 ## Release status
 
-The latest recorded published release is **v0.1.0-beta.1**. The onboarding
-improvements in this working tree are **unreleased**: demo, doctor, status,
-per-command help, the client helpers and these guides are not in that tag.
-Use the complete supplied source checkout to try them. Do not switch to beta.1
-and expect these commands to exist.
+The latest release is **v0.1.0-beta.2**. It introduces the isolated demo,
+doctor/status, per-command help, TypeScript client helpers, OpenAPI specification
+and refreshed guides.
 
 Controlled Gate A/B pilots are recorded in [the evidence index](docs/README.md).
 They do not establish external adoption, broad wallet compatibility or production

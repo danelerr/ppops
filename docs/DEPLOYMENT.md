@@ -3,7 +3,7 @@
 Run one daemon per receiver, network and token. Preserve its SQLite, encrypted
 RAILGUN database, wallet state and secrets across restarts.
 
-This guide describes the unreleased beta.2 source. Published beta.1 images do
+This guide describes beta.2. Published beta.1 images do
 not include the new --profile/--container onboarding flow.
 
 ## Build this source checkout

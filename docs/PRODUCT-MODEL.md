@@ -36,7 +36,7 @@ merchant responsible for backups and dependency availability.
 - Separate reference payer with controlled historical Gate A/B evidence.
 
 The demo, diagnostics, HTTP helpers and refreshed checkout are additions in
-unreleased beta.2. The published beta.1 tag has the earlier product surface.
+beta.2. The published beta.1 tag has the earlier product surface.
 
 ## Not included
 

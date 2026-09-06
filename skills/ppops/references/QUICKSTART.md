@@ -1,7 +1,7 @@
 # Merchant setup
 
 Read docs/QUICKSTART.md from the selected source checkout. New beta.2 onboarding
-is unreleased and is not included in the published beta.1 tag.
+is introduced in beta.2 and is not included in the earlier beta.1 tag.
 
 For evaluation use npm run demo. For a real instance, use the canonical guide's
 viewing-key setup, explicit profile/providers, doctor --offline, preflight,

@@ -1,7 +1,7 @@
 # Documentation
 
-Start with the task you want to complete. These guides describe the current,
-unreleased source checkout. Published beta.1 has an older onboarding surface.
+Start with the task you want to complete. These guides describe the v0.1.0-beta.2
+release. Published beta.1 has an older onboarding surface.
 
 ## Try, integrate and operate
 

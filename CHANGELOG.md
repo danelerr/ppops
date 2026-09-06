@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-beta.2 — unreleased
+## 0.1.0-beta.2 — 2026-09-06
 
 - Add an isolated local demo, runnable merchant example and TypeScript HTTP helpers.
 - Add doctor/status, per-command help, standard version output and actionable errors.
@@ -17,9 +17,8 @@ responses can include hints/field details; init now defaults to Arbitrum instead
 of Sepolia, and its next field is a list of steps. Clients should tolerate
 additive response fields. Back up and review config before upgrading.
 
-The new version has not been published. Historical Gate A/B reports apply to
-their recorded code and remain unchanged; no new mainnet or external pilot is
-claimed for this release candidate.
+Historical Gate A/B reports apply to their recorded code and remain unchanged;
+no new mainnet or external pilot is claimed for this release.
 
 ## 0.1.0-beta.1
 

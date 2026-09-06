@@ -2,7 +2,7 @@
 
 Status: **OPEN — no independent operator has completed this gate yet.**
 
-The new beta.2 onboarding is unreleased; use a matching source revision for any new pilot. Historical release status on 2026-08-30: public `main` and its verify/Docker CI
+The new beta.2 onboarding is available in v0.1.0-beta.2. Historical release status on 2026-08-30: public `main` and its verify/Docker CI
 pass. [`v0.1.0-beta.1`](https://github.com/danelerr/ppops/releases/tag/v0.1.0-beta.1)
 is published with an immutable GHCR digest, merchant/payer SBOMs and all three
 public gate reports.
