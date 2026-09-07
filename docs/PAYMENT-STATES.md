@@ -29,6 +29,12 @@ All are integer strings in token atomic units.
 The checkout presents partial-and-expired explicitly even though the API keeps
 the backwards-compatible PARTIAL state.
 
+The beta.3 PayIn checkout adds a paymentStage presentation
+projection to the public request. It separates detection from finalized value
+awaiting privacy validation, without creating a second acceptance engine. See
+[PayIn](PAYIN.md) for the exact display mapping. Finality, spendability and matching
+remain independent conditions; they are not new sequential intent statuses.
+
 ## Events
 
 | Type | Trigger |

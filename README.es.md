@@ -8,6 +8,11 @@ cuando el importe puede considerarse confirmado.
 El servicio del comercio utiliza una clave de visualización; las claves para
 gastar permanecen fuera de él.
 
+Este flujo se llama **PPOps PayIn**: solicitud firmada, pago desde una wallet
+separada, detección view-only, validación y notificación al comercio.
+**Payout** (salidas y posibles reembolsos) queda únicamente en el
+[roadmap](docs/ROADMAP.md), sin API ni claves de gasto en el servicio.
+
 ## Pruébalo sin fondos
 
 Desde este repositorio, con Node.js 24:
@@ -35,5 +40,10 @@ Todo este recorrido es una simulación local. No necesitas wallet, RPC ni dinero
 La wallet del pagador debe tener USDC privado disponible para gastar, además
 de la comisión. Una transferencia pública normal no completa el cobro.
 
-La versión actual es **v0.1.0-beta.2**, que incluye la demo local, el cliente TypeScript y las utilidades de diagnóstico.
+La versión actual es **v0.1.0-beta.3**. Conserva la demo local, el cliente TypeScript y las utilidades de diagnóstico de beta.2.
+Esta release añade mejoras de PayIn: checkout
+con verificación local, estados claros, QR de la solicitud y diagnóstico de saldo
+en el payer de referencia. El botón **Pay privately** abre el intercambio de la
+solicitud; todavía no conecta automáticamente con una wallet. La firma no prueba
+por sí sola la identidad del comercio. Consulta [PayIn](docs/PAYIN.md).
 La documentación técnica completa está en inglés en el [README principal](README.md).

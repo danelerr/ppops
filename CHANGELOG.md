@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.0-beta.3 — 2026-09-07
+
+- Name the incoming-payment product PayIn; keep Payout/refunds in a conditional roadmap.
+- Add browser-side signed-request verification and optional independent public-signer comparison.
+- Introduce a white/purple checkout with payment-language progress, advanced details,
+  local request-link QR and copy/download handoff. No wallet connector is implied.
+- Expose additive paymentStage and overpaymentAmountAtomic public presentation fields.
+- Preserve FINALIZED + SPENDABLE + MATCHED acceptance, existing intent statuses and payment.confirmed.
+- Add reference-payer readiness with exact balance/fee-budget arithmetic; no submission or estimated wait.
+- Accept additive public request fields in the payer while retaining signed-field verification.
+- Document Payment Request v1, privacy boundaries and separate payer usability targets.
+
+These changes follow published beta.2. No new real-money pilot, wallet compatibility
+or independent usability result is claimed.
+
+The reference payer is version 0.1.0-alpha.1. Existing beta.0–beta.2 backup manifests
+remain restorable. Build/install the merchant and payer from this same source tag.
+
 ## 0.1.0-beta.2 — 2026-09-06
 
 - Add an isolated local demo, runnable merchant example and TypeScript HTTP helpers.

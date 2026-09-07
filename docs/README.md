@@ -1,13 +1,16 @@
 # Documentation
 
-Start with the task you want to complete. These guides describe the v0.1.0-beta.2
-release. Published beta.1 has an older onboarding surface.
+Start with the task you want to complete. These guides describe **v0.1.0-beta.3**,
+including the PayIn checkout and reference-payer readiness. Use the documentation
+at the beta.2 tag when operating that older release.
 
 ## Try, integrate and operate
 
 | Task | Guide |
 | --- | --- |
 | Evaluate without funds | [Local demo](DEMO.md) |
+| Understand incoming payments | [PayIn](PAYIN.md) |
+| Implement a compatible payer | [Payment Request v1](PAYMENT-REQUEST.md) |
 | Start a real receiver | [Merchant quickstart](QUICKSTART.md) |
 | Integrate an application | [Merchant integration](MERCHANT-INTEGRATION.md), [runnable example](../examples/README.md) |
 | Pay from a separate host | [Payer integration](PAYER-INTEGRATION.md) |
@@ -40,3 +43,4 @@ prerequisites. Their dates and tested versions matter.
 - [Public evidence](../artifacts/)
 
 Planning and grant material is kept under [archive](archive/README.md).
+Future product scope is in the [roadmap](ROADMAP.md).

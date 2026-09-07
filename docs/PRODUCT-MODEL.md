@@ -4,6 +4,11 @@ PPOps is a self-hosted merchant service for private native USDC on Arbitrum.
 It creates signed payment requests, observes a receiver through view-only
 access and emits payment events after reconciling private settlements.
 
+The current primitive is **PPOps PayIn**: a signed payment request, payer execution,
+view-only settlement detection, privacy/finality validation, matching and
+deterministic merchant notification. An operations layer for private money movement
+is the product direction; incoming payments are the implemented scope.
+
 ## Responsibilities
 
 | Component | Owns |
@@ -34,6 +39,8 @@ merchant responsible for backups and dependency availability.
 - Optional TypeScript HTTP and webhook helpers.
 - Configuration diagnostics, runtime status and offline backup/restore.
 - Separate reference payer with controlled historical Gate A/B evidence.
+- Beta.3 PayIn UX: local browser signature verification, request-link QR,
+  payment-language progress and a non-submitting payer readiness command.
 
 The demo, diagnostics, HTTP helpers and refreshed checkout are additions in
 beta.2. The published beta.1 tag has the earlier product surface.
@@ -41,8 +48,14 @@ beta.2. The published beta.1 tag has the earlier product surface.
 ## Not included
 
 PPOps does not provide spending custody, wallet funding, refunds, swaps, fiat
-conversion, commerce plugins or additional rails. General consumer-wallet
-descriptor support and QR/deep-link integrations remain unvalidated.
+conversion, commerce plugins or additional rails. QR encoding of the signed-request
+URL is implemented in the working tree; interoperability with consumer-wallet QR
+scanners and deep links remains unvalidated. The checkout is a request/status
+surface, not a wallet or signer.
+
+Payout, starting potentially with refunds, remains [roadmap only](ROADMAP.md).
+There is no payout API. Future signing and approval must remain external to the
+merchant's view-only daemon.
 
 The reference payer shares the repository for reproducibility, but has its own
 dependencies, database, process and secrets. Merchant code must never import

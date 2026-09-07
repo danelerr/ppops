@@ -36,7 +36,10 @@ const signedRequest = async () => {
     PAYMENT_DESCRIPTOR_TYPES,
     descriptorPayload,
   );
-  const descriptor: SignedPaymentDescriptor = { ...descriptorPayload, signature };
+  const descriptor: SignedPaymentDescriptor = {
+    ...descriptorPayload,
+    signature,
+  };
   return {
     signer,
     request: {
@@ -63,37 +66,96 @@ const signedRequest = async () => {
 describe("PPOps payment request verification", () => {
   it("accepts an exact, unspent request signed by the independently pinned signer", async () => {
     const { request, signer } = await signedRequest();
-    expect(verifyPaymentRequest(request, signer.address, 1_900_000_000)).toEqual(request);
+    expect(
+      verifyPaymentRequest(request, signer.address, 1_900_000_000),
+    ).toEqual(request);
   });
 
   it("rejects a substituted signer", async () => {
     const { request } = await signedRequest();
     expect(() =>
-      verifyPaymentRequest(request, Wallet.createRandom().address, 1_900_000_000),
+      verifyPaymentRequest(
+        request,
+        Wallet.createRandom().address,
+        1_900_000_000,
+      ),
     ).toThrow(/trusted signer/);
+  });
+
+  it("accepts additive beta.2 presentation fields while enforcing merchant readiness", async () => {
+    const { request, signer } = await signedRequest();
+    expect(
+      verifyPaymentRequest(
+        {
+          ...request,
+          reconciliationReady: true,
+          paymentStage: "AWAITING_PAYMENT",
+          overpaymentAmountAtomic: "0",
+        },
+        signer.address,
+        1_900_000_000,
+      ),
+    ).toMatchObject({ id: request.id });
+    expect(() =>
+      verifyPaymentRequest(
+        { ...request, reconciliationReady: false },
+        signer.address,
+        1_900_000_000,
+      ),
+    ).toThrow(/reconciliation/);
+    expect(() =>
+      verifyPaymentRequest(
+        { ...request, paymentStage: "PAYMENT_REVERTED" },
+        signer.address,
+        1_900_000_000,
+      ),
+    ).toThrow(/review/);
+    expect(() =>
+      verifyPaymentRequest(
+        { ...request, simulated: true },
+        signer.address,
+        1_900_000_000,
+      ),
+    ).toThrow(/Simulations/);
   });
 
   it("rejects unsigned request-field tampering even when the descriptor is intact", async () => {
     const { request, signer } = await signedRequest();
     expect(() =>
-      verifyPaymentRequest({ ...request, amountAtomic: "100001" }, signer.address, 1_900_000_000),
+      verifyPaymentRequest(
+        { ...request, amountAtomic: "100001" },
+        signer.address,
+        1_900_000_000,
+      ),
     ).toThrow(/amount mismatch/);
     expect(() =>
-      verifyPaymentRequest({ ...request, memo: `ppops:v1:0x${"ef".repeat(32)}` }, signer.address, 1_900_000_000),
+      verifyPaymentRequest(
+        { ...request, memo: `ppops:v1:0x${"ef".repeat(32)}` },
+        signer.address,
+        1_900_000_000,
+      ),
     ).toThrow(/Memo\/reference mismatch/);
   });
 
   it("refuses paid, pending and expired requests", async () => {
     const { request, signer } = await signedRequest();
     expect(() =>
-      verifyPaymentRequest({ ...request, status: "PAID" }, signer.address, 1_900_000_000),
+      verifyPaymentRequest(
+        { ...request, status: "PAID" },
+        signer.address,
+        1_900_000_000,
+      ),
     ).toThrow(/not OPEN/);
     expect(() =>
-      verifyPaymentRequest({ ...request, pendingAmountAtomic: "1" }, signer.address, 1_900_000_000),
+      verifyPaymentRequest(
+        { ...request, pendingAmountAtomic: "1" },
+        signer.address,
+        1_900_000_000,
+      ),
     ).toThrow(/pending settlement/);
-    expect(() => verifyPaymentRequest(request, signer.address, 2_000_000_001)).toThrow(
-      /expired/,
-    );
+    expect(() =>
+      verifyPaymentRequest(request, signer.address, 2_000_000_001),
+    ).toThrow(/expired/);
   });
 
   it("requires a live request source for value-bearing submission", () => {
@@ -102,12 +164,18 @@ describe("PPOps payment request verification", () => {
         "http://127.0.0.1:8787/pay/pi_example/request.json",
       ),
     ).not.toThrow();
-    expect(() => assertLivePaymentRequestSource("./request.json")).toThrow(/live HTTP/);
+    expect(() => assertLivePaymentRequestSource("./request.json")).toThrow(
+      /live HTTP/,
+    );
   });
 
   it("detects request replacement during proof generation", async () => {
     const { request, signer } = await signedRequest();
-    const original = verifyPaymentRequest(request, signer.address, 1_900_000_000);
+    const original = verifyPaymentRequest(
+      request,
+      signer.address,
+      1_900_000_000,
+    );
     const same = verifyPaymentRequest(
       structuredClone(request),
       signer.address,
@@ -120,6 +188,8 @@ describe("PPOps payment request verification", () => {
       signer.address,
       1_900_000_000,
     );
-    expect(() => assertSamePaymentRequest(original, replaced)).toThrow(/changed/);
+    expect(() => assertSamePaymentRequest(original, replaced)).toThrow(
+      /changed/,
+    );
   });
 });

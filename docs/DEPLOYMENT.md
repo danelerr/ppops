@@ -3,7 +3,7 @@
 Run one daemon per receiver, network and token. Preserve its SQLite, encrypted
 RAILGUN database, wallet state and secrets across restarts.
 
-This guide describes beta.2. Published beta.1 images do
+This guide describes beta.3. Published beta.1 images do
 not include the new --profile/--container onboarding flow.
 
 ## Build this source checkout
@@ -66,8 +66,9 @@ from the matching release. Set PPOPS_IMAGE to that full image@sha256:digest,
 then pull and run the same Compose profile with --no-build. Keep the source
 Compose file and image version aligned.
 
-beta.2 has not been published yet. To test this working tree, build it locally.
-Do not replace a digest with a guessed tag or assume beta.1 contains new commands.
+Use the digest attached to the v0.1.0-beta.3 release. Do not replace it with a
+guessed digest or assume an older image contains the PayIn UX and onboarding
+documented here. To test a different working tree, build it locally.
 
 ## Public checkout and private API
 

@@ -61,6 +61,15 @@ the signed descriptor. See OpenAPI's Intent schema for exact types.
 
 Demo and example-shop routes do not exist on the real daemon.
 
+## Public PayIn request (beta.3)
+
+The request endpoint includes paymentStage and overpaymentAmountAtomic as additive
+presentation fields. paymentStage is AWAITING_PAYMENT, PAYMENT_DETECTED,
+PRIVACY_CHECKS_PENDING, PAYMENT_COMPLETE or PAYMENT_REVERTED. Intent statuses and
+merchant event names are unchanged. These mutable fields are not signed settlement
+proofs; the descriptor signs payment terms. See [Payment Request v1](PAYMENT-REQUEST.md)
+for signature/transport rules and [PayIn](PAYIN.md) for the checkout presentation.
+
 ## Pagination
 
 List routes return { items, limit, offset }. Default limit is 100, maximum 250;

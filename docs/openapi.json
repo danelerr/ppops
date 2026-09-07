@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "PPOps merchant API",
-    "version": "0.1.0-beta.2",
+    "version": "0.1.0-beta.3",
     "description": "One merchant receiver, network and token per instance. Amounts are integer atomic-unit strings; timestamps are Unix seconds. Webhooks are at-least-once. See docs/PAYMENT-STATES.md for expiry and settlement semantics."
   },
   "servers": [
@@ -1645,6 +1645,20 @@
           "reconciliationReady": {
             "type": "boolean"
           },
+          "paymentStage": {
+            "type": "string",
+            "enum": [
+              "AWAITING_PAYMENT",
+              "PAYMENT_DETECTED",
+              "PRIVACY_CHECKS_PENDING",
+              "PAYMENT_COMPLETE",
+              "PAYMENT_REVERTED"
+            ]
+          },
+          "overpaymentAmountAtomic": {
+            "type": "string",
+            "pattern": "^(?:0|[1-9][0-9]*)$"
+          },
           "simulated": {
             "type": "boolean",
             "const": true
@@ -1667,7 +1681,9 @@
           "memo",
           "descriptor",
           "expectedMerchantSigner",
-          "reconciliationReady"
+          "reconciliationReady",
+          "paymentStage",
+          "overpaymentAmountAtomic"
         ],
         "additionalProperties": false
       },

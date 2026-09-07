@@ -27,3 +27,4 @@ ppops.config.json
 *.p12
 *.pfx
 *.tgz
+/src/api/checkout.generated.ts

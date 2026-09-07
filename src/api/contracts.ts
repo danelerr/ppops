@@ -74,6 +74,8 @@ export const CheckoutHttpSchema = z.object({
   descriptor: DescriptorHttpSchema,
   expectedMerchantSigner: z.string(),
   reconciliationReady: z.boolean(),
+  paymentStage: z.enum(["AWAITING_PAYMENT", "PAYMENT_DETECTED", "PRIVACY_CHECKS_PENDING", "PAYMENT_COMPLETE", "PAYMENT_REVERTED"]),
+  overpaymentAmountAtomic: AtomicAmountSchema,
   simulated: z.literal(true).optional(),
 });
 export const SettlementHttpSchema = z.object({

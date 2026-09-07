@@ -1,8 +1,17 @@
 # PPOps Payer
 
-`ppops-payer` is a minimal, reproducible RAILGUN Wallet SDK harness for the
-PPOps mainnet gate. It replaces Railway Wallet in the critical test path; it
-does not replace PPOps and it is not a general-purpose wallet.
+`ppops-payer` is the reference implementation of the PPOps PayIn payer experience
+and a reproducible RAILGUN Wallet SDK harness. It verifies requests, checks local
+readiness and demonstrates explicit preparation, authorization and recovery.
+It replaces Railway Wallet in the critical test path; it does not replace PPOps
+and it is not a general-purpose wallet.
+
+Core **beta.3 / payer alpha.1** adds the readiness command. Start
+with [payer integration](../../docs/PAYER-INTEGRATION.md) and
+[Payment Request v1](../../docs/PAYMENT-REQUEST.md) for the request/QR contract.
+Readiness reports a balance snapshot against your fee budget, never a fee quote,
+spending approval or guaranteed preparation time. The technical execution
+commands below remain separate; the checkout does not connect a wallet.
 
 It shares the PPOps Git repository for reproducibility but remains an
 independent package and runtime. Run every command in this README from

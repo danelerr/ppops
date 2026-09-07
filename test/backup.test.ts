@@ -85,7 +85,7 @@ const configAt = (root: string, sourceSecrets?: string): { config: PPOpsConfig; 
 };
 
 describe("backup and restore", () => {
-  it("restores SQLite, encrypted RAILGUN state and recovery secrets", async () => {
+  it.each(["0.1.0-beta.0", "0.1.0-beta.1", "0.1.0-beta.2"])("restores SQLite, encrypted RAILGUN state and recovery secrets from %s", async (legacyVersion) => {
     const sourceRoot = rootForTest();
     const source = configAt(sourceRoot);
     const merchant = Wallet.createRandom();
@@ -126,14 +126,14 @@ describe("backup and restore", () => {
     expect(backup.manifest.containsSecrets).toBe(true);
     expect(backup.manifest.ppopsVersion).toBe(PPOPS_VERSION);
 
-    // A beta.1 operator must still be able to recover a beta.0 schema-v1
+    // The current release must still recover an older schema-v1
     // backup. The manifest itself is deliberately outside its file inventory.
     const manifestPath = join(backupPath, "manifest.json");
     const legacyManifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
       string,
       unknown
     >;
-    legacyManifest.ppopsVersion = "0.1.0-beta.0";
+    legacyManifest.ppopsVersion = legacyVersion;
     writeFileSync(manifestPath, `${JSON.stringify(legacyManifest, null, 2)}\n`, {
       mode: 0o600,
     });

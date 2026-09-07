@@ -20,6 +20,7 @@ import { FixedWindowRateLimiter } from "../security/rate-limit.js";
 import { PPOPS_VERSION } from "../version.js";
 import { CreateIntentSchema, requestIssues } from "./contracts.js";
 import { openApiDocument } from "./openapi.js";
+import { paymentStage } from "./payin.js";
 
 const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(250).default(100),
@@ -133,6 +134,8 @@ export const createApiApp = (dependencies: {
   });
 
   app.use("/pay/*", async (context, next) => {
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
     const rate = checkoutLimiter.consume(requestSource(context));
     if (!rate.allowed) {
       context.header("retry-after", rate.retryAfterSeconds.toString());
@@ -142,8 +145,6 @@ export const createApiApp = (dependencies: {
       "content-security-policy",
       "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
-    context.header("cache-control", "no-store");
-    context.header("referrer-policy", "no-referrer");
     await next();
   });
 
@@ -168,10 +169,19 @@ export const createApiApp = (dependencies: {
   app.get("/pay/:id/request.json", (context) => {
     const intent = dependencies.intents.get(context.req.param("id"));
     if (!intent) return context.json({ error: { code: "NOT_FOUND" } }, 404);
-    return context.json({ ...checkoutIntent(intent), reconciliationReady: dependencies.health().railgunReady, ...(dependencies.demo ? { simulated: true } : {}) });
+    return context.json({ ...checkoutIntent(intent),
+      overpaymentAmountAtomic: intent.overpaymentAmountAtomic,
+      paymentStage: paymentStage(intent, dependencies.database.listSettlementsForIntent(intent.id)),
+      reconciliationReady: dependencies.health().railgunReady,
+      ...(dependencies.demo ? { simulated: true } : {}) });
   });
 
-  app.get("/payer-guide", (context) => context.html(PAYER_GUIDE_HTML));
+  app.get("/payer-guide", (context) => {
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    context.header("content-security-policy", "default-src 'none'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'");
+    return context.html(PAYER_GUIDE_HTML);
+  });
 
   app.onError((error, context) => {
     const status = error.message.includes("not found") ? 404 : 500;

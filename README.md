@@ -1,6 +1,6 @@
 # PPOps
 
-Self-hosted payment reconciliation for private USDC on Arbitrum.
+Self-hosted PayIn operations for private USDC on Arbitrum.
 
 Your backend creates a payment request. A separate RAILGUN wallet pays it.
 PPOps observes the merchant wallet through a viewing key and sends your backend
@@ -8,6 +8,10 @@ a signed webhook when the payment is finalized, spendable and matched.
 
 PPOps never holds the merchant's spending keys. Run one instance per receiver,
 network and token.
+
+**PayIn** means one incoming payment: a signed request, execution in a separate
+payer wallet, view-only detection, validation, matching and merchant notification.
+See [the PayIn model and checkout](docs/PAYIN.md). Payout is [roadmap only](docs/ROADMAP.md).
 
 ## Try it locally
 
@@ -69,9 +73,10 @@ are exported at ppops/client from the built source package.
 
 ## Release status
 
-The latest release is **v0.1.0-beta.2**. It introduces the isolated demo,
-doctor/status, per-command help, TypeScript client helpers, OpenAPI specification
-and refreshed guides.
+The current release is **v0.1.0-beta.3**: browser-side request verification, a
+local request QR, clearer payment progress and reference-payer readiness.
+It retains the beta.2 demo, doctor/status, TypeScript helpers and OpenAPI.
+Wallet-native handoff remains unvalidated; the checkout does not connect a wallet.
 
 Verification reports and benchmarks are documented in [the evidence index](docs/README.md).
 

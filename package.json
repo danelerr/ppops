@@ -1,6 +1,6 @@
 {
   "name": "ppops",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Self-hosted, view-only RAILGUN payment reconciler",
   "private": true,
   "repository": {
@@ -47,7 +47,15 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build:checkout": "tsx scripts/build-checkout.ts",
+    "build": "npm run build:checkout && tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build:checkout",
+    "pretest": "npm run build:checkout",
+    "pretest:coverage": "npm run build:checkout",
+    "pretest:watch": "npm run build:checkout",
+    "predev": "npm run build:checkout",
+    "predemo": "npm run build:checkout",
+    "predoctor": "npm run build:checkout",
     "prepack": "npm run build && npm run docs:check",
     "dev": "tsx src/cli.ts serve",
     "start": "node dist/cli.js serve",
@@ -94,8 +102,11 @@
     "@types/better-sqlite3": "9.6.0",
     "@types/leveldown": "4.0.6",
     "@types/node": "24.10.1",
+    "@types/qrcode": "1.5.6",
     "@vitest/coverage-v8": "4.1.11",
+    "esbuild": "0.25.12",
     "fast-check": "4.9.0",
+    "qrcode": "1.5.4",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
     "vite": "7.3.6",

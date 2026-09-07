@@ -10,6 +10,8 @@ import {
 import { dirname, resolve } from "node:path";
 
 import { z } from "zod";
+import { formatUnits } from "ethers";
+import { payerReadiness } from "./readiness.js";
 
 import {
   BroadcasterTrustConfigSchema,
@@ -41,6 +43,7 @@ import {
   assertLivePaymentRequestSource,
   loadPaymentRequest,
   verifyPaymentRequest,
+  verifyPaymentRequestDescriptor,
   type PaymentRequest,
 } from "./request.js";
 import {
@@ -76,6 +79,8 @@ Commands:
   ppops-payer secrets-check --config PATH
   ppops-payer request-verify --request URL_OR_PATH --expected-signer ADDRESS
   ppops-payer sync --config PATH
+  ppops-payer readiness --config PATH --request URL_OR_FILE --expected-signer ADDRESS \\
+    --expected-payer 0zk_ADDRESS --max-network-fee-atomic AMOUNT [--format text|json]
   ppops-payer submission-status --config PATH --intent-id pi_ID
   ppops-payer finalize-poi --config PATH --intent-id pi_ID \\
     --expected-payer 0zk_ADDRESS [--expected-railgun-txid TXID]
@@ -710,6 +715,99 @@ const sync = async (options: ParsedOptions): Promise<void> => {
   output({ ok: true, ...result });
 };
 
+const readiness = async (options: ParsedOptions): Promise<void> => {
+  assertAllowed(options, [
+    "config",
+    "request",
+    "expected-signer",
+    "expected-payer",
+    "max-network-fee-atomic",
+    "format",
+  ]);
+  const configPath = one(options, "config", { required: true });
+  const source = one(options, "request", { required: true });
+  const signer = one(options, "expected-signer", { required: true });
+  const expectedPayer = one(options, "expected-payer", { required: true });
+  const feeBudgetAtomic = one(options, "max-network-fee-atomic", {
+    required: true,
+  });
+  if (!/^(0|[1-9][0-9]*)$/.test(feeBudgetAtomic) || feeBudgetAtomic.length > 78)
+    throw new PayerUsageError(
+      "Use a non-negative atomic fee budget.",
+      "max-network-fee-atomic",
+    );
+  const format = one(options, "format", { defaultValue: "text" });
+  if (format !== "text" && format !== "json")
+    throw new PayerUsageError("Use --format text or --format json.", "format");
+  const readVerified = async () => {
+    try {
+      return verifyPaymentRequestDescriptor(
+        await loadPaymentRequest(source),
+        signer,
+      );
+    } catch (error) {
+      throw new SafeFailure(
+        "REQUEST_INVALID",
+        "Payment request could not be verified",
+        { cause: error },
+      );
+    }
+  };
+  const request = await readVerified();
+  let result = payerReadiness({ request, feeBudgetAtomic });
+  // Expired/funded requests are diagnosed without opening a wallet or reading secrets.
+  if (
+    result.state === "RAIL_UNAVAILABLE" &&
+    request.reconciliationReady !== false
+  ) {
+    const config = await loadConfig(configPath);
+    const secrets = await loadRuntimeSecrets(config, false);
+    try {
+      result = await withEngine(config, secrets, async (engine) => {
+        assertExpectedPayerAddress(engine.railgunAddress, expectedPayer);
+        const balances = await engine.syncBalances();
+        const refreshed = await readVerified();
+        if (
+          refreshed.id !== request.id ||
+          JSON.stringify(refreshed.descriptor) !==
+            JSON.stringify(request.descriptor)
+        )
+          throw new SafeFailure(
+            "REQUEST_INVALID",
+            "Payment request changed during readiness check",
+          );
+        return payerReadiness({
+          request: refreshed,
+          feeBudgetAtomic,
+          balances,
+        });
+      });
+    } catch (error) {
+      if (
+        !(error instanceof SafeFailure) ||
+        !["ENGINE_START_FAILED", "SYNC_FAILED", "RPC_UNAVAILABLE"].includes(
+          error.code,
+        )
+      )
+        throw error;
+      result = payerReadiness({
+        request,
+        feeBudgetAtomic,
+        railAvailable: false,
+      });
+    }
+  }
+  if (format === "json") output({ ok: true, readiness: result });
+  else {
+    const money = (value: string | null) =>
+      value === null ? "unavailable" : formatUnits(value, 6) + " USDC";
+    writeSync(
+      process.stdout.fd,
+      `PPOps PayIn · payer readiness\n\nPrivate balance  ${result.state}\nAmount           ${money(result.amountAtomic)}\nFee budget       ${money(result.feeBudgetAtomic)} (not a quote)\nRequired         ${money(result.requiredAmountAtomic)}\nAvailable        ${money(result.availableAmountAtomic)}\nPreparing        ${money(result.preparingAmountAtomic)}\n\n${result.message}\nNo payment was submitted. Readiness is a snapshot, not spending authorization.\n`,
+    );
+  }
+};
+
 const runSelfSigned = async (
   options: ParsedOptions,
   submit: boolean,
@@ -1102,6 +1200,9 @@ const main = async (): Promise<void> => {
       return;
     case "sync":
       await sync(options);
+      return;
+    case "readiness":
+      await readiness(options);
       return;
     case "submission-status":
       await submissionStatus(options);

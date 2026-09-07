@@ -40,8 +40,11 @@ const PaymentRequestSchema = z
     memo: z.string().regex(/^ppops:v1:0x[0-9a-f]{64}$/i),
     descriptor: SignedPaymentDescriptorSchema,
     expectedMerchantSigner: z.string(),
+    reconciliationReady: z.boolean().optional(),
+    paymentStage: z.string().optional(),
+    simulated: z.boolean().optional(),
   })
-  .strict();
+  .strip(); // v1 may add presentation fields; signed fields remain strictly verified.
 
 export type PaymentRequest = z.infer<typeof PaymentRequestSchema>;
 
@@ -49,47 +52,90 @@ const assertSame = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
 };
 
-export const verifyPaymentRequest = (
+export const verifyPaymentRequestDescriptor = (
   value: unknown,
   expectedSigner: string,
-  nowSeconds = Math.floor(Date.now() / 1_000),
 ): PaymentRequest => {
   const request = PaymentRequestSchema.parse(value);
   verifySignedDescriptor(request.descriptor, expectedSigner);
   const descriptor = request.descriptor;
-  assertSame(request.status === "OPEN", "Payment request is not OPEN");
-  assertSame(request.receivedAmountAtomic === "0", "Payment request already received funds");
-  assertSame(request.pendingAmountAtomic === "0", "Payment request has a pending settlement");
-  assertSame(request.expiresAt > nowSeconds, "Payment request is expired");
+  assertSame(
+    request.simulated !== true,
+    "Simulations are not payment requests",
+  );
   assertSame(descriptor.expiresAt === request.expiresAt, "Expiry mismatch");
   assertSame(request.chainId === PAYER_CHAIN_ID, "Unsupported chain ID");
-  assertSame(descriptor.chainId === request.chainId, "Descriptor chain mismatch");
+  assertSame(
+    descriptor.chainId === request.chainId,
+    "Descriptor chain mismatch",
+  );
   assertSame(
     request.tokenAddress.toLowerCase() === PAYER_TOKEN_ADDRESS,
     "Unsupported payment token",
   );
   assertSame(
-    descriptor.tokenAddress.toLowerCase() === request.tokenAddress.toLowerCase(),
+    descriptor.tokenAddress.toLowerCase() ===
+      request.tokenAddress.toLowerCase(),
     "Descriptor token mismatch",
   );
   assertSame(
-    request.tokenSymbol === PAYER_TOKEN_SYMBOL && request.decimals === PAYER_TOKEN_DECIMALS,
+    request.tokenSymbol === PAYER_TOKEN_SYMBOL &&
+      request.decimals === PAYER_TOKEN_DECIMALS,
     "Unsupported token metadata",
   );
-  assertSame(descriptor.decimals === request.decimals, "Descriptor decimals mismatch");
-  assertSame(descriptor.amountAtomic === request.amountAtomic, "Descriptor amount mismatch");
   assertSame(
-    request.amountFormatted === formatUnits(request.amountAtomic, request.decimals),
+    descriptor.decimals === request.decimals,
+    "Descriptor decimals mismatch",
+  );
+  assertSame(
+    descriptor.amountAtomic === request.amountAtomic,
+    "Descriptor amount mismatch",
+  );
+  assertSame(
+    request.amountFormatted ===
+      formatUnits(request.amountAtomic, request.decimals),
     "Formatted amount mismatch",
   );
-  assertSame(descriptor.recipient0zk === request.recipient, "Recipient mismatch");
   assertSame(
-    request.memo.toLowerCase() === `ppops:v1:${descriptor.reference.toLowerCase()}`,
+    descriptor.recipient0zk === request.recipient,
+    "Recipient mismatch",
+  );
+  assertSame(
+    request.memo.toLowerCase() ===
+      `ppops:v1:${descriptor.reference.toLowerCase()}`,
     "Memo/reference mismatch",
   );
   assertSame(
     getAddress(request.expectedMerchantSigner) === getAddress(expectedSigner),
     "Checkout signer field does not match the trusted signer",
+  );
+  return request;
+};
+
+export const verifyPaymentRequest = (
+  value: unknown,
+  expectedSigner: string,
+  nowSeconds = Math.floor(Date.now() / 1_000),
+): PaymentRequest => {
+  const request = verifyPaymentRequestDescriptor(value, expectedSigner);
+  assertSame(request.status === "OPEN", "Payment request is not OPEN");
+  assertSame(
+    request.receivedAmountAtomic === "0",
+    "Payment request already received funds",
+  );
+  assertSame(
+    request.pendingAmountAtomic === "0",
+    "Payment request has a pending settlement",
+  );
+  assertSame(request.expiresAt > nowSeconds, "Payment request is expired");
+  assertSame(
+    request.reconciliationReady !== false,
+    "Merchant reconciliation is not ready",
+  );
+  assertSame(
+    request.paymentStage === undefined ||
+      request.paymentStage === "AWAITING_PAYMENT",
+    "Payment request needs review before another payment",
   );
   return request;
 };
@@ -105,7 +151,9 @@ export const assertSamePaymentRequest = (
 
 export const assertLivePaymentRequestSource = (source: string): void => {
   if (!/^https?:\/\//i.test(source)) {
-    throw new Error("Payment submission requires a live HTTP(S) payment request");
+    throw new Error(
+      "Payment submission requires a live HTTP(S) payment request",
+    );
   }
 };
 
@@ -133,8 +181,12 @@ const readResponseBody = async (response: Response): Promise<string> => {
 
 const loadFromUrl = async (source: string): Promise<unknown> => {
   const url = new URL(source);
-  if (url.username || url.password) throw new Error("Request URL credentials are forbidden");
-  const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.username || url.password)
+    throw new Error("Request URL credentials are forbidden");
+  const loopback =
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "[::1]";
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error("Remote payment requests require HTTPS");
   }
@@ -145,9 +197,14 @@ const loadFromUrl = async (source: string): Promise<unknown> => {
     signal: AbortSignal.timeout(15_000),
     headers: { accept: "application/json" },
   });
-  if (!response.ok) throw new Error(`Payment request returned HTTP ${response.status}`);
-  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
-  if (contentType !== "application/json") throw new Error("Payment request is not JSON");
+  if (!response.ok)
+    throw new Error(`Payment request returned HTTP ${response.status}`);
+  const contentType = response.headers
+    .get("content-type")
+    ?.split(";", 1)[0]
+    ?.trim();
+  if (contentType !== "application/json")
+    throw new Error("Payment request is not JSON");
   return JSON.parse(await readResponseBody(response)) as unknown;
 };
 

@@ -70,6 +70,45 @@ node dist/cli.js request-verify \
 This command does not open a full wallet. Verification must cover signature,
 chain 42161, native-USDC token, amount, recipient, memo and expiry.
 
+## Check readiness (beta.3 / payer alpha.1)
+
+The current source includes a non-submitting readiness check. Use the payer
+configuration already created on your own host and an explicit fee budget:
+
+~~~bash
+node dist/cli.js readiness \
+  --config ./payer.config.json \
+  --request https://PAY_HOST/pay/INTENT_ID/request.json \
+  --expected-signer PINNED_MERCHANT_SIGNER \
+  --expected-payer YOUR_PRIVATE_PAYER_ADDRESS \
+  --max-network-fee-atomic 100000 \
+  --format text
+~~~
+
+100000 means an illustrative **0.10 USDC budget**, not a fee estimate. Choose your
+own limit. Output distinguishes available and preparing private balance and
+includes amount plus fee budget. Use --format json for integrations.
+
+| Result | Next step |
+| --- | --- |
+| READY | Prepare a real quote; review and authorize separately |
+| INSUFFICIENT_PRIVATE_BALANCE | Review the shortfall and pending funds in your own wallet |
+| PRIVATE_BALANCE_PENDING | Wait for private-balance preparation; check again, no reliable ETA |
+| SYNCING | Let wallet synchronization finish |
+| RAIL_UNAVAILABLE | Restore wallet/merchant connectivity before sending |
+| REQUEST_EXPIRED | Ask the merchant for a fresh request |
+| REQUEST_NOT_PAYABLE | Inspect the existing payment; do not send again |
+
+The command synchronizes locally before reporting; SYNCING is also available in
+the readiness model for client integrations. The merchant never receives the
+payer's balance or wallet secrets. This command uses the payer's existing local
+wallet runtime; it does not create proofs, obtain a quote or submit a transaction.
+Expired/funded requests can be diagnosed without opening that wallet.
+
+General QR wallet support remains unvalidated. The checkout's QR contains the
+HTTPS request URL defined in [Payment Request v1](PAYMENT-REQUEST.md), not a
+public transfer address. A file/QR alone must never bypass fresh request checks.
+
 ## Prepare, review, authorize
 
 Follow the [Broadcaster runbook](../tools/ppops-payer/docs/GATE-B.md) to pin trusted

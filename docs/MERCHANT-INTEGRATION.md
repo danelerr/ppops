@@ -18,11 +18,11 @@ npm pack
 ~~~
 
 The prepack check builds the code and verifies the documentation. This version
-produces `ppops-0.1.0-beta.2.tgz`. In your application's directory, install the
+produces `ppops-0.1.0-beta.3.tgz`. In your application's directory, install the
 actual archive path:
 
 ~~~bash
-npm install /absolute/path/to/ppops-0.1.0-beta.2.tgz
+npm install /absolute/path/to/ppops-0.1.0-beta.3.tgz
 ~~~
 
 The helper targets Node.js 22+ and ESM. This is the complete merchant package,

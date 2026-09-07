@@ -2,7 +2,7 @@ services:
   ppops:
     build:
       context: .
-    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.2}
+    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.3}
     init: true
     restart: unless-stopped
     user: "${PPOPS_UID:-1000}:${PPOPS_GID:-1000}"
@@ -35,7 +35,7 @@ services:
     profiles: [setup]
     build:
       context: .
-    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.2}
+    image: ${PPOPS_IMAGE:-ppops:0.1.0-beta.3}
     user: "${PPOPS_UID:-1000}:${PPOPS_GID:-1000}"
     volumes:
       - ./instance:/app/config

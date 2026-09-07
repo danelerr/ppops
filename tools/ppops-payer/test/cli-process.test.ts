@@ -5,9 +5,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { RailgunEngine } from "@railgun-community/engine";
+import { Wallet } from "ethers";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PAYER_DEPLOYMENT_BLOCK } from "../src/constants.js";
+import { DESCRIPTOR_DOMAIN_NAME, PAYMENT_DESCRIPTOR_TYPES } from "../src/descriptor.js";
 
 const execFileAsync = promisify(execFile);
 const roots: string[] = [];
@@ -17,6 +19,93 @@ afterEach(async () => {
 });
 
 describe("CLI process lifecycle", () => {
+  it("diagnoses expired and funded requests without loading configuration or wallet secrets", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ppops-readiness-cli-"));
+    roots.push(root);
+    const signer = Wallet.createRandom();
+    const recipient = RailgunEngine.encodeAddress({
+      masterPublicKey: 1n,
+      viewingPublicKey: new Uint8Array(32).fill(1),
+    });
+    const terms = {
+      version: 1,
+      chainId: 42161,
+      rail: "railgun",
+      tokenAddress: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      decimals: 6,
+      amountAtomic: "20000000",
+      recipient0zk: recipient,
+      reference: "0x" + "ab".repeat(32),
+      expiresAt: 1,
+      nonce: "0x" + "cd".repeat(32),
+      merchantSigner: signer.address,
+    };
+    const signature = await signer.signTypedData(
+      { name: DESCRIPTOR_DOMAIN_NAME, version: "1", chainId: terms.chainId },
+      PAYMENT_DESCRIPTOR_TYPES,
+      terms,
+    );
+    for (const [status, expected] of [
+      ["OPEN", "REQUEST_EXPIRED"],
+      ["PAID", "REQUEST_NOT_PAYABLE"],
+    ]) {
+      const path = join(root, "request.json");
+      await writeFile(
+        path,
+        JSON.stringify({
+          id: "pi_" + "12".repeat(16),
+          chainId: terms.chainId,
+          tokenAddress: terms.tokenAddress,
+          tokenSymbol: "USDC",
+          decimals: 6,
+          amountAtomic: terms.amountAtomic,
+          amountFormatted: "20.0",
+          receivedAmountAtomic: status === "PAID" ? terms.amountAtomic : "0",
+          pendingAmountAtomic: "0",
+          status,
+          expiresAt: terms.expiresAt,
+          rail: "railgun",
+          recipient,
+          memo: "ppops:v1:" + terms.reference,
+          descriptor: { ...terms, signature },
+          expectedMerchantSigner: signer.address,
+        }),
+      );
+      const { stdout, stderr } = await execFileAsync(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          "src/cli.ts",
+          "readiness",
+          "--config",
+          join(root, "intentionally-absent.json"),
+          "--request",
+          path,
+          "--expected-signer",
+          signer.address,
+          "--expected-payer",
+          recipient,
+          "--max-network-fee-atomic",
+          "100000",
+          "--format",
+          "json",
+        ],
+        { cwd: process.cwd(), timeout: 15_000 },
+      );
+      expect(JSON.parse(stdout)).toMatchObject({
+        ok: true,
+        readiness: {
+          state: expected,
+          paymentSubmitted: false,
+          estimatedReadyAt: null,
+          availableAmountAtomic: null,
+          requiredAmountAtomic: "20100000",
+        },
+      });
+      expect(stderr).toBe("");
+    }
+  }, 30_000);
   it("supports per-command help and version before reading configuration", async () => {
     for (const args of [["init", "--help"], ["help", "prepare-broadcaster"], ["recover-broadcaster", "-h"], ["--version"]]) {
       const result = await execFileAsync(process.execPath, ["--import", "tsx", "src/cli.ts", ...args], { cwd: process.cwd(), timeout: 15_000 });
