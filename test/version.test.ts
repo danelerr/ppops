@@ -8,6 +8,10 @@ const rootFile = (path: string): string =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("release version consistency", () => {
+  it("includes the checkout build script in the Docker context", () => {
+    expect(rootFile("Dockerfile")).toContain("COPY scripts/build-checkout.ts ./scripts/build-checkout.ts");
+    expect(rootFile(".dockerignore")).toContain("!scripts/build-checkout.ts");
+  });
   it("keeps runtime, package metadata and container defaults aligned", () => {
     const packageJson = JSON.parse(rootFile("package.json")) as { version: string };
     const packageLock = JSON.parse(rootFile("package-lock.json")) as {
