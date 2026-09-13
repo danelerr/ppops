@@ -32,10 +32,13 @@ y PAID/200 para la consulta autenticada.
 
 ## Preparación para el envío
 
-El texto del proyecto está guardado en el formulario y el guion está preparado.
-La publicación del código y los materiales de la submission están en curso,
-autorizados por Daniel. Quedan el video con voz humana y el envío final.
-Confirmar la modalidad Continuity registrada y el corte preevento.
+El código está publicado en GitHub: commit `8f85a323d1df0df5c8ff66fb78051d6195ecda14`.
+El formulario conserva textos, repositorio, logo, portada, tres capturas, stack
+y declaración de IA. El dashboard confirma Continuity Track. Se seleccionó
+consideración para finalista; Bazantic figura como tecnología utilizada, sin
+postulación a premio de partner. La revisión final señala únicamente el video
+como material faltante. El envío final sigue pendiente; requiere un video humano
+de 2–4 minutos. El corte preevento aún requiere revisión de atribución.
 
 Ledger se omitió por instrucción de Daniel. Uniswap no se implementó. La entrega
 actual se centra en la consulta para agentes mediante Bazantic.

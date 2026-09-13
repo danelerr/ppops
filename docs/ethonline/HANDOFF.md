@@ -66,9 +66,11 @@ The functional demo alone does not establish that prize requirement.
 
 ## Submission preparation
 
-Submission repository: https://github.com/danelerr/ppops . Record the video
-and complete the submission. Confirm the registered Continuity category in the dashboard;
-attribution must distinguish existing work from work completed during the event.
+Submission repository: https://github.com/danelerr/ppops . The delivery is
+published in commit `8f85a323d1df0df5c8ff66fb78051d6195ecda14`. The dashboard
+confirms Continuity Track. Project text, images, repository, technology choices,
+and AI attribution are saved. The final form still requires the demo video.
+Attribution distinguishes existing work from work completed during this delivery.
 If selecting Bazantic, provide the account's registration username (GitHub handle
 or email) in the form so the Recipe can be attributed to you. The project has
 not yet been submitted.
