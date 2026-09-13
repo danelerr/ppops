@@ -1,0 +1,6 @@
+WARNING: failed to clean up stale arg0 temp dirs: Permission denied (os error 13)
+2026-09-13T13:44:38.914147Z ERROR codex_skills_extension::host_service: failed to install system skills: io error while remove existing system skills dir: Permission denied (os error 13)
+2026-09-13T13:44:38.923561Z ERROR codex_skills_extension::host_service: failed to install system skills: io error while remove existing system skills dir: Permission denied (os error 13)
+2026-09-13T13:44:38.989635Z ERROR codex_skills_extension::host_service: failed to install system skills: io error while remove existing system skills dir: Permission denied (os error 13)
+2026-09-13T13:44:38.989735Z ERROR codex_skills_extension::host_service: failed to install system skills: io error while remove existing system skills dir: Permission denied (os error 13)
+2026-09-13T13:44:38.992323Z ERROR codex_skills_extension::host_service: failed to install system skills: io error while remove existing system skills dir: Permission denied (os error 13)

@@ -1,0 +1,72 @@
+{
+  "lockedAt": "2026-09-13T13:42:39.016Z",
+  "client": "codex-cli 0.154.0",
+  "model": "gpt-6-astra",
+  "reasoningEffort": "high",
+  "authentication": "existing ChatGPT login",
+  "task": "Query demo-open, demo-partial, demo-paid, demo-expired and demo-late. Report each observed status. For each, state whether this API gives you enough information and authority to deliver the order or request another payment. Do not perform either action or assume a remaining payment deadline.",
+  "commonInstructions": "You are a participant in a bounded API-use evaluation. Complete the user's task using only API.md and the getDemoPaymentStatus.mjs command in the current directory. Read API.md for the full raw contract and tool description. Use no other files, services, credentials, agents, memories or web searches. Do not modify files. The available command performs real read-only demo HTTP queries. Budget: at most five calls total, one per requested alias, 60 seconds wall time, and 32768 reported input plus output tokens. Preserve failures in the final answer; no retries. Do not seek other evaluations or their results. The only available tool operation is getDemoPaymentStatus(requestRef), invoked through the documented command. Other tools must not be substituted.",
+  "arms": {
+    "A": "Raw API information and tool access",
+    "B": "Identical access plus published Recipe name, description and prompt_template; output_example excluded"
+  },
+  "guidance": "\n\nPublished Bazantic Recipe guidance (name: PPOps Payment Status Brief; handle: ppops-payment-status-brief; revision: 2026-09-13T09:35:58.952439+00:00):\nRead the requested synthetic PPOps demo states and explain the limits of each observation. Cannot pay, deliver, request another payment, or determine merchant policy. Demo events are simulated; gateway runs in sandbox over a temporary HTTPS tunnel.\n\nTask: Query the requested demo aliases. Report each observed status. For each, state whether this API gives enough information and authority to deliver the order or request another payment. Do not perform either action or assume a remaining payment deadline.\nInputs: {\"requestRefs\":[\"demo-open\",\"demo-partial\",\"demo-paid\",\"demo-expired\",\"demo-late\"]}\n\nAPI semantics (also included in the raw tool description): OPEN: observed open; no remaining-time guarantee. PARTIAL: partial payment, possibly past expiry; do not instruct another payment. PAID: reconciler reports paid, no delivery action authorized. EXPIRED: expired, later payment remains possible. PAID_LATE: paid late, merchant policy required. UNKNOWN: uninterpretable state; infer neither paid nor unpaid. Each result is a fresh observation and may change. No timestamps or merchant policy are available.\n\nProcedure: For each supplied alias call getDemoPaymentStatus once, sequentially, using its requestRef. Preserve the exact returned alias and status; never infer results from alias names. Reuse a server-issued conversation_id only if returned. On a tool or network error report UNAVAILABLE and the safe error code without inferring paid or unpaid; do not repeat the call. The workflow only observes synthetic demo data. It grants no delivery or payment authority.\nReturn a concise JSON object with simulation:true and an observations array in input order. Each entry has requestRef, status, interpretation, and actionAuthority:\"NONE\". Do not provide payment instructions, deadlines, production IDs, credentials or private data.",
+  "args": [
+    "exec",
+    "--ignore-user-config",
+    "--skip-git-repo-check",
+    "--ephemeral",
+    "--json",
+    "--color",
+    "never",
+    "--sandbox",
+    "workspace-write",
+    "--model",
+    "gpt-6-astra",
+    "-c",
+    "model_reasoning_effort=\"high\"",
+    "-c",
+    "approval_policy=\"never\"",
+    "-c",
+    "sandbox_workspace_write.network_access=true",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-c",
+    "web_search=\"disabled\"",
+    "-c",
+    "features.apps=false",
+    "-c",
+    "features.memories=false",
+    "-c",
+    "features.multi_agent=false"
+  ],
+  "workspace": "/var/folders/wv/wxv7t4_13y3509xjzhrttx_r0000gn/T/ppops-bazantic-ab-3hMI17",
+  "bridgeOrigin": "http://127.0.0.1:52338",
+  "origin": "https://classified-corporation-desktop-casio.trycloudflare.com",
+  "gateway": "https://gvp5zq3zpbfqhl5cpjhfkyk5km.bazgateway.com",
+  "limits": {
+    "wallTimeMs": 60000,
+    "statusCalls": 5,
+    "reportedTotalTokens": 32768,
+    "realUsdcSpending": 0
+  },
+  "order": [
+    "A1",
+    "B1",
+    "A2",
+    "B2"
+  ],
+  "hashes": {
+    "api": "eb5aa9ea87cd037759c495edd96bf403eff4e15cf39f0fd09ff856236e82cb7d",
+    "helper": "20d7af2d307e3102bac7bb48213234764a0faddfaecb5b1969f34ee9908edaef",
+    "task": "b928f042e02c4a26de116b75466321522c212d6ecb8ec54263523ce84a524c8e",
+    "common": "f2914557889e17a3299b9b0da489b6a50e8fcc1a91b38943f99bd0705f10c50d",
+    "guidance": "363eeb841c854340399b8f60e123f7f2b0ef1b9b280f481770610d3636b336ef"
+  },
+  "limitations": [
+    "Published guidance is consumed as text by Codex; the hosted Haiku Recipe runtime is not invoked.",
+    "Both arms use the same local credential-hiding bridge to the HTTPS adapter, not paid gateway execution.",
+    "Temperature, seed and provider snapshot are not exposed by this CLI invocation; identical defaults are used, not claimed pinned values.",
+    "Token ceiling can be checked only after the CLI emits usage; a violation is recorded as a budget failure."
+  ]
+}

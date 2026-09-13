@@ -1,0 +1,181 @@
+{
+  "exportedAt": "2026-09-13T13:51:55.829555+00:00",
+  "redactions": [
+    "Codex thread_id replaced with <REDACTED_THREAD_ID>; no events or outcomes omitted."
+  ],
+  "files": [
+    {
+      "file": "without-recipe-run-1.instructions.txt",
+      "sourceSha256": "0a74a86b189e20b73b54f1098003f78a5dd0199c43bf56b55535d5c1fcd0928b",
+      "exportSha256": "0a74a86b189e20b73b54f1098003f78a5dd0199c43bf56b55535d5c1fcd0928b",
+      "redacted": false,
+      "originalFile": "A1.instructions.txt",
+      "displayName": "Without Recipe \u00b7 run 1"
+    },
+    {
+      "file": "without-recipe-run-1.json",
+      "sourceSha256": "7e8af5b7832f906023687a9d5c39117c50a692aeb20d99e80e221b73c8486581",
+      "exportSha256": "7e8af5b7832f906023687a9d5c39117c50a692aeb20d99e80e221b73c8486581",
+      "redacted": false,
+      "originalFile": "A1.json",
+      "displayName": "Without Recipe \u00b7 run 1"
+    },
+    {
+      "file": "without-recipe-run-1.jsonl",
+      "sourceSha256": "12f318b7f7619b9eb83103a40eb6a4dc68a9acc4816fbd45d73bcd01479d879f",
+      "exportSha256": "a1f63f256b509ecb5be5d9a18198d2443ed924ccb64a22c6bda56c2f16ca9f95",
+      "redacted": true,
+      "originalFile": "A1.jsonl",
+      "displayName": "Without Recipe \u00b7 run 1"
+    },
+    {
+      "file": "without-recipe-run-1.stderr.txt",
+      "sourceSha256": "0084e964c0a2b0aca5ecdadbe040e840e8a87da3bfa1355398c148c6e1d6b029",
+      "exportSha256": "0084e964c0a2b0aca5ecdadbe040e840e8a87da3bfa1355398c148c6e1d6b029",
+      "redacted": false,
+      "originalFile": "A1.stderr.txt",
+      "displayName": "Without Recipe \u00b7 run 1"
+    },
+    {
+      "file": "without-recipe-run-2.instructions.txt",
+      "sourceSha256": "0a74a86b189e20b73b54f1098003f78a5dd0199c43bf56b55535d5c1fcd0928b",
+      "exportSha256": "0a74a86b189e20b73b54f1098003f78a5dd0199c43bf56b55535d5c1fcd0928b",
+      "redacted": false,
+      "originalFile": "A2.instructions.txt",
+      "displayName": "Without Recipe \u00b7 run 2"
+    },
+    {
+      "file": "without-recipe-run-2.json",
+      "sourceSha256": "3c83dfb2afaf374ce06d9f66a612449f8e1348418ab5fb08a69e17d0d1cdaaf1",
+      "exportSha256": "3c83dfb2afaf374ce06d9f66a612449f8e1348418ab5fb08a69e17d0d1cdaaf1",
+      "redacted": false,
+      "originalFile": "A2.json",
+      "displayName": "Without Recipe \u00b7 run 2"
+    },
+    {
+      "file": "without-recipe-run-2.jsonl",
+      "sourceSha256": "c2807c25c4f2305b4de5a00c90301b03a5193e387b93afcf971cd4f5c1685f8b",
+      "exportSha256": "e39d56d9b9cb143835787f1d688b947c0f0be1090e6b002294e14f847a14aa19",
+      "redacted": true,
+      "originalFile": "A2.jsonl",
+      "displayName": "Without Recipe \u00b7 run 2"
+    },
+    {
+      "file": "without-recipe-run-2.stderr.txt",
+      "sourceSha256": "ff2dc3a8d0e526d823511ecd1e172932492af6e64befb422318001216841ed20",
+      "exportSha256": "ff2dc3a8d0e526d823511ecd1e172932492af6e64befb422318001216841ed20",
+      "redacted": false,
+      "originalFile": "A2.stderr.txt",
+      "displayName": "Without Recipe \u00b7 run 2"
+    },
+    {
+      "file": "with-recipe-run-1.instructions.txt",
+      "sourceSha256": "19f7c5422bbc5c5c7dc22eb4fab831c92f41ee6437f553c1a0cf5a927b15ec35",
+      "exportSha256": "19f7c5422bbc5c5c7dc22eb4fab831c92f41ee6437f553c1a0cf5a927b15ec35",
+      "redacted": false,
+      "originalFile": "B1.instructions.txt",
+      "displayName": "With Recipe \u00b7 run 1"
+    },
+    {
+      "file": "with-recipe-run-1.json",
+      "sourceSha256": "27fadd52f73bbb969a42fb65920b5e9399997f16497a536818cbe5767e407b00",
+      "exportSha256": "27fadd52f73bbb969a42fb65920b5e9399997f16497a536818cbe5767e407b00",
+      "redacted": false,
+      "originalFile": "B1.json",
+      "displayName": "With Recipe \u00b7 run 1"
+    },
+    {
+      "file": "with-recipe-run-1.jsonl",
+      "sourceSha256": "fd7c044fba377d8bd93f7e319ca7a9f2a0f50653f8db01eb5b6708d82b833408",
+      "exportSha256": "0f10bb27f2524b72ab9b8c7c3e04b4754b520276e64e281288cf8971078af771",
+      "redacted": true,
+      "originalFile": "B1.jsonl",
+      "displayName": "With Recipe \u00b7 run 1"
+    },
+    {
+      "file": "with-recipe-run-1.stderr.txt",
+      "sourceSha256": "dde58e866b75da3216af85edb2b2e53747bf4e3a50f3af1777fee8c96827cf14",
+      "exportSha256": "dde58e866b75da3216af85edb2b2e53747bf4e3a50f3af1777fee8c96827cf14",
+      "redacted": false,
+      "originalFile": "B1.stderr.txt",
+      "displayName": "With Recipe \u00b7 run 1"
+    },
+    {
+      "file": "with-recipe-run-2.instructions.txt",
+      "sourceSha256": "19f7c5422bbc5c5c7dc22eb4fab831c92f41ee6437f553c1a0cf5a927b15ec35",
+      "exportSha256": "19f7c5422bbc5c5c7dc22eb4fab831c92f41ee6437f553c1a0cf5a927b15ec35",
+      "redacted": false,
+      "originalFile": "B2.instructions.txt",
+      "displayName": "With Recipe \u00b7 run 2"
+    },
+    {
+      "file": "with-recipe-run-2.json",
+      "sourceSha256": "c23fb01219d398b2e35c665ca2d71546988c6765158e21225fb01f9119dd242e",
+      "exportSha256": "c23fb01219d398b2e35c665ca2d71546988c6765158e21225fb01f9119dd242e",
+      "redacted": false,
+      "originalFile": "B2.json",
+      "displayName": "With Recipe \u00b7 run 2"
+    },
+    {
+      "file": "with-recipe-run-2.jsonl",
+      "sourceSha256": "19e33ecb41bcb5e2e854c8cb904f7686a758fa918e2d7e463dcf9c66f9e54253",
+      "exportSha256": "bc4ee1ab7d599cf65ad8807b9218a8dde5ec61ea84436e093b0349e4d6d752c6",
+      "redacted": true,
+      "originalFile": "B2.jsonl",
+      "displayName": "With Recipe \u00b7 run 2"
+    },
+    {
+      "file": "with-recipe-run-2.stderr.txt",
+      "sourceSha256": "72972d1aa53998ed7b64738f261a0a3159cdda5f6f99ca8f486cfdb23b8cab71",
+      "exportSha256": "72972d1aa53998ed7b64738f261a0a3159cdda5f6f99ca8f486cfdb23b8cab71",
+      "redacted": false,
+      "originalFile": "B2.stderr.txt",
+      "displayName": "With Recipe \u00b7 run 2"
+    },
+    {
+      "file": "campaign.json",
+      "sourceSha256": "c32e4eefb8c9c8d19abb1bb76d48af8c67670da9bd82ab6e3bd52cb366877ef6",
+      "exportSha256": "c32e4eefb8c9c8d19abb1bb76d48af8c67670da9bd82ab6e3bd52cb366877ef6",
+      "redacted": false
+    },
+    {
+      "file": "generated-tool.json",
+      "sourceSha256": "9dbec81b5b8636da26937cc8d20efe04d48448beab87c8ec23618876c680d54e",
+      "exportSha256": "9dbec81b5b8636da26937cc8d20efe04d48448beab87c8ec23618876c680d54e",
+      "redacted": false
+    },
+    {
+      "file": "openapi.json",
+      "sourceSha256": "335e9c1ec70800c54b6f47641c7b45ce1d972cdd9754dd9461be53dc56a312a8",
+      "exportSha256": "335e9c1ec70800c54b6f47641c7b45ce1d972cdd9754dd9461be53dc56a312a8",
+      "redacted": false
+    },
+    {
+      "file": "protocol.json",
+      "sourceSha256": "b95cf750e44cb245c9b72be3c9f5f1cadd6612a1025b73104c3ffebdc84b9864",
+      "exportSha256": "b95cf750e44cb245c9b72be3c9f5f1cadd6612a1025b73104c3ffebdc84b9864",
+      "redacted": false
+    },
+    {
+      "file": "task.txt",
+      "sourceSha256": "12c9606202a153c868d4805453cb2cbb03a3b59299fa1223c7f14d39f9934812",
+      "exportSha256": "12c9606202a153c868d4805453cb2cbb03a3b59299fa1223c7f14d39f9934812",
+      "redacted": false
+    }
+  ],
+  "recoveredFiles": [
+    {
+      "file": "API.md",
+      "from": "A1.jsonl completed cat API.md output",
+      "sha256": "eb5aa9ea87cd037759c495edd96bf403eff4e15cf39f0fd09ff856236e82cb7d",
+      "matchesLockedProtocol": true
+    }
+  ],
+  "cleanup": {
+    "at": "2026-09-13T14:27:24.417277+00:00",
+    "sourceCopiesRemoved": true,
+    "exportHashesVerifiedBeforeRemoval": true,
+    "note": "Ignored source duplicates removed during authorized repository cleanup. Complete exported traces and original/export hashes are retained."
+  },
+  "namingNote": "Files use descriptive names. Original capture content, run IDs, source hashes and export hashes are unchanged."
+}

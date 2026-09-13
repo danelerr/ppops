@@ -1,0 +1,387 @@
+{
+  "startedAt": "2026-09-13T13:42:39.012Z",
+  "runs": [
+    {
+      "name": "A1",
+      "startedAt": "2026-09-13T13:42:41.059Z",
+      "calls": [
+        {
+          "requestRef": "demo-open",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:42:53.351Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "requestRef": "demo-partial",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:43:00.474Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-partial",
+            "status": "PARTIAL"
+          }
+        },
+        {
+          "requestRef": "demo-paid",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:43:01.096Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        },
+        {
+          "requestRef": "demo-expired",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:43:01.607Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-expired",
+            "status": "EXPIRED"
+          }
+        },
+        {
+          "requestRef": "demo-late",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:43:01.889Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-late",
+            "status": "PAID_LATE"
+          }
+        }
+      ],
+      "rejectedCalls": 0,
+      "timedOut": false,
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 35827,
+      "finishedAt": "2026-09-13T13:43:16.886Z",
+      "usage": {
+        "input_tokens": 65745,
+        "cached_input_tokens": 48000,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 470,
+        "reasoning_output_tokens": 0
+      },
+      "totalTokens": 66215,
+      "tokenLimitExceeded": true,
+      "messages": [
+        "I’ll read the API contract, query each alias once, and report the observed statuses and what they authorize.",
+        "All five queries returned HTTP 200. This API provides observations, never authority for business actions.\n\n| Alias | Observed status | Enough information and authority to deliver? | Enough information and authority to request another payment? |\n|---|---|---|---|\n| `demo-open` | `OPEN` | No; payment is not confirmed. | No; open does not guarantee remaining payment time. |\n| `demo-partial` | `PARTIAL` | No; only partial payment is reported. | No; it may already be expired, and the contract prohibits instructing another payment. |\n| `demo-paid` | `PAID` | No; the reconciler reports paid, but delivery is not authorized. | No; paid status provides no basis or authorization for another payment. |\n| `demo-expired` | `EXPIRED` | No; payment is not confirmed. | No; later payment remains possible, and another payment is not authorized. |\n| `demo-late` | `PAID_LATE` | No; merchant policy is required. | No; merchant policy is required, and another payment is not authorized. |\n\nObservations may change. The API supplies neither timestamps nor merchant policy, so no remaining deadline can be inferred. Neither action was performed."
+      ],
+      "errors": [],
+      "inputsUnchanged": true,
+      "status": "FAILED"
+    },
+    {
+      "name": "B1",
+      "startedAt": "2026-09-13T13:43:16.891Z",
+      "calls": [
+        {
+          "requestRef": "demo-open",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:43:38.496Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "requestRef": "demo-partial",
+          "status": "failed"
+        },
+        {
+          "requestRef": "demo-paid",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:14.906Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        }
+      ],
+      "rejectedCalls": 0,
+      "timedOut": true,
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "durationMs": 60017,
+      "finishedAt": "2026-09-13T13:44:16.907Z",
+      "usage": null,
+      "totalTokens": null,
+      "tokenLimitExceeded": false,
+      "messages": [
+        "I’ll read the API contract, then query each alias once and report the observed status and action limits."
+      ],
+      "errors": [],
+      "inputsUnchanged": true,
+      "status": "FAILED"
+    },
+    {
+      "name": "A2",
+      "startedAt": "2026-09-13T13:44:38.839Z",
+      "calls": [
+        {
+          "requestRef": "demo-open",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:51.791Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "requestRef": "demo-partial",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:58.157Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-partial",
+            "status": "PARTIAL"
+          }
+        },
+        {
+          "requestRef": "demo-paid",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:58.641Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        },
+        {
+          "requestRef": "demo-expired",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:59.056Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-expired",
+            "status": "EXPIRED"
+          }
+        },
+        {
+          "requestRef": "demo-late",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:44:59.287Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-late",
+            "status": "PAID_LATE"
+          }
+        }
+      ],
+      "rejectedCalls": 0,
+      "timedOut": false,
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 32341,
+      "finishedAt": "2026-09-13T13:45:11.180Z",
+      "usage": {
+        "input_tokens": 65758,
+        "cached_input_tokens": 48000,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 403,
+        "reasoning_output_tokens": 0
+      },
+      "totalTokens": 66161,
+      "tokenLimitExceeded": true,
+      "messages": [
+        "I’ll read the API contract and query each alias once, then report the status and what it establishes about delivery or another payment request.",
+        "All five queries returned HTTP 200.\n\n| Alias | Observed status | Enough information and authority to deliver? | To request another payment? | Meaning |\n|---|---|---|---|---|\n| demo-open | OPEN | No | No | Observed open; no remaining-time guarantee. |\n| demo-partial | PARTIAL | No | No | Partially paid, possibly past expiry; do not instruct another payment. |\n| demo-paid | PAID | No | No | Reconciler reports paid; delivery is not authorized. |\n| demo-expired | EXPIRED | No | No | Expired; later payment remains possible. |\n| demo-late | PAID_LATE | No | No | Paid late; merchant policy is required. |\n\nThese are changeable observations, never permission for business actions. The API supplies neither timestamps nor merchant policy. No deadline was assumed, and neither action was performed."
+      ],
+      "errors": [],
+      "inputsUnchanged": true,
+      "status": "FAILED"
+    },
+    {
+      "name": "B2",
+      "startedAt": "2026-09-13T13:45:11.183Z",
+      "calls": [
+        {
+          "requestRef": "demo-open",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:45:22.887Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "requestRef": "demo-partial",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:45:28.860Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-partial",
+            "status": "PARTIAL"
+          }
+        },
+        {
+          "requestRef": "demo-paid",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:45:36.886Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        },
+        {
+          "requestRef": "demo-expired",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:45:43.399Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-expired",
+            "status": "EXPIRED"
+          }
+        },
+        {
+          "requestRef": "demo-late",
+          "status": "complete",
+          "startedAt": "2026-09-13T13:45:48.371Z",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-late",
+            "status": "PAID_LATE"
+          }
+        }
+      ],
+      "rejectedCalls": 0,
+      "timedOut": false,
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 54297,
+      "finishedAt": "2026-09-13T13:46:05.480Z",
+      "usage": {
+        "input_tokens": 120362,
+        "cached_input_tokens": 101888,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 558,
+        "reasoning_output_tokens": 0
+      },
+      "totalTokens": 120920,
+      "tokenLimitExceeded": true,
+      "messages": [
+        "I’ll read the API contract, query each alias once, and report the observed status and limits on action authority.",
+        "{\n  \"simulation\": true,\n  \"observations\": [\n    {\n      \"requestRef\": \"demo-open\",\n      \"status\": \"OPEN\",\n      \"interpretation\": \"Observed open; no remaining-time guarantee. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-partial\",\n      \"status\": \"PARTIAL\",\n      \"interpretation\": \"Partial payment, possibly past expiry; do not request another payment. Insufficient information or authority for either action.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-paid\",\n      \"status\": \"PAID\",\n      \"interpretation\": \"Reconciler reports paid. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-expired\",\n      \"status\": \"EXPIRED\",\n      \"interpretation\": \"Observed expired; later payment remains possible. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-late\",\n      \"status\": \"PAID_LATE\",\n      \"interpretation\": \"Paid late; merchant policy required. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    }\n  ],\n  \"limits\": \"Each observation may change. No timestamps or merchant policy are available. Neither action was performed.\"\n}"
+      ],
+      "errors": [],
+      "inputsUnchanged": true,
+      "status": "FAILED"
+    }
+  ],
+  "fixtureChecks": [
+    {
+      "before": "A1",
+      "observations": [
+        {
+          "startedAt": "2026-09-13T13:42:39.020Z",
+          "requestRef": "demo-open",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:42:39.359Z",
+          "requestRef": "demo-partial",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-partial",
+            "status": "PARTIAL"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:42:40.201Z",
+          "requestRef": "demo-paid",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:42:40.374Z",
+          "requestRef": "demo-expired",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-expired",
+            "status": "EXPIRED"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:42:40.684Z",
+          "requestRef": "demo-late",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-late",
+            "status": "PAID_LATE"
+          }
+        }
+      ]
+    },
+    {
+      "before": "A2",
+      "observations": [
+        {
+          "startedAt": "2026-09-13T13:44:36.912Z",
+          "requestRef": "demo-open",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-open",
+            "status": "OPEN"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:44:37.154Z",
+          "requestRef": "demo-partial",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-partial",
+            "status": "PARTIAL"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:44:37.936Z",
+          "requestRef": "demo-paid",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-paid",
+            "status": "PAID"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:44:38.053Z",
+          "requestRef": "demo-expired",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-expired",
+            "status": "EXPIRED"
+          }
+        },
+        {
+          "startedAt": "2026-09-13T13:44:38.510Z",
+          "requestRef": "demo-late",
+          "httpStatus": 200,
+          "response": {
+            "requestRef": "demo-late",
+            "status": "PAID_LATE"
+          }
+        }
+      ]
+    }
+  ],
+  "finishedAt": "2026-09-13T13:46:05.484Z"
+}

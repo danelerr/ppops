@@ -1,0 +1,227 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PPOps demo payment status",
+    "version": "1.0.0",
+    "description": "Isolated simulation. Read-only observations; this service cannot pay or fulfill orders."
+  },
+  "servers": [
+    {
+      "url": "https://classified-corporation-desktop-casio.trycloudflare.com"
+    }
+  ],
+  "paths": {
+    "/v1/demo/payment-status/{requestRef}": {
+      "get": {
+        "operationId": "getDemoPaymentStatus",
+        "summary": "Read one authorized demo request status",
+        "description": "OPEN: observed open; no remaining-time guarantee. PARTIAL: partial payment, possibly past expiry; do not instruct another payment. PAID: reconciler reports paid, no delivery action authorized. EXPIRED: expired, later payment remains possible. PAID_LATE: paid late, merchant policy required. UNKNOWN: uninterpretable state; infer neither paid nor unpaid. Each result is a fresh observation and may change. No timestamps or merchant policy are available.",
+        "security": [
+          {
+            "gatewayBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "requestRef",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^demo-[a-z0-9-]{1,48}$",
+              "maxLength": 53
+            },
+            "example": "demo-open"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current demo observation; never permission to take a business action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "requestRef",
+                    "status"
+                  ],
+                  "properties": {
+                    "requestRef": {
+                      "type": "string",
+                      "pattern": "^demo-[a-z0-9-]{1,48}$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "PARTIAL",
+                        "PAID",
+                        "EXPIRED",
+                        "PAID_LATE",
+                        "UNKNOWN"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "const": "UNAUTHORIZED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "const": "NOT_FOUND"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "const": "RATE_LIMITED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "UPSTREAM_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "const": "UPSTREAM_UNAVAILABLE"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "UPSTREAM_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "error"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "const": "UPSTREAM_UNAVAILABLE"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "gatewayBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

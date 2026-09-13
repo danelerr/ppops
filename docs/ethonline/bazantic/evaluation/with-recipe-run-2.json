@@ -1,0 +1,78 @@
+{
+  "name": "B2",
+  "startedAt": "2026-09-13T13:45:11.183Z",
+  "calls": [
+    {
+      "requestRef": "demo-open",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:45:22.887Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-open",
+        "status": "OPEN"
+      }
+    },
+    {
+      "requestRef": "demo-partial",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:45:28.860Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-partial",
+        "status": "PARTIAL"
+      }
+    },
+    {
+      "requestRef": "demo-paid",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:45:36.886Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-paid",
+        "status": "PAID"
+      }
+    },
+    {
+      "requestRef": "demo-expired",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:45:43.399Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-expired",
+        "status": "EXPIRED"
+      }
+    },
+    {
+      "requestRef": "demo-late",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:45:48.371Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-late",
+        "status": "PAID_LATE"
+      }
+    }
+  ],
+  "rejectedCalls": 0,
+  "timedOut": false,
+  "exitCode": 0,
+  "signal": null,
+  "durationMs": 54297,
+  "finishedAt": "2026-09-13T13:46:05.480Z",
+  "usage": {
+    "input_tokens": 120362,
+    "cached_input_tokens": 101888,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 558,
+    "reasoning_output_tokens": 0
+  },
+  "totalTokens": 120920,
+  "tokenLimitExceeded": true,
+  "messages": [
+    "I’ll read the API contract, query each alias once, and report the observed status and limits on action authority.",
+    "{\n  \"simulation\": true,\n  \"observations\": [\n    {\n      \"requestRef\": \"demo-open\",\n      \"status\": \"OPEN\",\n      \"interpretation\": \"Observed open; no remaining-time guarantee. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-partial\",\n      \"status\": \"PARTIAL\",\n      \"interpretation\": \"Partial payment, possibly past expiry; do not request another payment. Insufficient information or authority for either action.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-paid\",\n      \"status\": \"PAID\",\n      \"interpretation\": \"Reconciler reports paid. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-expired\",\n      \"status\": \"EXPIRED\",\n      \"interpretation\": \"Observed expired; later payment remains possible. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    },\n    {\n      \"requestRef\": \"demo-late\",\n      \"status\": \"PAID_LATE\",\n      \"interpretation\": \"Paid late; merchant policy required. Insufficient information or authority to deliver or request another payment.\",\n      \"actionAuthority\": \"NONE\"\n    }\n  ],\n  \"limits\": \"Each observation may change. No timestamps or merchant policy are available. Neither action was performed.\"\n}"
+  ],
+  "errors": [],
+  "inputsUnchanged": true,
+  "status": "FAILED"
+}

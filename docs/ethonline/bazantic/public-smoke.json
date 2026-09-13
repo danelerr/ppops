@@ -1,0 +1,45 @@
+{
+  "time": "2026-09-13T09:21:37.177Z",
+  "origin": "https://pregnancy-versions-done-jacob.trycloudflare.com",
+  "checks": [
+    {
+      "path": "/openapi.json",
+      "authenticated": false,
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": {
+        "operations": [
+          "/v1/demo/payment-status/{requestRef}"
+        ]
+      }
+    },
+    {
+      "path": "/v1/demo/payment-status/demo-paid",
+      "authenticated": false,
+      "status": 401,
+      "cacheControl": "no-store",
+      "body": "{\"error\":{\"code\":\"UNAUTHORIZED\"}}"
+    },
+    {
+      "path": "/v1/demo/payment-status/demo-paid",
+      "authenticated": true,
+      "status": 200,
+      "cacheControl": "no-store",
+      "body": "{\"requestRef\":\"demo-paid\",\"status\":\"PAID\"}"
+    },
+    {
+      "path": "/demo/checkout",
+      "authenticated": false,
+      "status": 401,
+      "cacheControl": "no-store",
+      "body": "{\"error\":{\"code\":\"UNAUTHORIZED\"}}"
+    },
+    {
+      "path": "/v1/intents",
+      "authenticated": true,
+      "status": 404,
+      "cacheControl": "no-store",
+      "body": "{\"error\":{\"code\":\"NOT_FOUND\"}}"
+    }
+  ]
+}

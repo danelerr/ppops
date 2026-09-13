@@ -70,6 +70,13 @@ analytics, support tickets, or public evidence.
 
 ## Fulfillment
 
+The optional [Bazantic demo adapter](ethonline/bazantic/README.md) uses its own
+limited bearer credential and synthetic data. Its runner exposes only status
+projection and public API documentation on loopback; it does not serve the
+merchant administration or demo mutation routes. Keep it isolated from
+production, and approve any HTTPS exposure and sharing of its limited credential
+separately. A model's interpretation never authorizes merchant fulfillment.
+
 Treat PPOps as a payment oracle with strict state criteria, not an
 authorization to spend. The merchant backend must:
 

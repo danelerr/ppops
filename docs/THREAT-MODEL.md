@@ -398,6 +398,25 @@ flowchart LR
 
 ## Quality check
 
+### Optional ETHOnline demo adapter
+
+`src/examples/bazantic-status.ts` adds a separate, opt-in demo boundary:
+gateway caller → limited status adapter → private demo API. The gateway receives
+only an alias and one observed status. It never receives internal intent IDs,
+amounts, timestamps, descriptors or the administrative bearer credential.
+The standalone runner has no production config input and never listens with its
+internal API; synthetic events are prepared locally before serving status.
+
+The adapter authenticates callers independently, fixes upstream origin/path,
+copies its allowlist, rejects redirects, bounds response size and timeout, and
+constructs the response from allowed fields. It accepts no mutation or arbitrary
+proxy operation. Tests cover those controls in `test/bazantic-status.test.ts`.
+A compromised adapter host can still recover its upstream credential; isolation
+to disposable demo data is mandatory. Its shared rate limit allows one caller
+to exhaust the demo quota. Public deployment and third-party retention remain
+operational decisions, not guarantees established by local tests. See the
+[runbook](ethonline/bazantic/README.md). This addition is not a new full audit.
+
 - [x] Covered HTTP, CLI, config, secrets, wallet state, chain TXOs, RPC/PPOI,
   artifact paths, webhook, mainnet evidence, restore and build entry points.
 - [x] Represented every identified trust boundary in at least one threat.

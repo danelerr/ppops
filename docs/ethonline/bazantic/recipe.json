@@ -1,0 +1,81 @@
+{
+  "name": "PPOps Payment Status Brief",
+  "description": "Read the requested synthetic PPOps demo states and explain the limits of each observation. Cannot pay, deliver, request another payment, or determine merchant policy. Demo events are simulated; gateway runs in sandbox over a temporary HTTPS tunnel.",
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "requestRefs": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 5,
+        "items": {
+          "type": "string",
+          "enum": [
+            "demo-open",
+            "demo-partial",
+            "demo-paid",
+            "demo-expired",
+            "demo-late"
+          ]
+        }
+      }
+    },
+    "required": [
+      "requestRefs"
+    ]
+  },
+  "input_example": {
+    "requestRefs": [
+      "demo-open",
+      "demo-partial",
+      "demo-paid",
+      "demo-expired",
+      "demo-late"
+    ]
+  },
+  "output_example": {
+    "simulation": true,
+    "observations": [
+      {
+        "requestRef": "demo-open",
+        "status": "OPEN",
+        "interpretation": "Payment observed open with no remaining-time guarantee. API does not authorize delivery or payment request. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-partial",
+        "status": "PARTIAL",
+        "interpretation": "Partial payment received, possibly past expiry. API semantics prohibit requesting another payment. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-paid",
+        "status": "PAID",
+        "interpretation": "Reconciler reports paid. API explicitly denies delivery action authorization despite paid status. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-expired",
+        "status": "EXPIRED",
+        "interpretation": "Payment window expired; later payment remains possible. API does not authorize delivery or payment request. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-late",
+        "status": "PAID_LATE",
+        "interpretation": "Payment received late. Merchant policy required to proceed. API provides insufficient authority without policy context. No action permitted.",
+        "actionAuthority": "NONE"
+      }
+    ]
+  },
+  "prompt_template": "Task: Query the requested demo aliases. Report each observed status. For each, state whether this API gives enough information and authority to deliver the order or request another payment. Do not perform either action or assume a remaining payment deadline.\nInputs: {{inputs}}\n\nAPI semantics (also included in the raw tool description): OPEN: observed open; no remaining-time guarantee. PARTIAL: partial payment, possibly past expiry; do not instruct another payment. PAID: reconciler reports paid, no delivery action authorized. EXPIRED: expired, later payment remains possible. PAID_LATE: paid late, merchant policy required. UNKNOWN: uninterpretable state; infer neither paid nor unpaid. Each result is a fresh observation and may change. No timestamps or merchant policy are available.\n\nProcedure: For each supplied alias call getDemoPaymentStatus once, sequentially, using its requestRef. Preserve the exact returned alias and status; never infer results from alias names. Reuse a server-issued conversation_id only if returned. On a tool or network error report UNAVAILABLE and the safe error code without inferring paid or unpaid; do not repeat the call. The workflow only observes synthetic demo data. It grants no delivery or payment authority.\nReturn a concise JSON object with simulation:true and an observations array in input order. Each entry has requestRef, status, interpretation, and actionAuthority:\"NONE\". Do not provide payment instructions, deadlines, production IDs, credentials or private data.",
+  "model": "anthropic/claude-haiku-4.5",
+  "tool_bindings": [
+    {
+      "gateway_slug": "gvp5zq3zpbfqhl5cpjhfkyk5km",
+      "tool_name": "getDemoPaymentStatus"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "recipe": {
+    "handle": "ppops-payment-status-brief",
+    "name": "PPOps Payment Status Brief",
+    "description": "Read the requested synthetic PPOps demo states and explain the limits of each observation. Cannot pay, deliver, request another payment, or determine merchant policy. Demo events are simulated; gateway runs in sandbox over a temporary HTTPS tunnel.",
+    "status": "draft",
+    "input_schema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "required": [
+        "requestRefs"
+      ],
+      "properties": {
+        "requestRefs": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "demo-open",
+              "demo-partial",
+              "demo-paid",
+              "demo-expired",
+              "demo-late"
+            ],
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "input_example": {
+      "requestRefs": [
+        "demo-open",
+        "demo-partial",
+        "demo-paid",
+        "demo-expired",
+        "demo-late"
+      ]
+    },
+    "output_example": {
+      "simulation": true,
+      "observations": [
+        {
+          "status": "OPEN",
+          "requestRef": "demo-open",
+          "interpretation": "Observed open; no remaining-time guarantee.",
+          "actionAuthority": "NONE"
+        }
+      ]
+    },
+    "prompt_template": "Task: Query the requested demo aliases. Report each observed status. For each, state whether this API gives enough information and authority to deliver the order or request another payment. Do not perform either action or assume a remaining payment deadline.\nInputs: {{inputs}}\n\nAPI semantics (also included in the raw tool description): OPEN: observed open; no remaining-time guarantee. PARTIAL: partial payment, possibly past expiry; do not instruct another payment. PAID: reconciler reports paid, no delivery action authorized. EXPIRED: expired, later payment remains possible. PAID_LATE: paid late, merchant policy required. UNKNOWN: uninterpretable state; infer neither paid nor unpaid. Each result is a fresh observation and may change. No timestamps or merchant policy are available.\n\nProcedure: For each supplied alias call getDemoPaymentStatus once, sequentially, using its requestRef. Preserve the exact returned alias and status; never infer results from alias names. Reuse a server-issued conversation_id only if returned. On a tool or network error report UNAVAILABLE and the safe error code without inferring paid or unpaid; do not repeat the call. The workflow only observes synthetic demo data. It grants no delivery or payment authority.\nReturn a concise JSON object with simulation:true and an observations array in input order. Each entry has requestRef, status, interpretation, and actionAuthority:\"NONE\". Do not provide payment instructions, deadlines, production IDs, credentials or private data.",
+    "model": "anthropic/claude-haiku-4.5",
+    "tool_bindings": [
+      {
+        "gateway_slug": "gvp5zq3zpbfqhl5cpjhfkyk5km",
+        "tool_name": "getDemoPaymentStatus"
+      }
+    ],
+    "published_at": null,
+    "created_at": "2026-09-13T09:33:19.301658+00:00",
+    "updated_at": "2026-09-13T09:34:07.805908+00:00"
+  },
+  "redacted_fields": [
+    "id",
+    "account_id",
+    "created_by",
+    "transferred_at",
+    "transferred_from_account_id"
+  ]
+}

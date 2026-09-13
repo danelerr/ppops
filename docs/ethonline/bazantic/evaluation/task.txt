@@ -1,0 +1,1 @@
+Query demo-open, demo-partial, demo-paid, demo-expired and demo-late. Report each observed status. For each, state whether this API gives you enough information and authority to deliver the order or request another payment. Do not perform either action or assume a remaining payment deadline.

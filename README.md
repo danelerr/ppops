@@ -86,6 +86,14 @@ building this checkout and using a published image.
 
 ## Development
 
+The optional [Bazantic integration](docs/ethonline/bazantic/README.md) lets agents
+query PPOps demo payment states through an authenticated read-only API and a
+published MCP gateway and Recipe. The hosted integration test returned all five
+states correctly. Payment events are simulated; the agent receives only an alias
+and its observed status. See the [demo and presentation](docs/ethonline/HANDOFF.md)
+and [delivery evidence](docs/ethonline/STATUS.md). Attribution is recorded in
+CONTINUITY.md in the source checkout.
+
 ~~~bash
 npm run typecheck
 npm test

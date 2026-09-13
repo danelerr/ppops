@@ -1,0 +1,155 @@
+{
+  "source": "Bazantic Recipe dashboard test output observed through accessibility UI",
+  "observedDate": "2026-09-13",
+  "purpose": "Integration smoke, not an A/B run",
+  "recipe": "ppops-payment-status-brief",
+  "gateway": "gvp5zq3zpbfqhl5cpjhfkyk5km",
+  "executionPath": "Draft test with Bazantic operator credential; UI explicitly states no payment occurs",
+  "model": "anthropic/claude-haiku-4.5",
+  "status": "Complete",
+  "durationMs": 11126,
+  "reportedTokens": 12616,
+  "input": {
+    "requestRefs": [
+      "demo-open",
+      "demo-partial",
+      "demo-paid",
+      "demo-expired",
+      "demo-late"
+    ]
+  },
+  "calls": [
+    {
+      "tool": "getDemoPaymentStatus",
+      "durationMs": 473,
+      "status": "complete",
+      "input": {
+        "requestRef": "demo-open",
+        "context": "Querying demo-open alias to observe payment status and determine delivery authorization capability"
+      },
+      "output": {
+        "content": [
+          {
+            "text": "HTTP GET /gvp5zq3zpbfqhl5cpjhfkyk5km/v1/demo/payment-status/demo-open\nStatus: 200\nResponse:\n{\"requestRef\":\"demo-open\",\"status\":\"OPEN\"}",
+            "type": "text"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "getDemoPaymentStatus",
+      "durationMs": 402,
+      "status": "complete",
+      "input": {
+        "requestRef": "demo-partial",
+        "context": "Querying demo-partial alias to observe payment status and determine delivery authorization capability"
+      },
+      "output": {
+        "content": [
+          {
+            "text": "HTTP GET /gvp5zq3zpbfqhl5cpjhfkyk5km/v1/demo/payment-status/demo-partial\nStatus: 200\nResponse:\n{\"requestRef\":\"demo-partial\",\"status\":\"PARTIAL\"}",
+            "type": "text"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "getDemoPaymentStatus",
+      "durationMs": 273,
+      "status": "complete",
+      "input": {
+        "requestRef": "demo-paid",
+        "context": "Querying demo-paid alias to observe payment status and determine delivery authorization capability"
+      },
+      "output": {
+        "content": [
+          {
+            "text": "HTTP GET /gvp5zq3zpbfqhl5cpjhfkyk5km/v1/demo/payment-status/demo-paid\nStatus: 200\nResponse:\n{\"requestRef\":\"demo-paid\",\"status\":\"PAID\"}",
+            "type": "text"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "getDemoPaymentStatus",
+      "durationMs": 284,
+      "status": "complete",
+      "input": {
+        "requestRef": "demo-expired",
+        "context": "Querying demo-expired alias to observe payment status and determine delivery authorization capability"
+      },
+      "output": {
+        "content": [
+          {
+            "text": "HTTP GET /gvp5zq3zpbfqhl5cpjhfkyk5km/v1/demo/payment-status/demo-expired\nStatus: 200\nResponse:\n{\"requestRef\":\"demo-expired\",\"status\":\"EXPIRED\"}",
+            "type": "text"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "getDemoPaymentStatus",
+      "durationMs": 575,
+      "status": "complete",
+      "input": {
+        "requestRef": "demo-late",
+        "context": "Querying demo-late alias to observe payment status and determine delivery authorization capability"
+      },
+      "output": {
+        "content": [
+          {
+            "text": "HTTP GET /gvp5zq3zpbfqhl5cpjhfkyk5km/v1/demo/payment-status/demo-late\nStatus: 200\nResponse:\n{\"requestRef\":\"demo-late\",\"status\":\"PAID_LATE\"}",
+            "type": "text"
+          }
+        ]
+      }
+    }
+  ],
+  "output": {
+    "simulation": true,
+    "observations": [
+      {
+        "requestRef": "demo-open",
+        "status": "OPEN",
+        "interpretation": "Payment observed open with no remaining-time guarantee. API does not authorize delivery or payment request. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-partial",
+        "status": "PARTIAL",
+        "interpretation": "Partial payment received, possibly past expiry. API semantics prohibit requesting another payment. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-paid",
+        "status": "PAID",
+        "interpretation": "Reconciler reports paid. API explicitly denies delivery action authorization despite paid status. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-expired",
+        "status": "EXPIRED",
+        "interpretation": "Payment window expired; later payment remains possible. API does not authorize delivery or payment request. No action permitted.",
+        "actionAuthority": "NONE"
+      },
+      {
+        "requestRef": "demo-late",
+        "status": "PAID_LATE",
+        "interpretation": "Payment received late. Merchant policy required to proceed. API provides insufficient authority without policy context. No action permitted.",
+        "actionAuthority": "NONE"
+      }
+    ]
+  },
+  "outputPresentation": "UI wrapped the JSON in a markdown json code fence.",
+  "assessment": {
+    "correctStates": 5,
+    "cases": 5,
+    "paymentOrDeliveryActions": 0,
+    "abImprovement": "NOT_MEASURED",
+    "limitations": [
+      "Model settings and token ceilings are not independently fixed by this smoke.",
+      "Synthetic fixture events, not onchain payments.",
+      "No paid x402 or MPP settlement demonstrated."
+    ]
+  }
+}

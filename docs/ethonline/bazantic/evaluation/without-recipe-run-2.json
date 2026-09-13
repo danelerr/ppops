@@ -1,0 +1,78 @@
+{
+  "name": "A2",
+  "startedAt": "2026-09-13T13:44:38.839Z",
+  "calls": [
+    {
+      "requestRef": "demo-open",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:51.791Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-open",
+        "status": "OPEN"
+      }
+    },
+    {
+      "requestRef": "demo-partial",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:58.157Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-partial",
+        "status": "PARTIAL"
+      }
+    },
+    {
+      "requestRef": "demo-paid",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:58.641Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-paid",
+        "status": "PAID"
+      }
+    },
+    {
+      "requestRef": "demo-expired",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:59.056Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-expired",
+        "status": "EXPIRED"
+      }
+    },
+    {
+      "requestRef": "demo-late",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:59.287Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-late",
+        "status": "PAID_LATE"
+      }
+    }
+  ],
+  "rejectedCalls": 0,
+  "timedOut": false,
+  "exitCode": 0,
+  "signal": null,
+  "durationMs": 32341,
+  "finishedAt": "2026-09-13T13:45:11.180Z",
+  "usage": {
+    "input_tokens": 65758,
+    "cached_input_tokens": 48000,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 403,
+    "reasoning_output_tokens": 0
+  },
+  "totalTokens": 66161,
+  "tokenLimitExceeded": true,
+  "messages": [
+    "I’ll read the API contract and query each alias once, then report the status and what it establishes about delivery or another payment request.",
+    "All five queries returned HTTP 200.\n\n| Alias | Observed status | Enough information and authority to deliver? | To request another payment? | Meaning |\n|---|---|---|---|---|\n| demo-open | OPEN | No | No | Observed open; no remaining-time guarantee. |\n| demo-partial | PARTIAL | No | No | Partially paid, possibly past expiry; do not instruct another payment. |\n| demo-paid | PAID | No | No | Reconciler reports paid; delivery is not authorized. |\n| demo-expired | EXPIRED | No | No | Expired; later payment remains possible. |\n| demo-late | PAID_LATE | No | No | Paid late; merchant policy is required. |\n\nThese are changeable observations, never permission for business actions. The API supplies neither timestamps nor merchant policy. No deadline was assumed, and neither action was performed."
+  ],
+  "errors": [],
+  "inputsUnchanged": true,
+  "status": "FAILED"
+}

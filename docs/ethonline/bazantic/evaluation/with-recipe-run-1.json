@@ -1,0 +1,45 @@
+{
+  "name": "B1",
+  "startedAt": "2026-09-13T13:43:16.891Z",
+  "calls": [
+    {
+      "requestRef": "demo-open",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:43:38.496Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-open",
+        "status": "OPEN"
+      }
+    },
+    {
+      "requestRef": "demo-partial",
+      "status": "failed"
+    },
+    {
+      "requestRef": "demo-paid",
+      "status": "complete",
+      "startedAt": "2026-09-13T13:44:14.906Z",
+      "httpStatus": 200,
+      "response": {
+        "requestRef": "demo-paid",
+        "status": "PAID"
+      }
+    }
+  ],
+  "rejectedCalls": 0,
+  "timedOut": true,
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "durationMs": 60017,
+  "finishedAt": "2026-09-13T13:44:16.907Z",
+  "usage": null,
+  "totalTokens": null,
+  "tokenLimitExceeded": false,
+  "messages": [
+    "I’ll read the API contract, then query each alias once and report the observed status and action limits."
+  ],
+  "errors": [],
+  "inputsUnchanged": true,
+  "status": "FAILED"
+}
